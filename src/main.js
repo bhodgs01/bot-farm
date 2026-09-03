@@ -618,7 +618,11 @@ async function boot() {
         colony.restoreLayout(state.plots)
         // And the settings, but only for a browser that has none of its own — an explicit
         // choice made here always outranks the file.
-        if (!hasStoredSettings() && state.settings) settings.applyAll(state.settings)
+        // The colony file's copy predates the tilt-shift default flip unless it says otherwise.
+        if (!hasStoredSettings() && state.settings) {
+          const shared = state.settings.settingsVersion >= 2 ? state.settings : { ...state.settings, tiltShift: false }
+          settings.applyAll(shared)
+        }
       })
       .catch(() => {
         /* first run, or the file is gone — an empty colony state is a valid one */
@@ -658,7 +662,7 @@ settings.onChange((changed, scope) => {
   // Kept in the colony file as well as in this browser's own storage. `localStorage` is
   // per *origin*, so a dev server that comes back on a different port looks to the browser
   // like a different site and hands you factory settings — the file does not care.
-  state.settings = { ...settings.values }
+  state.settings = { ...settings.values, settingsVersion: 2 }
   queueSave()
   if (scope.render || changed.has('fov')) engine.applySettings()
   colony.onSettingsChanged(changed, scope)

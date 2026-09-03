@@ -9,6 +9,8 @@
 const STORE_KEY = 'botcrossing.settings.v1'
 /** Pre-rename key. Read once so an existing colony keeps the settings it was tuned to. */
 const LEGACY_STORE_KEY = 'cosmo.settings.v1'
+/** Set once the stored tilt-shift default has been migrated off. */
+const TILT_MIGRATION_KEY = 'botfarm.tiltshift.v2'
 
 /**
  * What a fresh install opens on. Fixed rather than guessed from the device: `autoQuality`
@@ -266,7 +268,16 @@ function load() {
       }
     }
     const raw = JSON.parse(stored || '{}')
-    return raw && typeof raw === 'object' ? raw : {}
+    const values = raw && typeof raw === 'object' ? raw : {}
+    // One-time migration: tilt-shift used to default on, and its focus plane leaves the near
+    // and far hexes blurred once the camera rests at the isometric pitch. Anyone who had it
+    // on by default gets it switched off once; turning it back on afterwards sticks.
+    if (values.tiltShift === true && !localStorage.getItem(TILT_MIGRATION_KEY)) {
+      values.tiltShift = false
+      localStorage.setItem(STORE_KEY, JSON.stringify(values))
+    }
+    localStorage.setItem(TILT_MIGRATION_KEY, '1')
+    return values
   } catch {
     return {}
   }
