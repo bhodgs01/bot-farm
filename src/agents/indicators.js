@@ -8,6 +8,9 @@ import {
   mdiSleep,
   mdiCreation,
   mdiLogout,
+  mdiEmail,
+  mdiPrinter3d,
+  mdiPlay,
 } from '@mdi/js'
 
 /**
@@ -20,8 +23,8 @@ import {
  * when you have pulled the camera right out.
  */
 
-const COLS = 4
-const ROWS = 2
+const COLS = 5
+const ROWS = 3
 
 /** Where the badge's bottom edge sits: a shade above the crown of the helmet. */
 const HEAD_CLEAR = 1.42
@@ -36,6 +39,9 @@ export const BADGE = {
   sleeping: 5,
   spawning: 6,
   leaving: 7,
+  mail: 8, // unread inbound mail, standing patiently on its client's hex
+  print: 9, // a print request: mail carrying a model file
+  watching: 10, // a Plex stream in progress
 }
 
 /** Badge tint. Pushed past 1.0 so the bloom pass gives them a soft halo. */
@@ -48,6 +54,9 @@ const BADGE_COLOR = {
   5: [0.9, 1.0, 1.7],
   6: [2.4, 1.4, 0.75],
   7: [1.2, 1.3, 1.35],
+  8: [2.7, 1.9, 0.55],
+  9: [0.6, 1.9, 2.8],
+  10: [2.6, 1.2, 0.5],
 }
 
 /**
@@ -61,6 +70,9 @@ const FADE_BY_BADGE = {
   [BADGE.working]: 0.4,
   [BADGE.spawning]: 0.5,
   [BADGE.leaving]: 0.5,
+  [BADGE.mail]: 0,
+  [BADGE.print]: 0,
+  [BADGE.watching]: 0.3,
   [BADGE.paused]: 0.6,
   [BADGE.sleeping]: 1,
 }
@@ -247,7 +259,7 @@ export class Indicators {
  * — the glyph has to carry as a silhouette. Material's set is drawn filled to begin with,
  * one closed path per icon, so there is nothing to stroke and nothing to parse.
  */
-const ICON_PATHS = [mdiHelpCircle, mdiAlert, mdiHammer, mdiCheckBold, mdiPause, mdiSleep, mdiCreation, mdiLogout]
+const ICON_PATHS = [mdiHelpCircle, mdiAlert, mdiHammer, mdiCheckBold, mdiPause, mdiSleep, mdiCreation, mdiLogout, mdiEmail, mdiPrinter3d, mdiPlay]
 
 /**
  * The badge atlas. Red channel = the glyph, green channel = the plate's alpha — packing two

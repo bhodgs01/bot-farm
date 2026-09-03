@@ -50,12 +50,18 @@ export const ROSTER = [
   { id: 'mem',     name: 'Mem',     emoji: '🧠', role: 'second brain',         zone: 'KC Proto',          ns: ['graph-explorer', 'qdrant', 'neo4j', 'rag-parser'],           url: 'https://brain.kcproto.com' },
   { id: 'vera',    name: 'Vera',    emoji: '🎙️', role: 'voice AI',             zone: 'KC Proto',          ns: ['jarvis-hud', 'jarvis-watch'],                                url: 'https://hud.kcproto.com' },
   { id: 'janine',  name: 'Janine',  emoji: '💁‍♀️', role: 'email receptionist',   zone: 'KC Proto',          ns: ['janine', 'janine2'],                                         url: 'https://janine.kcproto.com' },
-  { id: 'cole',    name: 'COLE',    emoji: '🛡️', role: 'incident response',    zone: 'KC Proto',          ns: ['watchdog', 'anthropic-watch'],                 url: 'https://watchdog.kcproto.com' },
+  { id: 'cole',    name: 'COLE',    emoji: '🛡️', role: 'incident response',    zone: 'Watchdog',          ns: ['watchdog', 'anthropic-watch'],                 url: 'https://watchdog.kcproto.com' },
   { id: 'jim',     name: 'Jim',     emoji: '📋', role: 'helpdesk',             zone: 'KC Proto',          ns: ['ticket-bot', 'kuma-ticket-bridge', 'embassy-tickets'],       url: 'https://ticket_bot.kcproto.com' },
   { id: 'phyllis', name: 'Phyllis', emoji: '🧐', role: 'QA inspector',         zone: 'KC Proto',          ns: ['backup-monitor', 'backups', 'kev-fleet-check'],              url: '' },
   { id: 'frank',   name: 'Frank',   emoji: '🧑‍🎨', role: 'designer',             zone: 'KC Proto',          ns: ['kcaistudio'],                                                url: '' },
-  { id: 'adam',    name: 'Adam',    emoji: '🛠️', role: 'print farm operator',  zone: 'KC Proto',          ns: ['print-farm', 'print-service', 'octofarm'],                   url: 'https://print.kcproto.com' },
+  { id: 'adam',    name: 'Adam',    emoji: '🛠️', role: 'print farm operator',  zone: 'Print Service',          ns: ['print-farm', 'print-service', 'octofarm'],                   url: 'https://print.kcproto.com' },
   { id: 'clawd',   name: 'Clawd',   emoji: '🦞', role: 'chaos gremlin',        zone: 'KC Proto',          ns: ['clawd-dashboard'],                                           url: 'https://agents.kcproto.com/clawd-chat.html', probe: process.env.CLAWD_PROBE || '' },
+  { id: 'frances', name: 'Frances', emoji: '🩺', role: 'caregiver AI',         zone: 'Frances',           ns: ['caregiver'],                                                 url: 'https://caregiver.kcproto.com' },
+  { id: 'grader',  name: 'Grader',  emoji: '🧮', role: 'compliance grader',    zone: 'CyberGrade',        ns: ['cybergrade', 'cybergrade-api'],                              url: '' },
+  { id: 'clayton', name: 'Clayton', emoji: '🎤', role: 'presentation host',    zone: 'Clayton',           ns: ['clayton'],                                                   url: '' },
+  { id: 'atlas',   name: 'Atlas',   emoji: '⌚', role: 'wearable demo',        zone: 'Atlas',             ns: ['atlas-demo'],                                                url: '' },
+  { id: 'franky',  name: 'Franky',  emoji: '🚀', role: 'xprize',               zone: 'Franky',            ns: ['franky'],                                                    url: '' },
+  { id: 'plex',    name: 'Plex',    emoji: '📺', role: 'media server',         zone: 'Plex',              ns: ['plex'],                                                      url: 'https://app.plex.tv/desktop' },
   { id: 'biff',    name: 'Biff',    emoji: '🧑‍💼', role: 'club operations',      zone: 'KC AI Club',        ns: ['aiclub'],                                                    url: 'https://ai-club.kcproto.com/#/biff' },
   { id: 'marc',    name: 'Marc',    emoji: '🌿', role: 'landscape ops',        zone: 'Embassy Landscape', ns: ['marc', 'aspire-portal', 'irrigation-mapper', 'inspire-fallback'], url: 'https://inspire.kcproto.com' },
   { id: 'rusty',   name: 'Rusty',   emoji: '⛽', role: 'oil wells',            zone: 'CorrosionDC',       ns: ['corrosiondc'],                                               url: 'https://wellz.kcproto.com' },
@@ -250,6 +256,13 @@ async function appSignals() {
       return t && now - t < ESCALATION_WINDOW_MS && kind.includes('escalat')
     })
     const failingPods = Number(cluster?.podsFail) || 0
+    // Every unhealthy service stands on the Watchdog hex, slumped, until it recovers.
+    out._watchdogServices = unhealthy.map(([name, s]) => ({
+      name,
+      failures: Number(s.consecutiveFailures) || 0,
+      error: String(s.lastError || '').slice(0, 160),
+      since: Number(s.lastAlerted) || now,
+    }))
     out.cole = {
       running: unhealthy.length > 0 || failingPods > 0,
       unread: recentEscalations.length > 0,
@@ -423,7 +436,41 @@ async function currentSignals() {
 async function scanThreads() {
   const [snap, signals] = await Promise.all([clusterSnapshot(), currentSignals()])
   const probes = await Promise.all(ROSTER.map((a) => (a.probe ? probe(a.probe) : Promise.resolve(null))))
-  return ROSTER.map((agent, i) => deriveAgent(agent, snap, signals, probes[i]))
+  const agents = ROSTER.map((agent, i) => deriveAgent(agent, snap, signals, probes[i]))
+  return agents.concat(watchdogThreads(signals._watchdogServices || []))
+}
+
+/** One slumped astronaut per service the watchdog currently calls unhealthy. */
+function watchdogThreads(services) {
+  const now = Date.now()
+  return services.map((svc) => ({
+    id: `watchdog:${svc.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    title: `⚠ ${svc.name}`,
+    preview: svc.error || `${svc.failures} consecutive failures`,
+    project: 'Watchdog',
+    projectPath: 'cluster://watchdog',
+    worktree: '',
+    cwd: 'watchdog',
+    gitBranch: 'unhealthy',
+    model: `${svc.failures} failures`,
+    effort: '',
+    createdAt: svc.since || now,
+    lastActivityAt: now,
+    lastFocusedAt: 0,
+    running: false,
+    unread: false,
+    hasError: true,
+    starred: false,
+    routine: '',
+    prState: '',
+    archived: false,
+    hasTranscript: true,
+    sizeBytes: 1000 * (1 + svc.failures * 50),
+    source: 'watchdog',
+    canOpen: true,
+    canArchive: false,
+    ref: { agent: 'cole', url: 'https://watchdog.kcproto.com' },
+  }))
 }
 
 let detectCache = { at: 0, ok: false }

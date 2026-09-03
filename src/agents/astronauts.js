@@ -32,6 +32,9 @@ const SUIT_TONES = [0xf3f1ec, 0xe8e4dc, 0xf7f4ee, 0xdfe4e8, 0xf1e9df]
 const AGENT_LOOK = {
   working: { trim: 0x4f9a63, eye: [0.35, 2.5, 1.15] },
   waiting: { trim: 0x4f7ec9, eye: [0.45, 1.5, 3.0] },
+  mail: { trim: 0xc9a24f, eye: [2.4, 1.8, 0.6] },
+  print: { trim: 0x4fa3c9, eye: [0.6, 1.8, 2.7] },
+  watching: { trim: 0xc9784f, eye: [2.6, 1.3, 0.5] },
   blocked: { trim: 0xc94f4f, eye: [3.0, 0.5, 0.45] },
   celebrating: { trim: 0xc9a24f, eye: [2.9, 2.1, 0.6] },
   idle: { trim: 0x8b8b85, eye: [1.1, 1.5, 1.7] },
@@ -1012,7 +1015,7 @@ export class Astronauts {
       agent.faceFrame = FACE.idle
       return
     }
-    const rate = agent.status === 'working' ? 0.22 : 0.55
+    const rate = agent.status === 'working' || agent.status === 'watching' ? 0.22 : 0.55
     if (agent.faceTimer > rate) {
       agent.faceTimer = 0
       agent.faceIndex = (agent.faceIndex + 1) % loop.length
@@ -1045,10 +1048,16 @@ export class Astronauts {
     else {
       switch (agent.status) {
         case 'working':
+        case 'watching':
           key = 'work'
           break
         case 'waiting':
           key = 'wave'
+          break
+        // Mail waits patiently: no waving, the glyph over its head does the asking.
+        case 'mail':
+        case 'print':
+          key = 'idle'
           break
         case 'blocked':
           key = 'hit'

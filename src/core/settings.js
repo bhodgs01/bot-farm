@@ -72,7 +72,7 @@ export const PRESETS = {
       maxAgents: 90,
       stars: true,
       ibl: true,
-      tiltShift: true,
+      tiltShift: false, // off by default here: the focus plane drifts off the colony when the camera idles
     },
   },
   high: {
@@ -90,7 +90,7 @@ export const PRESETS = {
       maxAgents: 140,
       stars: true,
       ibl: true,
-      tiltShift: true,
+      tiltShift: false, // off by default here: the focus plane drifts off the colony when the camera idles
     },
   },
   ultra: {
@@ -108,7 +108,7 @@ export const PRESETS = {
       maxAgents: 200,
       stars: true,
       ibl: true,
-      tiltShift: true,
+      tiltShift: false, // off by default here: the focus plane drifts off the colony when the camera idles
     },
   },
 }

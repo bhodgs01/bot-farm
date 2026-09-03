@@ -40,6 +40,9 @@ const ICON = {
 const STAT_DEFS = [
   { key: 'working', label: 'building', cls: 'working' },
   { key: 'waiting', label: 'need you', cls: 'waiting' },
+  { key: 'mail', label: 'mail', cls: 'waiting' },
+  { key: 'print', label: 'print requests', cls: 'waiting' },
+  { key: 'watching', label: 'streaming', cls: 'working' },
   { key: 'blocked', label: 'blocked', cls: 'blocked' },
   { key: 'celebrating', label: 'shipped', cls: 'done' },
   { key: 'agents', label: 'crew', cls: 'idle' },
@@ -430,7 +433,7 @@ export class Hud {
     this.$('#btn-copy-path').disabled = !project.path
 
     const n = project.threads.length
-    const waiting = project.threads.filter((t) => t.status === 'waiting' || t.status === 'blocked').length
+    const waiting = project.threads.filter((t) => ['waiting', 'blocked', 'mail', 'print'].includes(t.status)).length
     this.$('.side .threads-head').innerHTML =
       `<span>${n} thread${n === 1 ? '' : 's'}</span>` + (waiting ? `<span class="want">${waiting} need you</span>` : '')
 
@@ -743,8 +746,8 @@ function escapeHtml(s) {
 
 /** Status → the colour family the top-bar counters already use for it. */
 function statusClass(status) {
-  if (status === 'working') return 'working'
-  if (status === 'waiting') return 'waiting'
+  if (status === 'working' || status === 'watching') return 'working'
+  if (status === 'waiting' || status === 'mail' || status === 'print') return 'waiting'
   if (status === 'blocked') return 'blocked'
   if (status === 'celebrating') return 'done'
   return 'idle'
@@ -907,10 +910,13 @@ const TEMPLATE = `
       </div>
     </div>
     <div style="margin-top:16px">
-      <div class="legend-row"><i class="badge" style="background:#1a2b46;color:#8fb4ee">?</i> waiting on your reply — click to open the thread</div>
-      <div class="legend-row"><i class="badge" style="background:#3d1c1c;color:#e88b8b">!</i> the session hit an error</div>
+      <div class="legend-row"><i class="badge" style="background:#1a2b46;color:#8fb4ee">?</i> an agent is waiting on you: click to open its dashboard</div>
+      <div class="legend-row"><i class="badge" style="background:#3a2d10;color:#f0c46a">&#9993;</i> unread mail from that client, waiting patiently on its hex</div>
+      <div class="legend-row"><i class="badge" style="background:#10303a;color:#7fd0f0">&#9113;</i> a print request came in</div>
+      <div class="legend-row"><i class="badge" style="background:#3a2210;color:#f0a06a">&#9654;</i> somebody is watching Plex</div>
+      <div class="legend-row"><i class="badge" style="background:#3d1c1c;color:#e88b8b">!</i> something is crashing, unready, or not answering</div>
       <div class="legend-row"><i class="badge" style="background:#16301f;color:#7fd39a">⚒</i> running right now, building</div>
-      <div class="legend-row"><i class="badge" style="background:#332b12;color:#e6c67f">✓</i> its pull request landed</div>
+      <div class="legend-row"><i class="badge" style="background:#332b12;color:#e6c67f">✓</i> shipped: good news worth a glance</div>
       <div class="legend-row"><i class="badge" style="background:#1d1f2e;color:#a9a8c0">z</i> nothing for three days</div>
     </div>
     <div style="margin-top:18px;display:flex;justify-content:flex-end">

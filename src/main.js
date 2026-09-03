@@ -104,7 +104,9 @@ const actions = {
   /** Fly to the next astronaut in a given state, cycling through them on repeat presses. */
   focusStatus: (status) => {
     const key = status === 'agents' ? null : status
-    const pool = colony.astronauts.agents.filter((a) => (key ? a.status === key : true))
+    // 'waiting' is the attention pool: everything that wants a human, not just the ? badge.
+    const wanted = key === 'waiting' ? new Set(['waiting', 'blocked', 'mail', 'print']) : key ? new Set([key]) : null
+    const pool = colony.astronauts.agents.filter((a) => (wanted ? wanted.has(a.status) : true))
     if (!pool.length) {
       hud.hint(key ? `Nobody is ${(STATUS_LABEL[key] || key).toLowerCase()} right now` : 'No crew on the surface')
       return

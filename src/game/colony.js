@@ -46,11 +46,14 @@ const LIVE_GROWTH = 0.004
 /** How many zones' positions to remember, including repos with nothing running in them. */
 const LAYOUT_MEMORY = 80
 
-export const STATUS_ORDER = ['blocked', 'waiting', 'working', 'celebrating', 'idle', 'sleeping']
+export const STATUS_ORDER = ['blocked', 'mail', 'print', 'waiting', 'working', 'watching', 'celebrating', 'idle', 'sleeping']
 
 export const STATUS_LABEL = {
   working: 'Working',
   waiting: 'Waiting on you',
+  mail: 'New mail',
+  print: 'Print request',
+  watching: 'Streaming',
   blocked: 'Blocked',
   celebrating: 'Shipped',
   idle: 'Idle',
@@ -61,6 +64,10 @@ export const STATUS_LABEL = {
 
 /** Thread → behaviour. First match wins, exactly like the board's auto-sort. */
 export function statusFor(thread, now = Date.now()) {
+  // Events are their own thing: a mail is never 'running' or 'errored', it just waits.
+  if (thread.kind === 'mail') return 'mail'
+  if (thread.kind === 'print') return 'print'
+  if (thread.kind === 'watching') return 'watching'
   if (thread.hasError) return 'blocked'
   if (thread.running) return 'working'
   if (thread.prState === 'MERGED') return 'celebrating'
@@ -76,6 +83,9 @@ export function statusFor(thread, now = Date.now()) {
  */
 const BADGE_FOR = {
   waiting: BADGE.waiting,
+  mail: BADGE.mail,
+  print: BADGE.print,
+  watching: BADGE.watching,
   blocked: BADGE.blocked,
   working: BADGE.working,
   celebrating: BADGE.done,
@@ -154,7 +164,7 @@ export class Colony {
     this.activePlots = new Set()
     this._dustTint = new THREE.Color(this.planet.ground.high)
     this._c = new THREE.Color()
-    this.stats = { agents: 0, projects: 0, working: 0, waiting: 0, blocked: 0, done: 0 }
+    this.stats = { agents: 0, projects: 0, working: 0, waiting: 0, mail: 0, print: 0, watching: 0, blocked: 0, done: 0 }
 
     this._buildTerrain()
   }
@@ -295,8 +305,9 @@ export class Colony {
       list.forEach((thread, i) => {
         const status = statusFor(thread, now)
         if (stats[status] !== undefined) stats[status]++
-        if (status === 'waiting' || status === 'blocked') urgent.add(plot.id)
-        if (status === 'waiting' || status === 'blocked' || status === 'working') active.add(plot.id)
+        const wantsYou = status === 'waiting' || status === 'blocked' || status === 'mail' || status === 'print'
+        if (wantsYou) urgent.add(plot.id)
+        if (wantsYou || status === 'working' || status === 'watching') active.add(plot.id)
         stats.agents++
 
         const building = this._syncBuilding(thread, plot, i)
@@ -729,7 +740,7 @@ export class Colony {
       // under it. Everything thrown off an astronaut has to land back on the same surface.
       const ground = agent.groundY || 0
 
-      if (agent.state === 'at-site' && agent.status === 'working') {
+      if (agent.state === 'at-site' && (agent.status === 'working' || agent.status === 'watching')) {
         // Sparks on the downbeat of the hammer swing, not every frame.
         const swing = Math.sin(agent.workSwing)
         if (swing < -0.75 && !agent._sparked) {
