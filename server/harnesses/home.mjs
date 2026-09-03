@@ -64,11 +64,13 @@ function base(entityId, attrs, kind, extra = {}) {
 
 /** `Front door sensor Contact Sensor` → `Front door`. */
 function doorName(attrs, entityId) {
-  return String(attrs.friendly_name || entityId.split('.')[1])
+  const raw = String(attrs.friendly_name || entityId.split('.')[1])
+  const cleaned = raw
     .replace(/\s*contact sensor\s*$/i, '')
     .replace(/\s*sensor\s*$/i, '')
-    .replace(/\s*opener door\s*$/i, ' door')
-    .trim() || entityId
+    .replace(/\s*opener door\s*$/i, '')
+    .trim()
+  return cleaned || raw.trim() || entityId
 }
 
 /** Plants have their soil sensor named after them; the sensor id is the plant's id. */
@@ -104,6 +106,8 @@ async function fetchThreads() {
       continue
     }
 
+    // A group entity (it lists members in attributes.entity_id) is a roll-up, not a door.
+    if (domain === 'binary_sensor' && Array.isArray(a.entity_id)) continue
     if (domain === 'binary_sensor' && (DOOR_CLASSES.has(cls) || /door|window/i.test(id)) && !VISITOR_CLASSES.has(cls) && !/motion|obstruction|button|motor|dry_contact/i.test(id) && !NOT_A_DOOR.test(a.friendly_name || id)) {
       if (s.state === 'on' || s.state === 'off') doors.push({ name: doorName(a, id), open: s.state === 'on', changed })
       continue

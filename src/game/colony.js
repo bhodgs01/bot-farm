@@ -671,6 +671,7 @@ export class Colony {
         ? { height: 0.34, dot: false, pad: 10, fontSize: 40, opacity: 1, color: '#fff3d6' }
         : { height: 0.3, dot: false, pad: 10, fontSize: 32, opacity: 0.92 }
       const mesh = createLabel(text, accent, 4, opts)
+      mesh.visible = true // the label factory starts hidden for the zone plates' fade-in
       mesh.renderOrder = 11
       this.plateGroup.add(mesh)
       const plate = { mesh, text, kind }

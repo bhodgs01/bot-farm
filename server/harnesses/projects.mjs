@@ -3,8 +3,7 @@
  *
  * Janine keeps the board (`/api/projects`, the same list the clawd dashboard renders).
  * A prospect needs a follow-up and holds a `?`; a project in process hammers away; an
- * active one is delivered and unpaid, so it also holds a `?` until the money lands. Paid
- * and completed projects are gone. The card reads client, project, type and the total.
+ * active one is an ongoing client and just stands there. Paid and completed are gone. The card reads client, project, type and the total.
  *
  * Read-only: one GET per poll.
  */
@@ -17,7 +16,7 @@ const PRINT_RATE = Number(process.env.PJ_PRINT_RATE) || 0.3
 const SETUP_FEE = Number(process.env.PJ_SETUP_FEE) || 3
 
 const SHOW = new Set(['prospect', 'in_process', 'active'])
-const LABEL = { prospect: 'prospect', in_process: 'in process', active: 'delivered, unpaid' }
+const LABEL = { prospect: 'prospect', in_process: 'in process', active: 'active client' }
 
 /** The dashboard's own total: labor + material + per-gram print charge + expenses. */
 function total(p) {
@@ -47,7 +46,7 @@ async function fetchThreads() {
       return {
         id: `project:${p.id}`,
         kind: 'project',
-        title: `${p.status === 'prospect' ? '🤝' : p.status === 'in_process' ? '🔧' : '💵'} ${who}`,
+        title: `${p.status === 'prospect' ? '🤝' : p.status === 'in_process' ? '🔧' : '🏷️'} ${who}`,
         preview: [what, LABEL[p.status], amount ? money(amount) : 'no price yet', p.type ? String(p.type).replace('_', ' ') : '', p.priority ? `${p.priority} lead` : '', `${age}d on the board`]
           .filter(Boolean)
           .join(' · '),
@@ -62,7 +61,7 @@ async function fetchThreads() {
         lastActivityAt: started,
         lastFocusedAt: 0,
         running: p.status === 'in_process',
-        unread: p.status === 'prospect' || p.status === 'active',
+        unread: p.status === 'prospect',
         hasError: false,
         starred: p.priority === 'hot',
         routine: '',
