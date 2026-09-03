@@ -347,12 +347,20 @@ export class Engine {
 
     const fps = this.perf.fps
     if (fps <= 0) return
+    // A window that is hidden, occluded or simply not focused gets its animation frames
+    // throttled by the browser. Those slow frames say nothing about the GPU, and reacting
+    // to them is how a colony left open on a second monitor quietly turns to mush.
+    if (document.hidden || (typeof document.hasFocus === 'function' && !document.hasFocus())) {
+      this._slow = 0
+      return
+    }
     const ceiling = this._targetScale()
     const current = this.viewport?.scale ?? ceiling
     // The floor is half the display's own resolution, not half a CSS pixel: on a retina
     // panel the old absolute 0.5 was a quarter-resolution buffer, which reads as broken
     // rather than as a machine having a hard time.
-    const floor = 0.35 * (window.devicePixelRatio || 1)
+    // Never below 60% of the display: lower reads as out of focus, not as a slow machine.
+    const floor = 0.6 * (window.devicePixelRatio || 1)
 
     // Sustained evidence, not one sample: 3 slow seconds to drop, 8 fast ones to climb.
     this._slow = fps < 45 ? (this._slow || 0) + 1 : 0
@@ -365,9 +373,9 @@ export class Engine {
       this._slow = 0
       // Having just proved this machine cannot hold the higher scale, do not go back and
       // ask it again ten seconds later — that is the oscillation.
-      this._climbAt = now + 30000
+      this._climbAt = now + 8000
     } else if (this._fast >= 8 && current < ceiling && now >= (this._climbAt || 0)) {
-      next = Math.min(ceiling, current + 0.1 * dpr)
+      next = Math.min(ceiling, current + 0.2 * dpr)
       this._fast = 0
     }
 
