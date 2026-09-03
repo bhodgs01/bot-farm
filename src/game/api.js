@@ -38,3 +38,6 @@ export const archiveThread = (thread, archived) =>
 export const newSession = (folder, harness) => post('/api/new-session', { folder, harness })
 
 export const revealFolder = (folder) => post('/api/reveal', { folder })
+
+/** Ask a worker what it needs. Gated at the edge; a 401 carries where to sign in. */
+export const askWorker = (thread, message) => post('/api/ask', { id: thread.id, message })

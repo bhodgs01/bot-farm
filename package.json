@@ -34,6 +34,7 @@
     "assets": "node tools/build-assets.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.123.0",
     "@mdi/js": "^7.4.47",
     "three": "^0.185.0"
   },

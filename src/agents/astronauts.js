@@ -1062,17 +1062,20 @@ export class Astronauts {
         // Mail waits patiently: no waving, the glyph over its head does the asking.
         case 'mail':
         case 'print':
-        case 'door':
           key = 'idle'
           break
+        case 'door':
+          key = 'wave'
+          break
         case 'plant':
-          key = 'hit'
+          key = 'wave'
           break
         case 'visitor':
           key = 'wave'
           break
+        // A problem is a raised hand, not a slump: you should be able to spot it from orbit.
         case 'blocked':
-          key = 'hit'
+          key = 'wave'
           break
         case 'celebrating':
           key = 'cheer'

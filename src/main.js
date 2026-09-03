@@ -17,6 +17,7 @@ import {
   archiveThread,
   newSession,
   revealFolder,
+  askWorker,
 } from './game/api.js'
 
 /**
@@ -138,6 +139,32 @@ const actions = {
     pool.sort((a, b) => a.id.localeCompare(b.id))
     const agent = pool[statusCursor++ % pool.length]
     select(agent.id, { fly: true })
+  },
+
+  /** Fly to one astronaut from the queue. */
+  focusThread: (id) => {
+    if (!id || !colony.agentFor(id)) return
+    select(id, { fly: true })
+  },
+
+  /** Ask the selected worker something. The reply lands in the card's transcript. */
+  askWorker: async (text) => {
+    const thread = threads.find((t) => t.id === selectedId)
+    if (!thread) return
+    hud.appendChat(thread.id, 'me', text)
+    hud.appendChat(thread.id, 'pending', '…')
+    try {
+      const res = await askWorker(thread, text)
+      hud.appendChat(thread.id, 'worker', res.reply || '…')
+    } catch (err) {
+      const msg = String(err?.message || err)
+      if (/sign in/i.test(msg) || /401/.test(msg) || /Failed to fetch/i.test(msg)) {
+        hud.appendChat(thread.id, 'worker', 'You need to sign in first. A sign-in tab just opened; come back and ask again.')
+        window.open('/api/ask/auth', '_blank', 'noopener')
+      } else {
+        hud.appendChat(thread.id, 'worker', `I could not answer: ${msg}`)
+      }
+    }
   },
 
   focusProject: (name) => {
@@ -574,6 +601,7 @@ function applyThreads(list) {
   const archivedSet = new Set(state.archived)
   const stats = colony.setThreads(list, archivedSet)
   hud.setStats(stats)
+  hud.setQueue(queueItems())
 
   legendProjects = colony.plotOrder
     .map((plot) => ({
@@ -699,6 +727,26 @@ settings.onChange((changed, scope) => {
   if (changed.has('showFps')) hud.syncSettings()
   if (changed.has('maxAgents')) applyThreads(threads)
 })
+
+// ── the queue ────────────────────────────────────────────────────────────────────────
+
+/** Everyone who wants a human, most urgent first: a problem before a mail, a mail before a task. */
+const QUEUE_ORDER = ['blocked', 'visitor', 'door', 'plant', 'print', 'mail', 'waiting']
+function queueItems() {
+  const rank = new Map(QUEUE_ORDER.map((s, i) => [s, i]))
+  return colony.astronauts.agents
+    .filter((a) => rank.has(a.status) && a.thread && a.state !== 'gone')
+    .sort((a, b) => rank.get(a.status) - rank.get(b.status) || (b.thread.lastActivityAt || 0) - (a.thread.lastActivityAt || 0))
+    .map((a) => ({
+      id: a.id,
+      title: a.thread.title,
+      status: a.status,
+      label: STATUS_LABEL[a.status] || a.status,
+      project: a.thread.project,
+      count: Number(a.thread.count) || 0,
+      need: String(a.thread.preview || '').split('\n')[0],
+    }))
+}
 
 // ── real time ─────────────────────────────────────────────────────────────────────────
 

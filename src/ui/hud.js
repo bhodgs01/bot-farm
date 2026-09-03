@@ -336,6 +336,20 @@ export class Hud {
     on('#btn-planet', 'click', () => this.actions.cyclePlanet?.())
     on('#btn-time', 'click', () => this.actions.cycleTime?.())
     on('#btn-open', 'click', () => this.actions.openThread?.())
+    on('#btn-collapse', 'click', () => this.toggleCollapse())
+    this.$('.thread-pop form.ask').addEventListener('submit', (e) => {
+      e.preventDefault()
+      const input = this.$('.thread-pop form.ask input')
+      const text = input.value.trim()
+      if (!text) return
+      input.value = ''
+      this.actions.askWorker?.(text)
+    })
+    // Keys typed into the chat box are for the worker, not the map.
+    this.$('.thread-pop form.ask input').addEventListener('keydown', (e) => e.stopPropagation())
+    try {
+      if (localStorage.getItem('botfarm.side.collapsed') === '1') this.toggleCollapse(true)
+    } catch {}
     on('#btn-archive', 'click', () => this.actions.archiveThread?.())
     on('#btn-deselect', 'click', () => this.actions.select?.(null))
     on('#btn-new-session', 'click', () => this.actions.newConversation?.())
@@ -491,6 +505,10 @@ export class Hud {
    */
   setSelection(agent, thread) {
     const card = this.$('.thread-pop')
+    if (thread && this._chatFor !== thread.id) {
+      this._chatFor = thread.id
+      this.renderChat(thread.id)
+    }
     // Only ever one accent button in the panel: whichever action is the immediate one.
     this.$('#btn-new-session').classList.toggle('primary', !agent || !thread)
     if (!agent || !thread) {
@@ -522,6 +540,62 @@ export class Hud {
     // often is how a HUD starts costing frames.
     this._cardSize = { w: card.offsetWidth, h: card.offsetHeight }
     this.$('#btn-open').disabled = thread.canOpen === false
+  }
+
+  /** Fold the panel down to its brand bar. Remembered per browser. */
+  toggleCollapse(force) {
+    const side = this.$('.side')
+    const on = force ?? !side.classList.contains('collapsed')
+    side.classList.toggle('collapsed', on)
+    this.$('#btn-collapse').title = on ? 'Expand the panel' : 'Collapse the panel'
+    this.$('#btn-collapse').classList.toggle('flip', on)
+    try {
+      localStorage.setItem('botfarm.side.collapsed', on ? '1' : '0')
+    } catch {}
+  }
+
+  /**
+   * The queue: everyone who wants a human, most urgent first. Click a row to fly there.
+   */
+  setQueue(items) {
+    const key = items.map((i) => `${i.id}:${i.status}:${i.count || 0}`).join('|')
+    if (this._last.queue === key) return
+    this._last.queue = key
+    this.$('.q-count').textContent = String(items.length)
+    this.$('.queue-pane').dataset.empty = String(items.length === 0)
+    const wrap = this.$('.queue')
+    const shown = items.slice(0, 40)
+    wrap.innerHTML =
+      shown
+        .map(
+          (i) =>
+            `<button class="row ${statusClass(i.status)}" data-id="${escapeHtml(i.id)}" title="${escapeHtml(i.need || '')}">` +
+            `<i class="dot"></i><span class="t">${escapeHtml(i.title)}${i.count ? ` <b>${i.count}</b>` : ''}</span>` +
+            `<span class="w">${escapeHtml(i.label)}</span><span class="p">${escapeHtml(i.project)}</span></button>`
+        )
+        .join('') + (items.length > shown.length ? `<div class="more">… and ${items.length - shown.length} more</div>` : '')
+    for (const row of wrap.querySelectorAll('.row')) {
+      row.addEventListener('click', () => this.actions.focusThread?.(row.dataset.id))
+    }
+  }
+
+  /** The chat transcript for one worker, kept per thread for the life of the page. */
+  renderChat(id) {
+    this.chatLogs ||= new Map()
+    const log = this.$('.thread-pop .chat .log')
+    const turns = this.chatLogs.get(id) || []
+    log.innerHTML = turns.map((t) => `<div class="turn ${t.role}">${escapeHtml(t.text)}</div>`).join('')
+    log.scrollTop = log.scrollHeight
+    this._cardSize = { w: this.$('.thread-pop').offsetWidth, h: this.$('.thread-pop').offsetHeight }
+  }
+
+  appendChat(id, role, text) {
+    this.chatLogs ||= new Map()
+    const turns = this.chatLogs.get(id) || []
+    if (role === 'worker' && turns.length && turns[turns.length - 1].role === 'pending') turns.pop()
+    turns.push({ role, text })
+    this.chatLogs.set(id, turns.slice(-20))
+    if (this._chatFor === id) this.renderChat(id)
   }
 
   /**
@@ -824,9 +898,15 @@ const TEMPLATE = `
     <button class="btn icon ghost" id="btn-help" title="Help (?)">${ICON.help}</button>
     <button class="btn icon ghost" id="btn-hide" title="Hide all UI (H)">${ICON.eye}</button>
     <button class="btn icon ghost" id="btn-settings" title="Settings (S)" aria-pressed="false">${ICON.settings}</button>
+    <button class="btn icon ghost" id="btn-collapse" title="Collapse the panel">${ICON.back}</button>
   </header>
 
   <div class="stats"></div>
+
+  <div class="queue-pane">
+    <div class="sec-head"><span>Needs you</span><b class="q-count">0</b></div>
+    <div class="queue"></div>
+  </div>
 
   <div class="side-body">
     <div class="projects-pane">
@@ -885,6 +965,13 @@ const TEMPLATE = `
   <div class="pair">
     <button class="btn primary" id="btn-open" title="Open this thread in the harness it came from (Enter)">${ICON.open} Open</button>
     <button class="btn" id="btn-archive" title="Archive — this astronaut walks back to the ship (A)">${ICON.archive} Archive</button>
+  </div>
+  <div class="chat">
+    <div class="log"></div>
+    <form class="ask" autocomplete="off">
+      <input name="q" placeholder="Ask what it needs…" maxlength="400">
+      <button class="btn primary" type="submit" title="Ask this worker">Ask</button>
+    </form>
   </div>
 </div>
 

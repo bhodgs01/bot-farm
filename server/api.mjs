@@ -11,6 +11,7 @@ import {
   scanThreads,
   setThreadArchived,
 } from './scan.mjs'
+import { ask, chatEnabled } from './ask.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = process.env.BOT_CROSSING_DATA || path.join(here, '..', 'data')
@@ -127,6 +128,52 @@ async function reconcileArchived(threads) {
   )
 }
 
+/**
+ * Who may talk to the workers. Behind Cloudflare Access the edge adds the signed-in email
+ * as `cf-access-authenticated-user-email`; the origin only trusts it when the request came
+ * through the tunnel (COLONY_PUBLIC) and the address is on the list. A workstation server
+ * only answers localhost, so there the gate is off.
+ */
+const CHAT_ALLOWED = new Set(
+  String(process.env.CHAT_ALLOWED_EMAILS || '')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+)
+function chatIdentity(req) {
+  if (process.env.COLONY_PUBLIC !== '1') return 'local'
+  const email = String(req.headers['cf-access-authenticated-user-email'] || '').toLowerCase()
+  return email && CHAT_ALLOWED.has(email) ? email : ''
+}
+
+/** A small bucket per caller: the workers are chatty but not that chatty. */
+const chatBuckets = new Map()
+function chatAllowed(who) {
+  const now = Date.now()
+  const b = chatBuckets.get(who) || { start: now, n: 0 }
+  if (now - b.start > 10 * 60 * 1000) Object.assign(b, { start: now, n: 0 })
+  b.n++
+  chatBuckets.set(who, b)
+  return b.n <= 40
+}
+
+/** The same first-match precedence the page uses, so the worker describes itself the way the map draws it. */
+function statusWord(t) {
+  if (t.kind === 'mail') return 'new mail'
+  if (t.kind === 'print') return 'print request'
+  if (t.kind === 'watching') return 'streaming'
+  if (t.kind === 'printing') return 'printing'
+  if (t.kind === 'door' || t.kind === 'doors') return t.hasError ? 'left open' : 'all shut'
+  if (t.kind === 'plant') return 'needs water'
+  if (t.kind === 'visitor') return 'movement'
+  if (t.hasError) return 'blocked'
+  if (t.running) return 'working'
+  if (t.prState === 'MERGED') return 'shipped'
+  if (t.unread) return 'waiting on you'
+  if (Date.now() - (t.lastActivityAt || 0) > 3 * 24 * 60 * 60 * 1000) return 'dormant'
+  return 'idle'
+}
+
 function send(res, status, body) {
   const payload = JSON.stringify(body)
   res.writeHead(status, {
@@ -226,6 +273,26 @@ export async function apiMiddleware(req, res, next) {
     if (url.pathname === '/api/threads' && req.method === 'GET') {
       const threads = await reconcileArchived(await scanThreads())
       return send(res, 200, { threads, scannedAt: Date.now() })
+    }
+
+    // A GET here exists only so the browser can complete the Access login in a tab.
+    if (url.pathname === '/api/ask/auth' && req.method === 'GET') {
+      const who = chatIdentity(req)
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
+      return res.end(`<!doctype html><meta charset=utf-8><title>Bot Farm</title><body style="font:15px system-ui;background:#0f1117;color:#e6e8ef;display:grid;place-items:center;height:100vh;margin:0"><div>${who ? 'Signed in. You can close this tab and talk to the workers.' : 'Signed in, but this address is not on the list for worker chat.'}</div>`)
+    }
+
+    if (url.pathname === '/api/ask' && req.method === 'POST') {
+      if (!chatEnabled()) return send(res, 503, { error: 'Worker chat is off on this server' })
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to talk to the workers', signIn: '/api/ask/auth' })
+      if (!chatAllowed(who)) return send(res, 429, { error: 'Give the workers a minute' })
+      const { id, message } = await readJsonBody(req, 64 * 1024)
+      const threads = await scanThreads()
+      const thread = threads.find((t) => t.id === id)
+      if (!thread) return send(res, 404, { error: 'That worker has walked off the map' })
+      const reply = await ask({ thread, status: statusWord(thread), message })
+      return send(res, 200, { reply })
     }
 
     if (url.pathname === '/api/harnesses' && req.method === 'GET') {
