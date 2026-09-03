@@ -11,6 +11,7 @@ const STORE_KEY = 'botcrossing.settings.v1'
 const LEGACY_STORE_KEY = 'cosmo.settings.v1'
 /** Set once the stored tilt-shift default has been migrated off. */
 const TILT_MIGRATION_KEY = 'botfarm.tiltshift.v2'
+const CREW_MIGRATION_KEY = 'botfarm.maxagents.v2'
 
 /**
  * What a fresh install opens on. Fixed rather than guessed from the device: `autoQuality`
@@ -35,7 +36,7 @@ export const PRESETS = {
       textureQuality: 'low',
       scatterDensity: 0.15,
       groundDetail: 'low',
-      maxAgents: 40,
+      maxAgents: 80,
       stars: false,
       ibl: false,
       tiltShift: false,
@@ -53,7 +54,7 @@ export const PRESETS = {
       textureQuality: 'low',
       scatterDensity: 0.35,
       groundDetail: 'low',
-      maxAgents: 60,
+      maxAgents: 120,
       stars: true,
       ibl: false,
       tiltShift: false,
@@ -71,7 +72,7 @@ export const PRESETS = {
       textureQuality: 'medium',
       scatterDensity: 0.6,
       groundDetail: 'medium',
-      maxAgents: 90,
+      maxAgents: 180,
       stars: true,
       ibl: true,
       tiltShift: false, // off by default here: the focus plane drifts off the colony when the camera idles
@@ -89,7 +90,7 @@ export const PRESETS = {
       textureQuality: 'high',
       scatterDensity: 0.85,
       groundDetail: 'high',
-      maxAgents: 140,
+      maxAgents: 240,
       stars: true,
       ibl: true,
       tiltShift: false, // off by default here: the focus plane drifts off the colony when the camera idles
@@ -107,7 +108,7 @@ export const PRESETS = {
       textureQuality: 'ultra',
       scatterDensity: 1,
       groundDetail: 'high',
-      maxAgents: 200,
+      maxAgents: 300,
       stars: true,
       ibl: true,
       tiltShift: false, // off by default here: the focus plane drifts off the colony when the camera idles
@@ -277,6 +278,13 @@ function load() {
       values.tiltShift = false
       localStorage.setItem(STORE_KEY, JSON.stringify(values))
     }
+    // The crew cap was sized for a laptop's worth of threads; the colony now holds a
+    // hundred-odd inhabitants, and a cap below that silently drops whole hexes.
+    if (Number(values.maxAgents) < 180 && !localStorage.getItem(CREW_MIGRATION_KEY)) {
+      values.maxAgents = 180
+      localStorage.setItem(STORE_KEY, JSON.stringify(values))
+    }
+    localStorage.setItem(CREW_MIGRATION_KEY, '1')
     localStorage.setItem(TILT_MIGRATION_KEY, '1')
     return values
   } catch {
