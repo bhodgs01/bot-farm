@@ -92,7 +92,7 @@ async function kubeGet(apiPath) {
   if (token && KUBE_API) {
     const res = await fetch(KUBE_API + apiPath, {
       headers: { Authorization: `Bearer ${token}` },
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(KUBE_TIMEOUT_MS),
     })
     if (!res.ok) throw new Error(`${apiPath} → ${res.status}`)
     return res.json()
@@ -102,39 +102,68 @@ async function kubeGet(apiPath) {
 }
 
 /**
- * One snapshot of everything the roster needs, shared across agents and reused for a few
- * seconds. Metrics are optional — a cluster without metrics-server just never shows CPU.
+ * One snapshot of everything the roster needs, shared across agents.
+ *
+ * The API server can be slow from some nodes (measured: 5s for a one-item list, 24s for
+ * the full pod list), so two rules: only the roster's namespaces are listed, in parallel,
+ * and a scan never waits on a refresh that is already running — it takes the last good
+ * snapshot and the refresh lands for the next poll. Only the very first scan waits.
  */
-let snapshot = { at: 0, promise: null }
+const ROSTER_NAMESPACES = [...new Set(ROSTER.flatMap((a) => a.ns))]
+const KUBE_TIMEOUT_MS = 90 * 1000
+let snapshot = { at: 0, data: null, inflight: null }
+let nsCreatedCache = { at: 0, map: new Map() }
+
+async function listPerNamespace(pathFor) {
+  const lists = await Promise.all(
+    ROSTER_NAMESPACES.map((ns) => kubeGet(pathFor(ns)).then((r) => r.items || []).catch(() => []))
+  )
+  return byNamespace(lists.flat())
+}
+
+async function buildSnapshot() {
+  const [pods, deploys, cronjobs, metrics] = await Promise.all([
+    listPerNamespace((ns) => `/api/v1/namespaces/${ns}/pods`),
+    listPerNamespace((ns) => `/apis/apps/v1/namespaces/${ns}/deployments`),
+    listPerNamespace((ns) => `/apis/batch/v1/namespaces/${ns}/cronjobs`),
+    kubeGet('/apis/metrics.k8s.io/v1beta1/pods').catch(() => ({ items: [] })),
+  ])
+  // Namespace creation times never change; refresh them rarely.
+  if (Date.now() - nsCreatedCache.at > 10 * 60 * 1000) {
+    try {
+      const namespaces = await kubeGet('/api/v1/namespaces')
+      const map = new Map()
+      for (const n of namespaces.items || []) map.set(n.metadata.name, Date.parse(n.metadata.creationTimestamp) || 0)
+      nsCreatedCache = { at: Date.now(), map }
+    } catch {
+      /* keep what we had */
+    }
+  }
+  const cpuByPod = new Map()
+  for (const m of metrics.items || []) {
+    let milli = 0
+    for (const c of m.containers || []) milli += parseCpu(c.usage?.cpu)
+    cpuByPod.set(`${m.metadata.namespace}/${m.metadata.name}`, milli)
+  }
+  return { pods, deploys, cronjobs, cpuByPod, nsCreated: nsCreatedCache.map }
+}
+
 async function clusterSnapshot() {
-  const now = Date.now()
-  if (snapshot.promise && now - snapshot.at < SNAPSHOT_TTL_MS) return snapshot.promise
-  snapshot = { at: now, promise: null }
-  snapshot.promise = (async () => {
-    const [pods, deploys, cronjobs, namespaces, metrics] = await Promise.all([
-      kubeGet('/api/v1/pods'),
-      kubeGet('/apis/apps/v1/deployments'),
-      kubeGet('/apis/batch/v1/cronjobs'),
-      kubeGet('/api/v1/namespaces'),
-      kubeGet('/apis/metrics.k8s.io/v1beta1/pods').catch(() => ({ items: [] })),
-    ])
-    const cpuByPod = new Map()
-    for (const m of metrics.items || []) {
-      let milli = 0
-      for (const c of m.containers || []) milli += parseCpu(c.usage?.cpu)
-      cpuByPod.set(`${m.metadata.namespace}/${m.metadata.name}`, milli)
-    }
-    const nsCreated = new Map()
-    for (const n of namespaces.items || []) nsCreated.set(n.metadata.name, Date.parse(n.metadata.creationTimestamp) || 0)
-    return {
-      pods: byNamespace(pods.items),
-      deploys: byNamespace(deploys.items),
-      cronjobs: byNamespace(cronjobs.items),
-      cpuByPod,
-      nsCreated,
-    }
-  })()
-  return snapshot.promise
+  const age = Date.now() - snapshot.at
+  if (snapshot.data && age < SNAPSHOT_TTL_MS) return snapshot.data
+  if (!snapshot.inflight) {
+    snapshot.inflight = buildSnapshot()
+      .then((data) => {
+        snapshot = { at: Date.now(), data, inflight: null }
+        return data
+      })
+      .catch((err) => {
+        snapshot.inflight = null
+        if (snapshot.data) return snapshot.data
+        throw err
+      })
+  }
+  return snapshot.data || snapshot.inflight
 }
 
 function byNamespace(items) {
@@ -369,7 +398,7 @@ function deriveAgent(agent, snap, signals, probeUp) {
 /**
  * App signals are slow (the brain feed roll-up alone can take seconds), and the page polls
  * every 15s. So they refresh in the background and a scan takes whatever is current:
- * stale-while-revalidate, with the very first scan the only one that waits.
+ * stale-while-revalidate; even the first scan does not wait for them.
  */
 const SIGNALS_TTL_MS = 20 * 1000
 let signalsCache = { at: 0, data: null, inflight: null }
@@ -387,7 +416,8 @@ async function currentSignals() {
         return signalsCache.data || {}
       })
   }
-  return signalsCache.data || signalsCache.inflight
+  // No signals yet? Paint the crew now from cluster state alone; queues arrive next poll.
+  return signalsCache.data || {}
 }
 
 async function scanThreads() {
