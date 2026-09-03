@@ -46,6 +46,18 @@ const LIVE_GROWTH = 0.004
 /** How many zones' positions to remember, including repos with nothing running in them. */
 const LAYOUT_MEMORY = 80
 
+/** Hexes whose colour carries meaning; everything else takes the next free palette entry. */
+const ZONE_ACCENT = {
+  Garden: 0x4f9a63,
+  Cluster: 0x4f7ec9,
+  'Print Service': 0xb8942a,
+  Brain: 0x8b5cc9,
+  Watchdog: 0xc95c5c,
+  Home: 0xc97f4f,
+  Inbox: 0xc96442,
+  'Trade Floor': 0x3fa8a0,
+}
+
 export const STATUS_ORDER = ['blocked', 'visitor', 'door', 'plant', 'mail', 'print', 'waiting', 'working', 'watching', 'printing', 'celebrating', 'idle', 'sleeping']
 
 export const STATUS_LABEL = {
@@ -438,6 +450,12 @@ export class Colony {
 
   /** A stable colour per repo, probing forward on a collision so no two plots match. */
   _pickAccent(name) {
+    // A few hexes mean something by colour: the Garden is green, the Cluster is blue.
+    const fixed = ZONE_ACCENT[name]
+    if (fixed) {
+      this.usedAccents.add(fixed)
+      return fixed
+    }
     const start = hashString(name) % PLOT_PALETTE.length
     for (let i = 0; i < PLOT_PALETTE.length; i++) {
       const accent = PLOT_PALETTE[(start + i) % PLOT_PALETTE.length]
