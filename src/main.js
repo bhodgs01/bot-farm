@@ -115,6 +115,7 @@ const actions = {
 
   cycleTime: () => {
     settings.set('autoTime', false)
+    settings.set('clockTime', false)
     const current = settings.get('timeOfDay')
     // Step to the next named time *after* the current one, wrapping at midnight.
     const next = TIMES.find((t) => t.value > current + 0.005) || TIMES[0]
@@ -126,7 +127,7 @@ const actions = {
   focusStatus: (status) => {
     const key = status === 'agents' ? null : status
     // 'waiting' is the attention pool: everything that wants a human, not just the ? badge.
-    const wanted = key === 'waiting' ? new Set(['waiting', 'blocked', 'mail', 'print']) : key ? new Set([key]) : null
+    const wanted = key === 'waiting' ? new Set(['waiting', 'blocked', 'mail', 'print', 'door', 'plant', 'visitor']) : key ? new Set([key]) : null
     const pool = colony.astronauts.agents.filter((a) => (wanted ? wanted.has(a.status) : true))
     if (!pool.length) {
       hud.hint(key ? `Nobody is ${(STATUS_LABEL[key] || key).toLowerCase()} right now` : 'No crew on the surface')
@@ -690,9 +691,30 @@ settings.onChange((changed, scope) => {
   queueSave()
   if (scope.render || changed.has('fov')) engine.applySettings()
   colony.onSettingsChanged(changed, scope)
+  // Dragging the time slider takes the sky off the clock; the toggle puts it back.
+  if (changed.has('timeOfDay') && !clockSetting && settings.get('clockTime')) settings.set('clockTime', false)
+  if (changed.has('clockTime') && settings.get('clockTime')) applyClock()
   if (changed.has('showFps')) hud.syncSettings()
   if (changed.has('maxAgents')) applyThreads(threads)
 })
+
+// ── real time ─────────────────────────────────────────────────────────────────────────
+
+/** The sky follows the actual hour in Kansas City until the time is set by hand. */
+let clockSetting = false
+function applyClock() {
+  if (!settings.get('clockTime')) return
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: 'numeric', hour12: false }).formatToParts(new Date())
+  const h = Number(parts.find((p) => p.type === 'hour')?.value) % 24
+  const m = Number(parts.find((p) => p.type === 'minute')?.value) || 0
+  const value = Math.round(((h + m / 60) / 24) * 1000) / 1000
+  if (Math.abs(value - settings.get('timeOfDay')) < 0.002) return
+  clockSetting = true
+  settings.set('timeOfDay', value)
+  clockSetting = false
+}
+applyClock()
+setInterval(applyClock, 30 * 1000)
 
 // ── frame ─────────────────────────────────────────────────────────────────────────────
 

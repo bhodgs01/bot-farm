@@ -1,8 +1,8 @@
 /**
  * Harness adapter: the print farm — every running print is an astronaut.
  *
- * A job starts on any printer and an astronaut walks out of the ship to the Print Service
- * hex and gets to work, with a ring over its head that fills as the print completes. The
+ * Every enabled printer is a machine on the Print Service hex with its operator beside it.
+ * A job starts and that operator gets to work, with a ring over its head that fills as the print completes. The
  * card shows the job, the printer, the client whose order it is, layers and ETA. When the
  * print finishes the astronaut walks home. A printer reporting an error slumps with a `!`
  * until it clears.
@@ -53,15 +53,17 @@ async function fetchThreads() {
     const state = String(p.state || '').toLowerCase()
     const order = p.assigned_order_id ? byOrder.get(p.assigned_order_id) : null
     const client = order?.client || ''
-    if (state === 'printing' || state === 'paused') {
+    const printing = state === 'printing' || state === 'paused'
+    if (printing) {
       const key = `${p.id}:${p.job_name || ''}`
       live.add(key)
       if (!jobStart.has(key)) jobStart.set(key, now)
       const progress = Math.max(0, Math.min(1, Number(p.progress) || 0))
       const layers = p.layer_total ? `layer ${p.layer_current || 0}/${p.layer_total}` : ''
       out.push({
-        id: `print:${p.id}:${jobStart.get(key)}`,
+        id: `print:${p.id}`,
         kind: 'printing',
+        landmark: 'printer',
         progress,
         title: `${p.job_name || 'Print'}`.slice(0, 120),
         preview: [client ? `for ${client}` : 'one-off', `on ${p.name}`, layers, eta(p.eta_seconds), state === 'paused' ? 'PAUSED' : '']
@@ -92,16 +94,19 @@ async function fetchThreads() {
         canArchive: false,
         ref: { printer: p.id },
       })
-    } else if (state === 'error' && p.error_text) {
+    } else {
+      const offline = p.online === false
+      const broken = state === 'error' && p.error_text
       out.push({
-        id: `print:${p.id}:error`,
-        title: `⚠ ${p.name}`,
-        preview: String(p.error_text).slice(0, 200),
+        id: `print:${p.id}`,
+        landmark: 'printer',
+        title: broken ? `⚠ ${p.name}` : p.name,
+        preview: broken ? String(p.error_text).slice(0, 200) : offline ? `${p.name} is offline` : `${p.name} idle${p.job_name ? ` · last: ${p.job_name}` : ''}${client ? ` · dedicated to ${client}` : ''}`,
         project: 'Print Service',
         projectPath: 'farm://print-service',
         worktree: '',
         cwd: p.name,
-        gitBranch: 'error',
+        gitBranch: broken ? 'error' : offline ? 'offline' : 'idle',
         model: p.model || '',
         effort: '',
         createdAt: Date.parse(p.updated_at) || now,
@@ -109,13 +114,13 @@ async function fetchThreads() {
         lastFocusedAt: 0,
         running: false,
         unread: false,
-        hasError: true,
+        hasError: Boolean(broken || offline),
         starred: false,
         routine: '',
         prState: '',
         archived: false,
         hasTranscript: false,
-        sizeBytes: 2000,
+        sizeBytes: 1000 * (1 + (Number(p.layer_total) || 0) / 10),
         source: 'print-farm',
         canOpen: true,
         canArchive: false,

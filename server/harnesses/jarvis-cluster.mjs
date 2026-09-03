@@ -50,25 +50,27 @@ export const ROSTER = [
   { id: 'mem',     name: 'Mem',     emoji: '🧠', role: 'second brain',         zone: 'Brain',           landmark: 'dish',          ns: ['graph-explorer', 'qdrant', 'neo4j', 'rag-parser'],           url: 'https://brain.kcproto.com' },
   { id: 'vera',    name: 'Vera',    emoji: '🎙️', role: 'voice AI',             zone: 'KC Proto',          ns: ['jarvis-hud', 'jarvis-watch'],                                url: 'https://hud.kcproto.com' },
   { id: 'janine',  name: 'Janine',  emoji: '💁‍♀️', role: 'email receptionist',   zone: 'KC Proto',          ns: ['janine', 'janine2'],                                         url: 'https://janine.kcproto.com' },
-  { id: 'cole',    name: 'COLE',    emoji: '🛡️', role: 'incident response',    zone: 'Watchdog',          ns: ['watchdog', 'anthropic-watch'],                 url: 'https://watchdog.kcproto.com' },
+  { id: 'cole',    name: 'COLE',    emoji: '🛡️', role: 'incident response',    zone: 'Watchdog',        landmark: 'tower',          ns: ['watchdog', 'anthropic-watch'],                 url: 'https://watchdog.kcproto.com' },
   { id: 'jim',     name: 'Jim',     emoji: '📋', role: 'helpdesk',             zone: 'KC Proto',          ns: ['ticket-bot', 'kuma-ticket-bridge', 'embassy-tickets'],       url: 'https://ticket_bot.kcproto.com' },
   { id: 'phyllis', name: 'Phyllis', emoji: '🧐', role: 'QA inspector',         zone: 'KC Proto',          ns: ['backup-monitor', 'backups', 'kev-fleet-check'],              url: '' },
   { id: 'frank',   name: 'Frank',   emoji: '🧑‍🎨', role: 'designer',             zone: 'KC Proto',          ns: ['kcaistudio'],                                                url: '' },
-  { id: 'adam',    name: 'Adam',    emoji: '🛠️', role: 'print farm operator',  zone: 'Print Service',          ns: ['print-farm', 'print-service', 'octofarm'],                   url: 'https://print.kcproto.com' },
-  { id: 'clawd',   name: 'Clawd',   emoji: '🦞', role: 'chaos gremlin',        zone: 'KC Proto',          ns: ['clawd-dashboard'],                                           url: 'https://agents.kcproto.com/clawd-chat.html', probe: process.env.CLAWD_PROBE || '' },
+  { id: 'adam',    name: 'Adam',    emoji: '🛠️', role: 'print farm operator',  zone: 'Print Service',   landmark: 'workshop',          ns: ['print-farm', 'print-service', 'octofarm'],                   url: 'https://print.kcproto.com' },
+  { id: 'clawd',   name: 'Clawd',   emoji: '🦞', role: 'chaos gremlin',        zone: 'KC Proto',        landmark: 'silo',          ns: ['clawd-dashboard'],                                           url: 'https://agents.kcproto.com/clawd-chat.html', probe: process.env.CLAWD_PROBE || '' },
   { id: 'frances', name: 'Frances', emoji: '🩺', role: 'caregiver AI',         zone: 'Frances',           ns: ['caregiver'],                                                 url: 'https://caregiver.kcproto.com' },
   { id: 'grader',  name: 'Grader',  emoji: '🧮', role: 'compliance grader',    zone: 'CyberGrade',        ns: ['cybergrade', 'cybergrade-api'],                              url: '' },
   { id: 'clayton', name: 'Clayton', emoji: '🎤', role: 'presentation host',    zone: 'Clayton',           ns: ['clayton'],                                                   url: '' },
   { id: 'atlas',   name: 'Atlas',   emoji: '⌚', role: 'wearable demo',        zone: 'Atlas',             ns: ['atlas-demo'],                                                url: '' },
   { id: 'franky',  name: 'Franky',  emoji: '🚀', role: 'xprize',               zone: 'Franky',            ns: ['franky'],                                                    url: '' },
-  { id: 'plex',    name: 'Plex',    emoji: '📺', role: 'media server',         zone: 'Plex',              ns: ['plex'],                                                      url: 'https://app.plex.tv/desktop' },
-  { id: 'biff',    name: 'Biff',    emoji: '🧑‍💼', role: 'club operations',      zone: 'KC AI Club',        ns: ['aiclub'],                                                    url: 'https://ai-club.kcproto.com/#/biff' },
+  { id: 'plex',    name: 'Plex',    emoji: '📺', role: 'media server',         zone: 'Plex',            landmark: 'pad',              ns: ['plex'],                                                      url: 'https://app.plex.tv/desktop' },
+  { id: 'core',    name: 'Core',    emoji: '🛰️', role: 'control plane',        zone: 'Cluster',           ns: ['kube-system'],                                               url: 'https://grafana.kcproto.com', landmark: 'solar' },
+  { id: 'house',   name: 'House',   emoji: '🏠', role: 'home assistant',       zone: 'Home',              ns: ['home-assistant'],                                            url: 'https://ha.kcproto.com', landmark: 'habitat' },
+  { id: 'biff',    name: 'Biff',    emoji: '🧑‍💼', role: 'club operations',      zone: 'KC AI Club',      landmark: 'lab',        ns: ['aiclub'],                                                    url: 'https://ai-club.kcproto.com/#/biff' },
   { id: 'marc',    name: 'Marc',    emoji: '🌿', role: 'landscape ops',        zone: 'Embassy Landscape', ns: ['marc', 'aspire-portal', 'irrigation-mapper', 'inspire-fallback'], url: 'https://inspire.kcproto.com' },
   { id: 'rusty',   name: 'Rusty',   emoji: '⛽', role: 'oil wells',            zone: 'CorrosionDC',       ns: ['corrosiondc'],                                               url: 'https://wellz.kcproto.com' },
   { id: 'olga',    name: 'Olga',    emoji: '🧑‍🏫', role: 'recruit intel',        zone: 'NGV Talent',        ns: ['recruit-intel', 'recruiter-bot', 'recruit-form', 'ngv-sales'], url: 'https://recruiter-bot.kcproto.com' },
   { id: 'dwight',  name: 'Dwight',  emoji: '🚜', role: 'inventory',            zone: 'NED Builds',        ns: ['nedbuilds-pro', 'small-business', 'ned-estimates'],          url: 'https://small-biz.kcproto.com' },
   { id: 'leo',     name: 'Leo',     emoji: '📣', role: 'listing announcer',    zone: 'NED Builds',        ns: ['ned-ar-bot'],                                                url: '' },
-  { id: 'snoop',   name: 'Snoop',   emoji: '📈', role: 'trader',               zone: 'Trade Floor',      ns: ['trade-bot'],                                                 url: 'https://trade-bot.kcproto.com' },
+  { id: 'snoop',   name: 'Snoop',   emoji: '📈', role: 'trader',               zone: 'Trade Floor',     landmark: 'reactor',      ns: ['trade-bot'],                                                 url: 'https://trade-bot.kcproto.com' },
   { id: 'marty',   name: 'Marty',   emoji: '🏃', role: 'shorts poster',        zone: 'Shorts',      ns: ['shorts-player'],                                             url: '' },
   { id: 'hank',    name: 'Hank',    emoji: '📒', role: 'bookkeeper',           zone: 'Books',      ns: ['books'],                                                     url: '' },
   { id: 'gordon',  name: 'Gordon',  emoji: '👨‍🍳', role: 'schema roast',         zone: 'Roast Bot',      ns: ['roast-bot'],                                                 url: 'https://schemacheckerai.com' },
@@ -128,12 +130,15 @@ async function listPerNamespace(pathFor) {
 }
 
 async function buildSnapshot() {
-  const [pods, deploys, cronjobs, metrics] = await Promise.all([
+  const [pods, deploys, cronjobs, metrics, nodes, nodeMetrics] = await Promise.all([
     listPerNamespace((ns) => `/api/v1/namespaces/${ns}/pods`),
     listPerNamespace((ns) => `/apis/apps/v1/namespaces/${ns}/deployments`),
     listPerNamespace((ns) => `/apis/batch/v1/namespaces/${ns}/cronjobs`),
     kubeGet('/apis/metrics.k8s.io/v1beta1/pods').catch(() => ({ items: [] })),
+    kubeGet('/api/v1/nodes').catch(() => ({ items: [] })),
+    kubeGet('/apis/metrics.k8s.io/v1beta1/nodes').catch(() => ({ items: [] })),
   ])
+  const nodePods = await podsPerNode((nodes.items || []).map((n) => n.metadata.name))
   // Namespace creation times never change; refresh them rarely.
   if (Date.now() - nsCreatedCache.at > 10 * 60 * 1000) {
     try {
@@ -151,7 +156,9 @@ async function buildSnapshot() {
     for (const c of m.containers || []) milli += parseCpu(c.usage?.cpu)
     cpuByPod.set(`${m.metadata.namespace}/${m.metadata.name}`, milli)
   }
-  return { pods, deploys, cronjobs, cpuByPod, nsCreated: nsCreatedCache.map }
+  const nodeUsage = new Map()
+  for (const m of nodeMetrics.items || []) nodeUsage.set(m.metadata.name, { cpu: parseCpu(m.usage?.cpu), mem: parseMem(m.usage?.memory) })
+  return { pods, deploys, cronjobs, cpuByPod, nsCreated: nsCreatedCache.map, nodes: nodes.items || [], nodeUsage, nodePods }
 }
 
 async function clusterSnapshot() {
@@ -180,6 +187,57 @@ function byNamespace(items) {
     out.get(ns).push(it)
   }
   return out
+}
+
+/** `16Gi` / `16384Ki` / `123456` → bytes. */
+function parseMem(q) {
+  if (!q) return 0
+  const m = String(q).match(/^([\d.]+)([KMGTPE]i?)?$/)
+  if (!m) return 0
+  const n = Number(m[1])
+  const unit = m[2] || ''
+  const pow = { K: 1e3, M: 1e6, G: 1e9, T: 1e12, Ki: 1024, Mi: 1024 ** 2, Gi: 1024 ** 3, Ti: 1024 ** 4 }[unit] || 1
+  return n * pow
+}
+
+/**
+ * How many pods each node carries, without downloading them: a list capped at one item
+ * reports `remainingItemCount`, so nineteen tiny requests replace one eight-megabyte one.
+ */
+let nodePodsCache = { at: 0, map: new Map() }
+async function podsPerNode(names) {
+  if (Date.now() - nodePodsCache.at < 60 * 1000) return nodePodsCache.map
+  const map = new Map()
+  const token = await serviceAccountToken()
+  if (token && KUBE_API) {
+    // Table format with no objects: one row per pod, a few bytes each.
+    await Promise.all(
+      names.map(async (name) => {
+        try {
+          const res = await fetch(`${KUBE_API}/api/v1/pods?fieldSelector=spec.nodeName%3D${encodeURIComponent(name)}&includeObject=None`, {
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json;as=Table;v=v1;g=meta.k8s.io' },
+            signal: AbortSignal.timeout(KUBE_TIMEOUT_MS),
+          })
+          const table = res.ok ? await res.json() : null
+          map.set(name, table?.rows?.length ?? nodePodsCache.map.get(name) ?? 0)
+        } catch {
+          map.set(name, nodePodsCache.map.get(name) || 0)
+        }
+      })
+    )
+  } else {
+    try {
+      const { stdout } = await execFileAsync('kubectl', ['get', 'pods', '-A', '--no-headers', '-o', 'custom-columns=NODE:.spec.nodeName'], { maxBuffer: 16 * 1024 * 1024 })
+      for (const line of stdout.split('\n')) {
+        const node = line.trim()
+        if (node && node !== '<none>') map.set(node, (map.get(node) || 0) + 1)
+      }
+    } catch {
+      /* keep the last counts */
+    }
+  }
+  nodePodsCache = { at: Date.now(), map }
+  return map
 }
 
 /** `250m` → 250, `1` → 1000, `123456n` → 0.12 (nanocores). */
@@ -438,7 +496,7 @@ async function scanThreads() {
   const [snap, signals] = await Promise.all([clusterSnapshot(), currentSignals()])
   const probes = await Promise.all(ROSTER.map((a) => (a.probe ? probe(a.probe) : Promise.resolve(null))))
   const agents = ROSTER.map((agent, i) => deriveAgent(agent, snap, signals, probes[i]))
-  return agents.concat(watchdogThreads(signals._watchdogServices || []), brainFeedThreads(snap))
+  return agents.concat(watchdogThreads(signals._watchdogServices || []), brainFeedThreads(snap), nodeThreads(snap))
 }
 
 /**
@@ -500,6 +558,62 @@ function brainFeedThreads(snap) {
     })
   }
   return out
+}
+
+/**
+ * The fleet itself: one astronaut per node on the Cluster hex. Hot CPU or memory hammers,
+ * NotReady, cordoned or under pressure slumps, and the card reads like a status page.
+ */
+function nodeThreads(snap) {
+  const now = Date.now()
+  return (snap.nodes || []).map((n) => {
+    const name = n.metadata.name
+    const cond = (type) => (n.status?.conditions || []).find((c) => c.type === type)
+    const ready = cond('Ready')?.status === 'True'
+    const pressure = ['MemoryPressure', 'DiskPressure', 'PIDPressure'].filter((t) => cond(t)?.status === 'True')
+    const cordoned = Boolean(n.spec?.unschedulable)
+    const use = snap.nodeUsage?.get(name)
+    const capCpu = parseCpu(n.status?.allocatable?.cpu)
+    const capMem = parseMem(n.status?.allocatable?.memory)
+    const cpuPct = use && capCpu ? Math.round((100 * use.cpu) / capCpu) : null
+    const memPct = use && capMem ? Math.round((100 * use.mem) / capMem) : null
+    const pods = snap.nodePods?.get(name) || 0
+    const role = Object.keys(n.metadata.labels || {}).some((k) => k.includes('control-plane') || k.includes('master')) ? 'control plane' : 'worker'
+    const problems = [!ready ? 'NotReady' : '', cordoned ? 'cordoned' : '', ...pressure].filter(Boolean)
+    const hot = (cpuPct ?? 0) >= 70 || (memPct ?? 0) >= 85
+    const readyAt = Date.parse(cond('Ready')?.lastTransitionTime || '') || 0
+    return {
+      id: `node:${name}`,
+      landmark: 'rack',
+      title: `🖥 ${name}`,
+      preview: [problems.length ? problems.join(', ') : 'Ready', cpuPct != null ? `cpu ${cpuPct}%` : '', memPct != null ? `mem ${memPct}%` : '', `${pods} pods`, n.status?.nodeInfo?.kubeletVersion || '']
+        .filter(Boolean)
+        .join(' · '),
+      project: 'Cluster',
+      projectPath: 'cluster://nodes',
+      worktree: '',
+      cwd: n.status?.addresses?.find((a) => a.type === 'InternalIP')?.address || '',
+      gitBranch: role,
+      model: cpuPct != null ? `${cpuPct}% cpu` : '',
+      effort: '',
+      createdAt: Date.parse(n.metadata.creationTimestamp) || now,
+      lastActivityAt: hot ? now : readyAt || now,
+      lastFocusedAt: 0,
+      running: hot,
+      unread: false,
+      hasError: problems.length > 0,
+      starred: role === 'control plane',
+      routine: '',
+      prState: '',
+      archived: false,
+      hasTranscript: true,
+      sizeBytes: 1000 * (1 + pods * 25),
+      source: 'nodes',
+      canOpen: true,
+      canArchive: false,
+      ref: { agent: 'core', url: 'https://grafana.kcproto.com' },
+    }
+  })
 }
 
 /** One slumped astronaut per service the watchdog currently calls unhealthy. */

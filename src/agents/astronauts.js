@@ -36,6 +36,9 @@ const AGENT_LOOK = {
   print: { trim: 0x4fa3c9, eye: [0.6, 1.8, 2.7] },
   watching: { trim: 0xc9784f, eye: [2.6, 1.3, 0.5] },
   printing: { trim: 0x4fb8a0, eye: [0.6, 2.3, 1.5] },
+  door: { trim: 0xc9a24f, eye: [2.6, 1.7, 0.5] },
+  plant: { trim: 0x5f9a4f, eye: [0.7, 2.2, 0.9] },
+  visitor: { trim: 0xc95c4f, eye: [2.8, 0.9, 0.7] },
   blocked: { trim: 0xc94f4f, eye: [3.0, 0.5, 0.45] },
   celebrating: { trim: 0xc9a24f, eye: [2.9, 2.1, 0.6] },
   idle: { trim: 0x8b8b85, eye: [1.1, 1.5, 1.7] },
@@ -1059,7 +1062,14 @@ export class Astronauts {
         // Mail waits patiently: no waving, the glyph over its head does the asking.
         case 'mail':
         case 'print':
+        case 'door':
           key = 'idle'
+          break
+        case 'plant':
+          key = 'hit'
+          break
+        case 'visitor':
+          key = 'wave'
           break
         case 'blocked':
           key = 'hit'

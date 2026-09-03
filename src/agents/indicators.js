@@ -11,6 +11,9 @@ import {
   mdiEmail,
   mdiPrinter3d,
   mdiPlay,
+  mdiDoorOpen,
+  mdiWaterOff,
+  mdiAccountAlert,
 } from '@mdi/js'
 
 /**
@@ -43,6 +46,9 @@ export const BADGE = {
   print: 9, // a print request: mail carrying a model file
   watching: 10, // a Plex stream in progress
   printing: 11, // a print in progress: drawn as a ring that fills with completion, no glyph
+  door: 12, // a door, window or garage left open
+  plant: 13, // a plant whose soil is dry
+  visitor: 14, // motion at the house right now
 }
 
 /** Badge tint. Pushed past 1.0 so the bloom pass gives them a soft halo. */
@@ -59,6 +65,9 @@ const BADGE_COLOR = {
   9: [0.6, 1.9, 2.8],
   10: [2.6, 1.2, 0.5],
   11: [0.6, 2.3, 1.5],
+  12: [2.6, 1.7, 0.5],
+  13: [0.7, 2.2, 0.9],
+  14: [2.8, 0.9, 0.7],
 }
 
 /**
@@ -76,6 +85,9 @@ const FADE_BY_BADGE = {
   [BADGE.print]: 0,
   [BADGE.watching]: 0.3,
   [BADGE.printing]: 0,
+  [BADGE.door]: 0,
+  [BADGE.plant]: 0,
+  [BADGE.visitor]: 0,
   [BADGE.paused]: 0.6,
   [BADGE.sleeping]: 1,
 }
@@ -238,7 +250,7 @@ export class Indicators {
       if (badge < 0) continue
 
       // A gentle bob, and an urgent one for the states that want your attention.
-      const urgent = badge === BADGE.waiting || badge === BADGE.blocked
+      const urgent = badge === BADGE.waiting || badge === BADGE.blocked || badge === BADGE.visitor || badge === BADGE.door
       const bobRate = urgent ? 3.4 : 1.6
       const bobAmp = urgent ? 0.075 : 0.035
       const bob = Math.sin(elapsed * bobRate + agent.phase) * bobAmp
@@ -288,7 +300,7 @@ export class Indicators {
  * — the glyph has to carry as a silhouette. Material's set is drawn filled to begin with,
  * one closed path per icon, so there is nothing to stroke and nothing to parse.
  */
-const ICON_PATHS = [mdiHelpCircle, mdiAlert, mdiHammer, mdiCheckBold, mdiPause, mdiSleep, mdiCreation, mdiLogout, mdiEmail, mdiPrinter3d, mdiPlay]
+const ICON_PATHS = [mdiHelpCircle, mdiAlert, mdiHammer, mdiCheckBold, mdiPause, mdiSleep, mdiCreation, mdiLogout, mdiEmail, mdiPrinter3d, mdiPlay, mdiDoorOpen, mdiWaterOff, mdiAccountAlert]
 
 /**
  * The badge atlas. Red channel = the glyph, green channel = the plate's alpha — packing two

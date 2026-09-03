@@ -46,7 +46,7 @@ const LIVE_GROWTH = 0.004
 /** How many zones' positions to remember, including repos with nothing running in them. */
 const LAYOUT_MEMORY = 80
 
-export const STATUS_ORDER = ['blocked', 'mail', 'print', 'waiting', 'working', 'watching', 'printing', 'celebrating', 'idle', 'sleeping']
+export const STATUS_ORDER = ['blocked', 'visitor', 'door', 'plant', 'mail', 'print', 'waiting', 'working', 'watching', 'printing', 'celebrating', 'idle', 'sleeping']
 
 export const STATUS_LABEL = {
   working: 'Working',
@@ -55,6 +55,9 @@ export const STATUS_LABEL = {
   print: 'Print request',
   watching: 'Streaming',
   printing: 'Printing',
+  door: 'Left open',
+  plant: 'Needs water',
+  visitor: 'Movement',
   blocked: 'Blocked',
   celebrating: 'Shipped',
   idle: 'Idle',
@@ -70,6 +73,10 @@ export function statusFor(thread, now = Date.now()) {
   if (thread.kind === 'print') return 'print'
   if (thread.kind === 'watching') return 'watching'
   if (thread.kind === 'printing') return 'printing'
+  if (thread.kind === 'door') return 'door'
+  if (thread.kind === 'plant') return 'plant'
+  if (thread.kind === 'visitor') return 'visitor'
+  if (thread.kind === 'person') return thread.running ? 'working' : 'idle'
   if (thread.hasError) return 'blocked'
   if (thread.running) return 'working'
   if (thread.prState === 'MERGED') return 'celebrating'
@@ -89,6 +96,9 @@ const BADGE_FOR = {
   print: BADGE.print,
   watching: BADGE.watching,
   printing: BADGE.printing,
+  door: BADGE.door,
+  plant: BADGE.plant,
+  visitor: BADGE.visitor,
   blocked: BADGE.blocked,
   working: BADGE.working,
   celebrating: BADGE.done,
@@ -167,7 +177,7 @@ export class Colony {
     this.activePlots = new Set()
     this._dustTint = new THREE.Color(this.planet.ground.high)
     this._c = new THREE.Color()
-    this.stats = { agents: 0, projects: 0, working: 0, waiting: 0, mail: 0, print: 0, watching: 0, printing: 0, blocked: 0, done: 0 }
+    this.stats = { agents: 0, projects: 0, working: 0, waiting: 0, mail: 0, print: 0, watching: 0, printing: 0, door: 0, plant: 0, visitor: 0, blocked: 0, done: 0 }
 
     this._buildTerrain()
   }
@@ -308,7 +318,7 @@ export class Colony {
       list.forEach((thread, i) => {
         const status = statusFor(thread, now)
         if (stats[status] !== undefined) stats[status]++
-        const wantsYou = status === 'waiting' || status === 'blocked' || status === 'mail' || status === 'print'
+        const wantsYou = ['waiting', 'blocked', 'mail', 'print', 'door', 'plant', 'visitor'].includes(status)
         if (wantsYou) urgent.add(plot.id)
         if (wantsYou || status === 'working' || status === 'watching' || status === 'printing') active.add(plot.id)
         stats.agents++

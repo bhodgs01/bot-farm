@@ -44,6 +44,9 @@ const STAT_DEFS = [
   { key: 'print', label: 'print requests', cls: 'waiting' },
   { key: 'watching', label: 'streaming', cls: 'working' },
   { key: 'printing', label: 'printing', cls: 'working' },
+  { key: 'door', label: 'doors open', cls: 'waiting' },
+  { key: 'plant', label: 'thirsty plants', cls: 'waiting' },
+  { key: 'visitor', label: 'movement', cls: 'blocked' },
   { key: 'blocked', label: 'blocked', cls: 'blocked' },
   { key: 'celebrating', label: 'shipped', cls: 'done' },
   { key: 'agents', label: 'crew', cls: 'idle' },
@@ -201,6 +204,7 @@ export class Hud {
         },
         this.controls
       ),
+      this._toggle('Real time', 'clockTime', 'The sky follows the actual hour in Kansas City.'),
       this._slider('Time of day', 'timeOfDay', 0, 1, 0.005, clockLabel),
       this._toggle('Cycle day/night', 'autoTime', 'Runs the clock forward on its own.'),
       this._slider('Cycle length', 'dayLength', 30, 900, 30, (v) => `${Math.round(v / 60)}m`),
@@ -426,15 +430,18 @@ export class Hud {
     swatch.style.color = hex(project.accent) // the halo is `currentColor`
     this.$('.side .name').textContent = project.name
     const path = this.$('.side .path')
-    path.textContent = project.path ? shortPath(project.path) : 'folder unknown'
+    path.textContent = project.path ? shortPath(project.path) : `${project.threads.length} on this hex`
     path.title = project.path || ''
     // Nothing to open a new thread in, and nothing to reveal, without a folder on disk.
+    this.$('#btn-new-session').hidden = !project.path
+    this.$('#btn-reveal').hidden = !project.path
+    this.$('#btn-copy-path').hidden = !project.path
     this.$('#btn-new-session').disabled = !project.path
     this.$('#btn-reveal').disabled = !project.path
     this.$('#btn-copy-path').disabled = !project.path
 
     const n = project.threads.length
-    const waiting = project.threads.filter((t) => ['waiting', 'blocked', 'mail', 'print'].includes(t.status)).length
+    const waiting = project.threads.filter((t) => ['waiting', 'blocked', 'mail', 'print', 'door', 'plant', 'visitor'].includes(t.status)).length
     this.$('.side .threads-head').innerHTML =
       `<span>${n} thread${n === 1 ? '' : 's'}</span>` + (waiting ? `<span class="want">${waiting} need you</span>` : '')
 
@@ -748,7 +755,8 @@ function escapeHtml(s) {
 /** Status → the colour family the top-bar counters already use for it. */
 function statusClass(status) {
   if (status === 'working' || status === 'watching' || status === 'printing') return 'working'
-  if (status === 'waiting' || status === 'mail' || status === 'print') return 'waiting'
+  if (['waiting', 'mail', 'print', 'door', 'plant'].includes(status)) return 'waiting'
+  if (status === 'visitor') return 'blocked'
   if (status === 'blocked') return 'blocked'
   if (status === 'celebrating') return 'done'
   return 'idle'
@@ -916,6 +924,9 @@ const TEMPLATE = `
       <div class="legend-row"><i class="badge" style="background:#10303a;color:#7fd0f0">&#9113;</i> a print request came in</div>
       <div class="legend-row"><i class="badge" style="background:#3a2210;color:#f0a06a">&#9654;</i> somebody is watching Plex</div>
       <div class="legend-row"><i class="badge" style="background:#103a30;color:#7ff0c0">&#9684;</i> a print in progress: the ring fills as it completes</div>
+      <div class="legend-row"><i class="badge" style="background:#3a2d10;color:#f0c46a">&#9707;</i> a door, window or garage left open</div>
+      <div class="legend-row"><i class="badge" style="background:#14301a;color:#8fe0a0">&#128167;</i> a plant whose soil has gone dry</div>
+      <div class="legend-row"><i class="badge" style="background:#3a1c14;color:#f0a08a">&#9673;</i> movement at the house right now</div>
       <div class="legend-row"><i class="badge" style="background:#3d1c1c;color:#e88b8b">!</i> something is crashing, unready, or not answering</div>
       <div class="legend-row"><i class="badge" style="background:#16301f;color:#7fd39a">⚒</i> running right now, building</div>
       <div class="legend-row"><i class="badge" style="background:#332b12;color:#e6c67f">✓</i> shipped: good news worth a glance</div>

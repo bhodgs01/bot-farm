@@ -319,6 +319,64 @@ const KINDS = {
     return 'Antenna'
   },
 
+  /**
+   * A 3D printer: bed on a base, two uprights and a top bar, a gantry carrying the
+   * toolhead, a lit screen on the front. The gantry takes the plot's accent so a farm of
+   * them still reads as one client's machines.
+   */
+  printer(c) {
+    const box = (w, h, d, cell, o = {}) => c.geom(new THREE.BoxGeometry(w, h, d), cell, o)
+    box(1.5, 0.16, 1.3, CELL.SLATE, { y: 0.08 })
+    box(1.1, 0.05, 1.0, CELL.WHITE, { y: 0.19 })
+    box(0.09, 1.25, 0.09, CELL.GREY, { x: -0.62, y: 0.16 + 0.62, z: -0.5 })
+    box(0.09, 1.25, 0.09, CELL.GREY, { x: 0.62, y: 0.16 + 0.62, z: -0.5 })
+    box(1.4, 0.09, 0.09, CELL.GREY, { y: 1.42, z: -0.5 })
+    box(1.28, 0.07, 0.07, CELL.TRIM, { y: 0.85, z: -0.36 })
+    box(0.2, 0.24, 0.2, CELL.BLACK, { x: 0.15, y: 0.8, z: -0.25 })
+    box(0.06, 0.12, 0.06, CELL.RED, { x: 0.15, y: 0.6, z: -0.25, emissive: 0.8 })
+    box(0.36, 0.18, 0.04, CELL.RED, { x: 0.45, y: 0.3, z: 0.66, emissive: 1 })
+    box(0.3, 0.35, 0.3, CELL.WHITE, { x: -0.9, y: 0.34, z: 0.45 })
+    return 'Printer'
+  },
+
+  /**
+   * A server: a tall dark cabinet with rows of status lights up the front and a vent
+   * grille, standing on a plinth. Nineteen of them is a data hall.
+   */
+  rack(c, rand) {
+    const box = (w, h, d, cell, o = {}) => c.geom(new THREE.BoxGeometry(w, h, d), cell, o)
+    box(1.1, 0.1, 1.1, CELL.SLATE, { y: 0.05 })
+    box(0.9, 2.3, 0.9, CELL.BLACK, { y: 0.1 + 1.15 })
+    box(0.94, 0.06, 0.94, CELL.GREY, { y: 2.43 })
+    for (let i = 0; i < 9; i++) {
+      const y = 0.35 + i * 0.22
+      box(0.72, 0.05, 0.03, CELL.GREY, { y, z: 0.46 })
+      const lit = rand() > 0.35
+      box(0.05, 0.05, 0.03, lit ? CELL.RED : CELL.SLATE, { x: -0.3, y, z: 0.47, emissive: lit ? 1 : 0 })
+      if (rand() > 0.5) box(0.05, 0.05, 0.03, CELL.SOLAR_A, { x: -0.2, y, z: 0.47, emissive: 0.9 })
+    }
+    box(0.5, 0.4, 0.02, CELL.GREY, { y: 2.2, z: 0.46 })
+    return 'Server'
+  },
+
+  /**
+   * A planter: a pot, dark soil, and a clump of foliage in the plot's accent. A thirsty
+   * plant slumps beside it; a happy one stands guard.
+   */
+  planter(c, rand) {
+    c.geom(new THREE.CylinderGeometry(0.42, 0.32, 0.5, 14), CELL.ROCK, { y: 0.25 })
+    c.geom(new THREE.CylinderGeometry(0.38, 0.38, 0.04, 14), CELL.BLACK, { y: 0.5 })
+    const leaves = 4 + Math.floor(rand() * 3)
+    for (let i = 0; i < leaves; i++) {
+      const a = rand() * Math.PI * 2
+      const r = 0.12 + rand() * 0.2
+      const s = 0.18 + rand() * 0.16
+      c.geom(new THREE.SphereGeometry(s, 10, 8), CELL.TRIM, { x: Math.cos(a) * r, y: 0.55 + s * 0.6 + rand() * 0.25, z: Math.sin(a) * r })
+    }
+    c.geom(new THREE.CylinderGeometry(0.03, 0.04, 0.5, 6), CELL.ROCK, { y: 0.75 })
+    return 'Planter'
+  },
+
   tower(c, rand) {
     c.add('structure_tall')
     c.add('lights', { y: 2.0, s: 0.7 })
@@ -352,7 +410,7 @@ const KINDS = {
   },
 }
 
-const KIND_IDS = Object.keys(KINDS).filter((k) => k !== 'dish')
+const KIND_IDS = Object.keys(KINDS).filter((k) => !['dish', 'printer', 'rack', 'planter'].includes(k))
 
 // ── the reveal shader ─────────────────────────────────────────────────────────────────
 

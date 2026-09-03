@@ -127,6 +127,7 @@ const DEFAULTS = {
   planet: 'moon',
   timeOfDay: 0.32, // 0..1 — 0 is midnight, 0.5 is noon
   autoTime: false,
+  clockTime: true, // the sky follows the real hour in Kansas City
   dayLength: 240, // seconds for a full cycle when autoTime is on
 
   // Look
