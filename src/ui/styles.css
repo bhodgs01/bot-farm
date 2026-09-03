@@ -635,7 +635,8 @@ body {
 
 /* ── the sidebar: brand, counts, repos, and the repo you drilled into ─────────────── */
 
-.side {
+/* The right edge is a stack: the Bot Farm panel, then the Needs-you card, each foldable. */
+.stack {
   position: absolute;
   top: 14px;
   right: 14px;
@@ -643,14 +644,26 @@ body {
   width: 320px;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  gap: 10px;
+  pointer-events: none;
   transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1);
 }
+.stack > * { pointer-events: auto; }
 
-/* Settings shares this edge; the sidebar steps aside rather than stacking under it. */
-.side.shifted {
+/* Settings shares this edge; the stack steps aside rather than stacking under it. */
+.stack.shifted {
   transform: translateX(-320px);
 }
+
+.side {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.side.collapsed { flex: 0 0 auto; }
 
 .side .brandbar {
   display: flex;
@@ -1368,3 +1381,48 @@ kbd {
 .hover-tip b { display: block; font-weight: 600; color: #fff; }
 .hover-tip i { display: block; font-style: normal; font-size: 11px; opacity: 0.6; margin: 1px 0 3px; }
 .hover-tip span { display: block; opacity: 0.85; }
+
+/* The Needs-you card. */
+.queue-card { flex: 0 0 auto; min-height: 0; max-height: 46vh; display: flex; flex-direction: column; overflow: hidden; }
+.queue-card .queue { flex: 1 1 auto; min-height: 0; }
+.queue-card .brandbar { display: flex; align-items: center; gap: 2px; padding: 8px 8px 8px 15px; flex: none; }
+.queue-card .brand { flex: 1; display: flex; align-items: center; gap: 8px; font-weight: 600; }
+.queue-card .brand .q-count { font-weight: 600; font-size: 11px; padding: 1px 8px; border-radius: 999px; background: rgba(120,150,255,0.18); color: #bcd0ff; }
+.queue-card .dot.q { background: #e88b8b; }
+.queue-card.collapsed .queue, .queue-card.collapsed .q-empty { display: none; }
+.queue-card .q-empty { display: none; padding: 6px 15px 12px; font-size: 12px; opacity: 0.55; }
+.queue-card[data-empty="true"] .q-empty { display: block; }
+.queue-card[data-empty="true"] .queue { display: none; }
+#btn-collapse-queue svg { transition: transform 0.2s; transform: rotate(90deg); }
+#btn-collapse-queue.flip svg { transform: rotate(-90deg); }
+.queue { overflow: auto; display: flex; flex-direction: column; gap: 3px; padding: 0 8px 8px; }
+.queue .row {
+  appearance: none; -webkit-appearance: none;
+  display: grid; grid-template-columns: 1fr auto; grid-template-areas: "t w" "p w";
+  column-gap: 10px; align-items: center; text-align: left;
+  padding: 6px 10px 6px 11px; border-radius: 9px; border: 0; border-left: 3px solid var(--q, #8fb4ee);
+  background: rgba(255,255,255,0.025); color: inherit; cursor: pointer; font: inherit;
+}
+.queue .row:hover { background: rgba(255,255,255,0.06); }
+.queue .row .dot { display: none; }
+.queue .row .t { grid-area: t; font-size: 12.5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.queue .row .t b { font-weight: 600; color: var(--q, #8fb4ee); }
+.queue .row .p { grid-area: p; font-size: 11px; opacity: 0.5; }
+.queue .row .w { grid-area: w; font-size: 11px; color: var(--q, #8fb4ee); white-space: nowrap; }
+.queue .row[data-status="blocked"] { --q: #f08a8a; }
+.queue .row[data-status="visitor"] { --q: #f0a06a; }
+.queue .row[data-status="door"] { --q: #f0c46a; }
+.queue .row[data-status="plant"] { --q: #8fe0a0; }
+.queue .row[data-status="mail"] { --q: #f0c46a; }
+.queue .row[data-status="print"] { --q: #7fd0f0; }
+.queue .row[data-status="waiting"] { --q: #8fb4ee; }
+.queue .more { font-size: 11px; opacity: 0.6; padding: 4px 10px; }
+
+/* The way back when every panel is hidden. */
+.unhide { position: fixed; right: 14px; bottom: 14px; z-index: 30; width: 38px; height: 38px; display: grid; place-items: center; opacity: 0.55; }
+.unhide:hover { opacity: 1; }
+.unhide[hidden] { display: none; }
+
+/* Collapsed Bot Farm panel: only the brand bar stays. */
+.side.collapsed .stats,
+.side.collapsed .side-body { display: none; }

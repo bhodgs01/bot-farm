@@ -337,6 +337,7 @@ export class Hud {
     on('#btn-time', 'click', () => this.actions.cycleTime?.())
     on('#btn-open', 'click', () => this.actions.openThread?.())
     on('#btn-collapse', 'click', () => this.toggleCollapse())
+    on('#btn-collapse-queue', 'click', () => this.toggleQueue())
     this.$('.thread-pop form.ask').addEventListener('submit', (e) => {
       e.preventDefault()
       const input = this.$('.thread-pop form.ask input')
@@ -349,6 +350,7 @@ export class Hud {
     this.$('.thread-pop form.ask input').addEventListener('keydown', (e) => e.stopPropagation())
     try {
       if (localStorage.getItem('botfarm.side.collapsed') === '1') this.toggleCollapse(true)
+      if (localStorage.getItem('botfarm.queue.collapsed') === '1') this.toggleQueue(true)
     } catch {}
     on('#btn-archive', 'click', () => this.actions.archiveThread?.())
     on('#btn-deselect', 'click', () => this.actions.select?.(null))
@@ -410,7 +412,7 @@ export class Hud {
       b.addEventListener('click', () => this.actions.pickProject?.(p.name))
       wrap.appendChild(b)
     }
-    this.$('.sec-head span').textContent = `${projects.length} repo${projects.length === 1 ? '' : 's'}`
+    this.$('.projects-pane .sec-head span').textContent = `${projects.length} repo${projects.length === 1 ? '' : 's'}`
   }
 
   /**
@@ -554,6 +556,18 @@ export class Hud {
     } catch {}
   }
 
+  /** Fold the queue card down to its header. Remembered per browser. */
+  toggleQueue(force) {
+    const card = this.$('.queue-card')
+    const on = force ?? !card.classList.contains('collapsed')
+    card.classList.toggle('collapsed', on)
+    this.$('#btn-collapse-queue').title = on ? 'Expand the queue' : 'Collapse the queue'
+    this.$('#btn-collapse-queue').classList.toggle('flip', on)
+    try {
+      localStorage.setItem('botfarm.queue.collapsed', on ? '1' : '0')
+    } catch {}
+  }
+
   /**
    * The queue: everyone who wants a human, most urgent first. Click a row to fly there.
    */
@@ -562,14 +576,14 @@ export class Hud {
     if (this._last.queue === key) return
     this._last.queue = key
     this.$('.q-count').textContent = String(items.length)
-    this.$('.queue-pane').dataset.empty = String(items.length === 0)
+    this.$('.queue-card').dataset.empty = String(items.length === 0)
     const wrap = this.$('.queue')
     const shown = items.slice(0, 40)
     wrap.innerHTML =
       shown
         .map(
           (i) =>
-            `<button class="row ${statusClass(i.status)}" data-id="${escapeHtml(i.id)}" title="${escapeHtml(i.need || '')}">` +
+            `<button class="row ${statusClass(i.status)}" data-status="${escapeHtml(i.status)}" data-id="${escapeHtml(i.id)}" title="${escapeHtml(i.need || '')}">` +
             `<i class="dot"></i><span class="t">${escapeHtml(i.title)}${i.count ? ` <b>${i.count}</b>` : ''}</span>` +
             `<span class="w">${escapeHtml(i.label)}</span><span class="p">${escapeHtml(i.project)}</span></button>`
         )
@@ -747,7 +761,7 @@ export class Hud {
     panel.classList.toggle('closed', !open)
     this.$('#btn-settings').setAttribute('aria-pressed', String(open))
     // Both live in the same slot on the right; the sidebar steps aside rather than hides.
-    this.$('.side').classList.toggle('shifted', open)
+    this.$('.stack').classList.toggle('shifted', open)
   }
 
   toggleHelp(force) {
@@ -764,6 +778,16 @@ export class Hud {
   toggleUi(force) {
     this.visible = force ?? !this.visible
     this.el.classList.toggle('hidden', !this.visible)
+    // The one control that survives hiding everything: a way back, for phones with no H key.
+    if (!this.unhide) {
+      this.unhide = document.createElement('button')
+      this.unhide.className = 'btn icon unhide panel'
+      this.unhide.title = 'Show the UI (H)'
+      this.unhide.innerHTML = ICON.eyeOff
+      this.unhide.addEventListener('click', () => this.toggleUi(true))
+      document.body.appendChild(this.unhide)
+    }
+    this.unhide.hidden = this.visible
     this.$('#btn-hide').innerHTML = this.visible ? ICON.eye : ICON.eyeOff
     this.actions.uiVisibility?.(this.visible)
     if (!this.visible) this.toggleHelp(false)
@@ -891,6 +915,7 @@ function ago(ts) {
 }
 
 const TEMPLATE = `
+<div class="stack">
 <aside class="side panel">
   <header class="brandbar">
     <div class="brand"><i class="dot"></i>Bot Farm</div>
@@ -902,11 +927,6 @@ const TEMPLATE = `
   </header>
 
   <div class="stats"></div>
-
-  <div class="queue-pane">
-    <div class="sec-head"><span>Needs you</span><b class="q-count">0</b></div>
-    <div class="queue"></div>
-  </div>
 
   <div class="side-body">
     <div class="projects-pane">
@@ -936,6 +956,16 @@ const TEMPLATE = `
     </div>
   </div>
 </aside>
+
+<aside class="queue-card panel">
+  <header class="brandbar">
+    <div class="brand"><i class="dot q"></i>Needs you <b class="q-count">0</b></div>
+    <button class="btn icon ghost" id="btn-collapse-queue" title="Collapse the queue">${ICON.back}</button>
+  </header>
+  <div class="queue"></div>
+  <div class="q-empty">Nobody needs you right now.</div>
+</aside>
+</div>
 
 <div class="rail panel">
   <button class="btn icon" id="btn-home" title="Reset the view (0)">${ICON.home}</button>
