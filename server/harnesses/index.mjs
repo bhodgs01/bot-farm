@@ -12,9 +12,10 @@ import printFarm from './printfarm.mjs'
 import home from './home.mjs'
 import chores from './chores.mjs'
 import tasks from './tasks.mjs'
+import trades from './trades.mjs'
 
-const ALL = { 'jarvis-cluster': jarvisCluster, mailroom, plex, 'print-farm': printFarm, home, chores, tasks, 'claude-code': claudeCode }
-const wanted = (process.env.COLONY_HARNESSES || 'jarvis-cluster,mailroom,plex,print-farm,home,chores,tasks').split(',').map((s) => s.trim()).filter(Boolean)
+const ALL = { 'jarvis-cluster': jarvisCluster, mailroom, plex, 'print-farm': printFarm, home, chores, tasks, trades, 'claude-code': claudeCode }
+const wanted = (process.env.COLONY_HARNESSES || 'jarvis-cluster,mailroom,plex,print-farm,home,chores,tasks,trades').split(',').map((s) => s.trim()).filter(Boolean)
 
 export const HARNESSES = wanted.map((id) => ALL[id]).filter(Boolean)
 

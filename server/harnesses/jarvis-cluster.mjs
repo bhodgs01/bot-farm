@@ -70,7 +70,7 @@ export const ROSTER = [
   { id: 'olga',    name: 'Olga',    emoji: '🧑‍🏫', role: 'recruit intel',        zone: 'NGV Talent',        ns: ['recruit-intel', 'recruiter-bot', 'recruit-form', 'ngv-sales'], url: 'https://recruiter-bot.kcproto.com' },
   { id: 'dwight',  name: 'Dwight',  emoji: '🚜', role: 'inventory',            zone: 'NED Builds',        ns: ['nedbuilds-pro', 'small-business', 'ned-estimates'],          url: 'https://small-biz.kcproto.com' },
   { id: 'leo',     name: 'Leo',     emoji: '📣', role: 'listing announcer',    zone: 'NED Builds',        ns: ['ned-ar-bot'],                                                url: '' },
-  { id: 'snoop',   name: 'Snoop',   emoji: '📈', role: 'trader',               zone: 'Trade Floor',     landmark: 'reactor',      ns: ['trade-bot'],                                                 url: 'https://trade-bot.kcproto.com' },
+  { id: 'snoop',   name: 'Snoop',   emoji: '📈', role: 'trader',               zone: 'Trade Floor',     landmark: 'reactor',      ns: [],  url: 'https://trade-bot.kcproto.com', probe: 'https://trade-bot.kcproto.com/api/health' },
   { id: 'marty',   name: 'Marty',   emoji: '🏃', role: 'shorts poster',        zone: 'Shorts',      ns: ['shorts-player'],                                             url: '' },
   { id: 'hank',    name: 'Hank',    emoji: '📒', role: 'bookkeeper',           zone: 'Books',      ns: ['books'],                                                     url: '' },
   { id: 'gordon',  name: 'Gordon',  emoji: '👨‍🍳', role: 'schema roast',         zone: 'Roast Bot',      ns: ['roast-bot'],                                                 url: 'https://schemacheckerai.com' },
@@ -286,13 +286,32 @@ async function probe(url) {
  */
 async function appSignals() {
   const out = {}
-  const [biff, cluster, watchdog, shorts, feeds] = await Promise.all([
+  const [biff, cluster, watchdog, shorts, feeds, trader] = await Promise.all([
     fetchJson(`${AGENTS_BASE}/api/biff`),
     fetchJson(`${AGENTS_BASE}/api/cluster`),
     fetchJson(`${WATCHDOG_BASE}/api/state`),
     fetchJson(`${AGENTS_BASE}/api/shorts-state`),
     fetchJson(`${AGENTS_BASE}/api/brain-feeds`, 20000),
+    fetchJson(`${process.env.TRADE_BOT_URL || 'https://trade-bot.kcproto.com'}/api/status`),
   ])
+
+  // Snoop's bot runs on the Hetzner node, so its own status endpoint is the signal.
+  if (trader && trader.account) {
+    const cycleAt = Date.parse(trader.lastCycleTime || '') || 0
+    const equity = Number(trader.account.equity) || 0
+    const last = Number(trader.account.last_equity) || equity
+    const day = equity - last
+    const paper = /^PA/i.test(String(trader.account.account_number || ''))
+    out.snoop = {
+      running: Boolean(cycleAt) && Date.now() - cycleAt < 20 * 60 * 1000,
+      error: Boolean(trader.lastError),
+      message: trader.lastError
+        ? `bot error: ${String(trader.lastError).slice(0, 120)}`
+        : `${paper ? 'strategist (paper)' : 'LIVE'} · equity $${Math.round(equity).toLocaleString('en-US')} · today ${day >= 0 ? '+' : '-'}$${Math.abs(Math.round(day)).toLocaleString('en-US')} · ${(trader.positions || []).length} positions · ${Number(trader.dailyTradeCount) || 0} trades today`,
+      activityAt: cycleAt,
+      work: Number(trader.tradeCount) || 0,
+    }
+  }
 
   if (biff) {
     const approvals = Number(biff.approvals) || 0
