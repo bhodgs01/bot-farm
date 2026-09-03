@@ -3,7 +3,8 @@
  *
  * A chore still to do stands there idle with the kid's name on it; a chore marked done
  * celebrates and walks home on the next poll after midnight, when the day rolls over.
- * Blake's own list is included: the map is supposed to say what *he* needs to do too.
+ * Blake's own list is one keeper on the Home hex: the number of chores left floats over
+ * his head and hovering lists them.
  *
  * Read-only: one GET of /api/state per poll.
  */
@@ -24,7 +25,43 @@ async function fetchThreads() {
   const dayStart = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Chicago' }))
   dayStart.setHours(0, 0, 0, 0)
   const out = []
+  const mine = Array.isArray(state.todayC?.blake) ? state.todayC.blake : []
+  if (mine.length) {
+    const left = mine.filter((c) => !done[`blake-${c.id}`])
+    const clean = (c) => String(c.task || '').replace(/https?:\/\/\S+/g, '').trim() || 'chore'
+    out.push({
+      id: 'chore:blake:list',
+      kind: left.length ? 'task' : 'done',
+      count: left.length,
+      title: `📝 Blake's chores`,
+      preview: left.length ? left.map((c) => `• ${clean(c)}`).join(String.fromCharCode(10)) : `all ${mine.length} done today`,
+      project: 'Home',
+      projectPath: 'home://chores',
+      worktree: '',
+      cwd: 'blake',
+      gitBranch: left.length ? `${left.length} left` : 'done',
+      model: `${mine.length - left.length}/${mine.length} done`,
+      effort: '',
+      createdAt: dayStart.getTime(),
+      lastActivityAt: now,
+      lastFocusedAt: 0,
+      running: false,
+      unread: false,
+      hasError: false,
+      starred: false,
+      routine: '',
+      prState: left.length ? '' : 'MERGED',
+      archived: false,
+      hasTranscript: false,
+      sizeBytes: 1000 * (1 + mine.length * 20),
+      source: 'chore-quest',
+      canOpen: true,
+      canArchive: false,
+      ref: { kid: 'blake' },
+    })
+  }
   for (const [kid, list] of Object.entries(state.todayC || {})) {
+    if (kid === 'blake') continue
     for (const chore of Array.isArray(list) ? list : []) {
       const isDone = Boolean(done[`${kid}-${chore.id}`])
       const task = String(chore.task || '').replace(/https?:\/\/\S+/g, '').trim() || 'chore'

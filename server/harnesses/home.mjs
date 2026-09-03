@@ -3,7 +3,8 @@
  *
  * Only things that mean something get a body:
  *   - a person who is home stands on the hex (Blake at his desk is *working*)
- *   - an open door, window or garage holds a door glyph until it closes
+ *   - one Doors keeper stands for every door, window, garage and mailbox: the count of
+ *     open ones floats by its `!`, and hovering lists which
  *   - motion or a visitor at the front holds a person glyph while it lasts
  *   - every plant stands in the Garden by its planter; one whose soil moisture is below
  *     the threshold slumps with a droplet glyph until it is watered
@@ -21,7 +22,9 @@ const TTL_MS = 15 * 1000
 const ZONE = 'Home'
 const GARDEN = 'Garden'
 
-const DOOR_CLASSES = new Set(['door', 'window', 'garage_door', 'opening', 'lock'])
+const DOOR_CLASSES = new Set(['door', 'window', 'garage_door', 'opening'])
+/** Sensor names that are not doors even though they are contact sensors. */
+const NOT_A_DOOR = /mail/i
 const VISITOR_CLASSES = new Set(['motion', 'occupancy', 'presence', 'moving'])
 const DESK = /at_desk|desk_occupancy/i
 
@@ -59,6 +62,15 @@ function base(entityId, attrs, kind, extra = {}) {
   }
 }
 
+/** `Front door sensor Contact Sensor` → `Front door`. */
+function doorName(attrs, entityId) {
+  return String(attrs.friendly_name || entityId.split('.')[1])
+    .replace(/\s*contact sensor\s*$/i, '')
+    .replace(/\s*sensor\s*$/i, '')
+    .replace(/\s*opener door\s*$/i, ' door')
+    .trim() || entityId
+}
+
 /** Plants have their soil sensor named after them; the sensor id is the plant's id. */
 function plantName(attrs, entityId) {
   return String(attrs.friendly_name || entityId.split('.')[1])
@@ -76,6 +88,7 @@ async function fetchThreads() {
   const states = await res.json()
   const out = []
   const seenPlants = new Set()
+  const doors = [] // { name, open, changed }
 
   for (const s of states) {
     const id = s.entity_id
@@ -91,12 +104,18 @@ async function fetchThreads() {
       continue
     }
 
+    if (domain === 'binary_sensor' && (DOOR_CLASSES.has(cls) || /door|window/i.test(id)) && !VISITOR_CLASSES.has(cls) && !/motion|obstruction|button|motor|dry_contact/i.test(id) && !NOT_A_DOOR.test(a.friendly_name || id)) {
+      if (s.state === 'on' || s.state === 'off') doors.push({ name: doorName(a, id), open: s.state === 'on', changed })
+      continue
+    }
+    if (domain === 'cover' && (cls === 'garage' || cls === 'garage_door' || cls === 'door' || cls === 'gate')) {
+      if (s.state === 'open' || s.state === 'closed' || s.state === 'opening' || s.state === 'closing') doors.push({ name: doorName(a, id), open: s.state !== 'closed', changed })
+      continue
+    }
+
     if (domain === 'binary_sensor') {
       if (s.state !== 'on') continue
-      if (DOOR_CLASSES.has(cls) || /door|window|garage/i.test(id) && !VISITOR_CLASSES.has(cls) && !/motion|obstruction/i.test(id)) {
-        out.push(base(id, a, 'door', { preview: `${a.friendly_name || id} is open`, branch: 'open', changed }))
-        continue
-      }
+      // handled below as a group
       if (DESK.test(id)) {
         out.push(base(id, a, 'person', { title: 'Blake at desk', preview: 'at the desk, working', branch: 'desk', running: true, changed }))
         continue
@@ -129,6 +148,28 @@ async function fetchThreads() {
       out.push(t)
     }
   }
+  // One keeper for every door in the house. Open ones are counted by the badge and
+  // listed on hover; a house with everything shut shows a quiet keeper and no badge.
+  if (doors.length) {
+    const open = doors.filter((d) => d.open)
+    const latest = doors.reduce((m, d) => Math.max(m, Date.parse(d.changed || '') || 0), 0)
+    const lines = [
+      open.length ? `OPEN: ${open.map((d) => d.name).join(', ')}` : 'Everything is shut',
+      `closed: ${doors.filter((d) => !d.open).map((d) => d.name).join(', ') || 'none'}`,
+    ]
+    const t = base('house.doors', {}, 'doors', {
+      title: '🚪 Doors',
+      preview: lines.join(String.fromCharCode(10)),
+      branch: open.length ? `${open.length} open` : 'all shut',
+      model: `${doors.length} sensors`,
+      error: open.length > 0,
+      changed: latest ? new Date(latest).toISOString() : undefined,
+      sizeBytes: 1000 * (1 + doors.length * 30),
+    })
+    t.count = open.length
+    out.push(t)
+  }
+
   // The greenhouse itself: the Garden's landmark, kept by a gardener who reports the count.
   const plants = out.filter((t) => t.project === GARDEN)
   const thirsty = plants.filter((t) => t.kind === 'plant').length

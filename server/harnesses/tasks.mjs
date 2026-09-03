@@ -103,6 +103,48 @@ async function fetchThreads() {
       }
     })
   )
+  // One keeper on KC Proto carries the whole list: the count over his head, the titles
+  // on hover, a `?` if anything is due soon and a `!` if anything is overdue.
+  if (out.length) {
+    const overdue = out.filter((t) => t.hasError).length
+    const soon = out.filter((t) => t.unread).length
+    const lines = out
+      .slice()
+      .sort((a, b) => (b.hasError - a.hasError) || (b.unread - a.unread) || a.createdAt - b.createdAt)
+      .slice(0, 14)
+      .map((t) => `• ${t.hasError ? '⚠ ' : ''}${t.title}${t.cwd ? ` (${t.cwd})` : ''}`)
+    if (out.length > 14) lines.push(`… and ${out.length - 14} more`)
+    out.push({
+      id: 'task:all',
+      kind: 'task',
+      count: out.length,
+      title: '📋 Tasks',
+      preview: lines.join(String.fromCharCode(10)),
+      project: 'KC Proto',
+      projectPath: 'tasks://all',
+      worktree: '',
+      cwd: 'all projects',
+      gitBranch: overdue ? `${overdue} overdue` : soon ? `${soon} due soon` : `${out.length} open`,
+      model: '',
+      effort: '',
+      createdAt: 0,
+      lastActivityAt: now,
+      lastFocusedAt: 0,
+      running: false,
+      unread: soon > 0,
+      hasError: overdue > 0,
+      starred: false,
+      routine: '',
+      prState: '',
+      archived: false,
+      hasTranscript: false,
+      sizeBytes: 1000 * (1 + out.length * 30),
+      source: 'vikunja',
+      canOpen: true,
+      canArchive: false,
+      ref: { task: 0 },
+    })
+  }
   return out
 }
 

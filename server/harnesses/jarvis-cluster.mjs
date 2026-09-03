@@ -204,6 +204,7 @@ function parseMem(q) {
  * How many pods each node carries, without downloading them: a list capped at one item
  * reports `remainingItemCount`, so nineteen tiny requests replace one eight-megabyte one.
  */
+const EMPTY_STATS = () => ({ total: 0, running: 0, starting: 0, bad: 0, badNames: [] })
 let nodePodsCache = { at: 0, map: new Map() }
 async function podsPerNode(names) {
   if (Date.now() - nodePodsCache.at < 60 * 1000) return nodePodsCache.map
@@ -219,18 +220,39 @@ async function podsPerNode(names) {
             signal: AbortSignal.timeout(KUBE_TIMEOUT_MS),
           })
           const table = res.ok ? await res.json() : null
-          map.set(name, table?.rows?.length ?? nodePodsCache.map.get(name) ?? 0)
+          if (!table) throw new Error('no table')
+          // Table columns: Name | Ready | Status | Restarts | Age | IP | Node ...
+          const stats = EMPTY_STATS()
+          for (const row of table.rows || []) {
+            const [podName, , status] = row.cells || []
+            const st = String(status || '')
+            if (/^(Completed|Succeeded)$/.test(st)) continue
+            stats.total++
+            if (st === 'Running') stats.running++
+            else if (/ContainerCreating|Pending|PodInitializing|^Init:|Terminating/.test(st)) stats.starting++
+            else if (/CrashLoopBackOff|Error|ImagePullBackOff|ErrImagePull|OOMKilled|CreateContainerConfigError|Evicted|Unknown/.test(st)) {
+              stats.bad++
+              if (stats.badNames.length < 6) stats.badNames.push(`${podName} (${st})`)
+            }
+          }
+          map.set(name, stats)
         } catch {
-          map.set(name, nodePodsCache.map.get(name) || 0)
+          map.set(name, nodePodsCache.map.get(name) || EMPTY_STATS())
         }
       })
     )
   } else {
     try {
-      const { stdout } = await execFileAsync('kubectl', ['get', 'pods', '-A', '--no-headers', '-o', 'custom-columns=NODE:.spec.nodeName'], { maxBuffer: 16 * 1024 * 1024 })
-      for (const line of stdout.split('\n')) {
-        const node = line.trim()
-        if (node && node !== '<none>') map.set(node, (map.get(node) || 0) + 1)
+      const { stdout } = await execFileAsync('kubectl', ['get', 'pods', '-A', '--no-headers', '-o', 'custom-columns=NODE:.spec.nodeName,PHASE:.status.phase,WAIT:.status.containerStatuses[*].state.waiting.reason'], { maxBuffer: 16 * 1024 * 1024 })
+      for (const line of stdout.split(String.fromCharCode(10))) {
+        const [node, phase, wait] = line.trim().split(/\s+/)
+        if (!node || node === '<none>' || phase === 'Succeeded') continue
+        const stats = map.get(node) || EMPTY_STATS()
+        stats.total++
+        if (/CrashLoopBackOff|ImagePullBackOff|ErrImagePull|CreateContainerConfigError/.test(wait || '') || phase === 'Failed') stats.bad++
+        else if (phase === 'Running') stats.running++
+        else stats.starting++
+        map.set(node, stats)
       }
     } catch {
       /* keep the last counts */
@@ -596,16 +618,21 @@ function nodeThreads(snap) {
     const capMem = parseMem(n.status?.allocatable?.memory)
     const cpuPct = use && capCpu ? Math.round((100 * use.cpu) / capCpu) : null
     const memPct = use && capMem ? Math.round((100 * use.mem) / capMem) : null
-    const pods = snap.nodePods?.get(name) || 0
+    const st = snap.nodePods?.get(name) || EMPTY_STATS()
+    const pods = st.total
     const role = Object.keys(n.metadata.labels || {}).some((k) => k.includes('control-plane') || k.includes('master')) ? 'control plane' : 'worker'
     const problems = [!ready ? 'NotReady' : '', cordoned ? 'cordoned' : '', ...pressure].filter(Boolean)
+    if (st.bad) problems.push(`${st.bad} pod${st.bad > 1 ? 's' : ''} down: ${st.badNames.join(', ')}`)
     const hot = (cpuPct ?? 0) >= 70 || (memPct ?? 0) >= 85
+    const pushing = st.starting > 0
     const readyAt = Date.parse(cond('Ready')?.lastTransitionTime || '') || 0
     return {
       id: `node:${name}`,
       landmark: 'rack',
+      count: st.bad || 0,
+      roof: `${st.running} pods`,
       title: `🖥 ${name}`,
-      preview: [problems.length ? problems.join(', ') : 'Ready', cpuPct != null ? `cpu ${cpuPct}%` : '', memPct != null ? `mem ${memPct}%` : '', `${pods} pods`, n.status?.nodeInfo?.kubeletVersion || '']
+      preview: [problems.length ? problems.join(', ') : 'Ready', cpuPct != null ? `cpu ${cpuPct}%` : '', memPct != null ? `mem ${memPct}%` : '', `${st.running} running`, st.starting ? `${st.starting} starting` : '', n.status?.nodeInfo?.kubeletVersion || '']
         .filter(Boolean)
         .join(' · '),
       project: 'Cluster',
@@ -616,9 +643,9 @@ function nodeThreads(snap) {
       model: cpuPct != null ? `${cpuPct}% cpu` : '',
       effort: '',
       createdAt: Date.parse(n.metadata.creationTimestamp) || now,
-      lastActivityAt: hot ? now : readyAt || now,
+      lastActivityAt: hot || pushing ? now : readyAt || now,
       lastFocusedAt: 0,
-      running: hot,
+      running: hot || pushing,
       unread: false,
       hasError: problems.length > 0,
       starred: role === 'control plane',

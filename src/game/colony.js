@@ -181,6 +181,10 @@ export class Colony {
     this.plotGroup = new THREE.Group()
     this.labelGroup = new THREE.Group()
     scene.add(this.plotGroup, this.labelGroup)
+    // Count plates by a badge (`thread.count`) and roof labels on buildings (`thread.roof`).
+    this.plates = new Map()
+    this.plateGroup = new THREE.Group()
+    scene.add(this.plateGroup)
 
     // Dismissing the HUD has to survive a poll: labels are chrome, and a scan landing while
     // everything is hidden must not quietly put them back on screen.
@@ -648,6 +652,57 @@ export class Colony {
   }
 
   /**
+   * Plates: a small number floating by an astronaut's badge when its thread carries a
+   * `count` (three doors open, five chores left, two pods down), and a roof label on a
+   * building when its thread carries `roof` (how many pods a node runs). Rebuilt only
+   * when the text changes; positions follow their owner every frame.
+   */
+  _syncPlates() {
+    const seen = new Set()
+    const want = (key, text, accent, kind) => {
+      seen.add(key)
+      const have = this.plates.get(key)
+      if (have && have.text === text) return have
+      if (have) {
+        this.plateGroup.remove(have.mesh)
+        have.mesh.userData.dispose?.()
+      }
+      const opts = kind === 'count'
+        ? { height: 0.34, dot: false, pad: 10, fontSize: 40, opacity: 1, color: '#fff3d6' }
+        : { height: 0.3, dot: false, pad: 10, fontSize: 32, opacity: 0.92 }
+      const mesh = createLabel(text, accent, 4, opts)
+      mesh.renderOrder = 11
+      this.plateGroup.add(mesh)
+      const plate = { mesh, text, kind }
+      this.plates.set(key, plate)
+      return plate
+    }
+
+    for (const agent of this.astronauts.agents) {
+      const t = agent.thread
+      const n = Number(t?.count)
+      if (!t || !Number.isFinite(n) || n <= 0 || agent.state === 'gone' || agent.scale < 0.4) continue
+      const plot = this.plots.get(t.project)
+      const plate = want(`count:${agent.id}`, String(n), plot?.accent ?? 0xffffff, 'count')
+      plate.mesh.position.set(agent.pos.x + 0.42, agent.pos.y + 2.12, agent.pos.z)
+    }
+    for (const [id, entry] of this.buildings) {
+      const t = this.threads.get(id)
+      if (!t?.roof || entry.retiring) continue
+      const plot = this.plots.get(t.project)
+      const plate = want(`roof:${id}`, String(t.roof), plot?.accent ?? 0xffffff, 'roof')
+      const top = entry.mesh.geometry?.boundingBox?.max.y ?? 2
+      plate.mesh.position.set(entry.mesh.position.x, entry.mesh.position.y + top * entry.progress + 0.32, entry.mesh.position.z)
+    }
+    for (const [key, plate] of this.plates) {
+      if (seen.has(key)) continue
+      this.plateGroup.remove(plate.mesh)
+      plate.mesh.userData.dispose?.()
+      this.plates.delete(key)
+    }
+  }
+
+  /**
    * Names fade in for the plots that have something going on, and for whichever one you are
    * pointing at. Everywhere else the colony stays unlabelled.
    */
@@ -705,6 +760,7 @@ export class Colony {
   // ── per-frame ───────────────────────────────────────────────────────────────────────
 
   update(dt, elapsed, focus) {
+    this._syncPlates()
     if (focus) this.sky.setFocus(focus)
     const cycled = this.sky.update(dt, elapsed, this.camera)
     if (cycled) this.settings.values.timeOfDay = this.sky.time

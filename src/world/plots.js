@@ -651,12 +651,12 @@ export class Plot {
  * shader, so they stay upright and legible from any camera angle without a per-frame
  * lookAt on the CPU.
  */
-export function createLabel(text, accent, pixelRatio = 4) {
-  const fontSize = 34
+export function createLabel(text, accent, pixelRatio = 4, opts = {}) {
+  const fontSize = opts.fontSize || 34
   const font = `500 ${fontSize}px ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif`
-  const dot = 9
-  const gap = 10
-  const pad = 14
+  const dot = opts.dot === false ? 0 : 9
+  const gap = opts.dot === false ? 0 : 10
+  const pad = opts.pad ?? 14
 
   const measure = document.createElement('canvas').getContext('2d')
   measure.font = font
@@ -683,16 +683,20 @@ export function createLabel(text, accent, pixelRatio = 4) {
   c.shadowBlur = 9
   c.fillStyle = 'rgba(0,0,0,0.9)'
   for (let i = 0; i < 3; i++) c.fillText(text, textX, midY) // build the halo up in passes
-  c.beginPath()
-  c.arc(pad + dot / 2, midY, dot / 2, 0, Math.PI * 2)
-  c.fill()
+  if (dot) {
+    c.beginPath()
+    c.arc(pad + dot / 2, midY, dot / 2, 0, Math.PI * 2)
+    c.fill()
+  }
 
   c.shadowBlur = 0
   c.fillStyle = '#' + new THREE.Color(accent).getHexString()
-  c.beginPath()
-  c.arc(pad + dot / 2, midY, dot / 2, 0, Math.PI * 2)
-  c.fill()
-  c.fillStyle = '#f4f2ee'
+  if (dot) {
+    c.beginPath()
+    c.arc(pad + dot / 2, midY, dot / 2, 0, Math.PI * 2)
+    c.fill()
+  }
+  c.fillStyle = opts.color || '#f4f2ee'
   c.fillText(text, textX, midY)
 
   const texture = new THREE.CanvasTexture(canvas)
@@ -705,7 +709,7 @@ export function createLabel(text, accent, pixelRatio = 4) {
   texture.generateMipmaps = true
   texture.anisotropy = 8
 
-  const height = 0.56
+  const height = opts.height || 0.56
   const geo = new THREE.PlaneGeometry(height * (w / h), height)
   const mat = new THREE.MeshBasicMaterial({
     map: texture,
@@ -717,7 +721,7 @@ export function createLabel(text, accent, pixelRatio = 4) {
     // because the one that wants you matters more than the zone it is standing in.
     depthTest: false,
     toneMapped: false,
-    opacity: 0,
+    opacity: opts.opacity ?? 0,
   })
   mat.onBeforeCompile = (shader) => {
     shader.vertexShader = shader.vertexShader.replace(

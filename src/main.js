@@ -71,7 +71,7 @@ function showHoverTip(agent, e) {
   }
   const state = STATUS_LABEL[agent.status] || ''
   const pct = Number.isFinite(t.progress) ? ` · ${Math.round(t.progress * 100)}%` : ''
-  hoverTip.innerHTML = `<b>${esc(t.title)}</b><i>${esc(state)}${pct}</i>` + (t.preview ? `<span>${esc(t.preview)}</span>` : '')
+  hoverTip.innerHTML = `<b>${esc(t.title)}</b><i>${esc(state)}${pct}</i>` + (t.preview ? `<span>${esc(t.preview).replace(/\n/g, '<br>')}</span>` : '')
   hoverTip.hidden = false
   const w = hoverTip.offsetWidth
   const h = hoverTip.offsetHeight
