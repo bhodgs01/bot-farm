@@ -430,13 +430,15 @@ export class Hud {
     swatch.style.color = hex(project.accent) // the halo is `currentColor`
     this.$('.side .name').textContent = project.name
     const path = this.$('.side .path')
-    path.textContent = project.path ? shortPath(project.path) : `${project.threads.length} on this hex`
+    // Only a real folder on disk earns the folder buttons; a hex path like home://garden
+    // is a label, not somewhere a new session could start.
+    const onDisk = Boolean(project.path && /^(\/|[A-Za-z]:[\/])/.test(project.path))
+    path.textContent = onDisk ? shortPath(project.path) : `${project.threads.length} on this hex`
     path.title = project.path || ''
-    // Nothing to open a new thread in, and nothing to reveal, without a folder on disk.
-    this.$('#btn-new-session').hidden = !project.path
-    this.$('#btn-reveal').hidden = !project.path
-    this.$('#btn-copy-path').hidden = !project.path
-    this.$('#btn-new-session').disabled = !project.path
+    this.$('#btn-new-session').hidden = !onDisk
+    this.$('#btn-reveal').hidden = !onDisk
+    this.$('#btn-copy-path').hidden = !onDisk
+    this.$('#btn-new-session').disabled = !onDisk
     this.$('#btn-reveal').disabled = !project.path
     this.$('#btn-copy-path').disabled = !project.path
 
