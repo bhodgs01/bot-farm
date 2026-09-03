@@ -52,7 +52,9 @@ export const ROSTER = [
   { id: 'janine',  name: 'Janine',  emoji: '💁‍♀️', role: 'email receptionist',   zone: 'KC Proto',          ns: ['janine', 'janine2'],                                         url: 'https://janine.kcproto.com' },
   { id: 'cole',    name: 'COLE',    emoji: '🛡️', role: 'incident response',    zone: 'Watchdog',        landmark: 'tower',          ns: ['watchdog', 'anthropic-watch'],                 url: 'https://watchdog.kcproto.com' },
   { id: 'jim',     name: 'Jim',     emoji: '📋', role: 'helpdesk',             zone: 'KC Proto',          ns: ['ticket-bot', 'kuma-ticket-bridge', 'embassy-tickets'],       url: 'https://ticket_bot.kcproto.com' },
-  { id: 'phyllis', name: 'Phyllis', emoji: '🧐', role: 'QA inspector',         zone: 'KC Proto',          ns: ['backup-monitor', 'backups', 'kev-fleet-check'],              url: '' },
+  { id: 'phyllis', name: 'Phyllis', emoji: '🧐', role: 'QA inspector',         zone: 'Backups',           ns: ['backup-monitor', 'backups', 'kev-fleet-check'],              url: '', landmark: 'silo' },
+  { id: 'sync',    name: 'Sync',    emoji: '🔁', role: 'file sync',            zone: 'Backups',           ns: ['syncthing'],                                                 url: 'https://syncthing.kcproto.com' },
+  { id: 'velero',  name: 'Velero',  emoji: '🧳', role: 'cluster backups',      zone: 'Backups',           ns: ['velero'],                                                    url: '' },
   { id: 'frank',   name: 'Frank',   emoji: '🧑‍🎨', role: 'designer',             zone: 'KC Proto',          ns: ['kcaistudio'],                                                url: '' },
   { id: 'adam',    name: 'Adam',    emoji: '🛠️', role: 'print farm operator',  zone: 'Print Service',   landmark: 'workshop',          ns: ['print-farm', 'print-service', 'octofarm'],                   url: 'https://print.kcproto.com' },
   { id: 'clawd',   name: 'Clawd',   emoji: '🦞', role: 'chaos gremlin',        zone: 'KC Proto',        landmark: 'silo',          ns: ['clawd-dashboard'],                                           url: 'https://agents.kcproto.com/clawd-chat.html', probe: process.env.CLAWD_PROBE || '' },
@@ -308,14 +310,72 @@ async function probe(url) {
  */
 async function appSignals() {
   const out = {}
-  const [biff, cluster, watchdog, shorts, feeds, trader] = await Promise.all([
+  const [biff, cluster, watchdog, shorts, feeds, trader, syncthing, velero] = await Promise.all([
     fetchJson(`${AGENTS_BASE}/api/biff`),
     fetchJson(`${AGENTS_BASE}/api/cluster`),
     fetchJson(`${WATCHDOG_BASE}/api/state`),
     fetchJson(`${AGENTS_BASE}/api/shorts-state`),
     fetchJson(`${AGENTS_BASE}/api/brain-feeds`, 20000),
     fetchJson(`${process.env.TRADE_BOT_URL || 'https://trade-bot.kcproto.com'}/api/status`),
+    fetchJson(process.env.SYNCTHING_STATUS_URL || 'http://syncthing-dashboard.syncthing.svc.cluster.local:3200/api/status'),
+    kubeGet('/apis/velero.io/v1/namespaces/velero/backups').catch(() => null),
   ])
+
+  if (syncthing && Array.isArray(syncthing.instances)) {
+    const inst = syncthing.instances
+    const offline = inst.filter((i) => !i.online || i.error)
+    const folders = inst.flatMap((i) => (i.folders || []).map((f) => ({ ...f, on: i.name })))
+    const busy = folders.filter((f) => /sync|scan/i.test(String(f.state || '')))
+    const broken = folders.filter((f) => /error|outofsync/i.test(String(f.state || '')))
+    const behind = folders.filter((f) => Number(f.syncPercentage) < 99)
+    const pct = folders.length ? Math.min(...folders.map((f) => Number(f.syncPercentage) || 0)) : 100
+    const latest = folders.reduce((m, f) => Math.max(m, Date.parse(f.stateChanged || '') || 0), 0)
+    out.sync = {
+      running: busy.length > 0,
+      error: offline.length > 0 || broken.length > 0,
+      message: offline.length
+        ? `${offline.map((i) => i.name).join(', ')} offline`
+        : broken.length
+          ? `${broken.map((f) => `${f.label} on ${f.on}`).join(', ')} in error`
+          : `${inst.length} nodes online · ${folders[0]?.label || 'mirror'} ${pct.toFixed(1)}% in sync${busy.length ? ` · ${busy.map((f) => `${f.on} ${f.state}`).join(', ')}` : ''}${behind.length ? ` · ${behind.map((f) => f.on).join(', ')} behind` : ''}`,
+      activityAt: latest,
+      work: Math.round((folders[0]?.globalFiles || 0) / 1000),
+    }
+  }
+
+  if (velero && Array.isArray(velero.items)) {
+    const backups = velero.items
+      .map((b) => ({
+        name: b.metadata?.name || '',
+        phase: b.status?.phase || 'Unknown',
+        start: Date.parse(b.status?.startTimestamp || b.metadata?.creationTimestamp || '') || 0,
+        end: Date.parse(b.status?.completionTimestamp || '') || 0,
+        items: Number(b.status?.progress?.itemsBackedUp) || 0,
+        errors: Number(b.status?.errors) || 0,
+        schedule: b.metadata?.labels?.['velero.io/schedule-name'] || '',
+      }))
+      .sort((a, b) => b.start - a.start)
+    const last = backups[0]
+    const inProgress = backups.filter((b) => b.phase === 'InProgress')
+    const now = Date.now()
+    const lastNightly = backups.find((b) => /nightly/.test(b.schedule || b.name))
+    const stale = lastNightly ? now - lastNightly.start > 27 * 60 * 60 * 1000 : true
+    const failed = last && /Failed/.test(last.phase)
+    const ago = (t) => (t ? `${Math.round((now - t) / 3600000)}h ago` : 'never')
+    out.velero = {
+      running: inProgress.length > 0,
+      error: Boolean(failed || stale),
+      message: inProgress.length
+        ? `backing up now: ${inProgress[0].name}`
+        : failed
+          ? `last backup ${last.phase}: ${last.name} (${last.errors} errors)`
+          : stale
+            ? `no nightly backup in ${lastNightly ? ago(lastNightly.start) : 'sight'}`
+            : `nightly ${lastNightly.phase} ${ago(lastNightly.start)} · ${lastNightly.items.toLocaleString('en-US')} items · ${backups.length} backups kept`,
+      activityAt: last?.end || last?.start || 0,
+      work: last?.items || 0,
+    }
+  }
 
   // Snoop's bot runs on the Hetzner node, so its own status endpoint is the signal.
   if (trader && trader.account) {
