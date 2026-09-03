@@ -128,6 +128,36 @@ class Composer {
     return this
   }
 
+  /**
+   * A procedural part, for the few things the pack does not ship. The geometry's UVs are
+   * pinned to one atlas cell so it takes that swatch's colour and surface response and
+   * merges into the same draw call as everything else.
+   * @param {THREE.BufferGeometry} geo  built in the building's own frame
+   * @param {number} cell                atlas cell index (see kit.js CELL)
+   */
+  geom(geo, cell, o = {}) {
+    const ref = this.parts[0]
+    if (ref && !ref.index && geo.index) geo = geo.toNonIndexed()
+    const count = geo.attributes.position.count
+    const u = ((cell % ATLAS.cols) + 0.5) / ATLAS.cols
+    const v = (Math.floor(cell / ATLAS.cols) + 0.5) / ATLAS.rows
+    const uv = new Float32Array(count * 2)
+    for (let i = 0; i < count; i++) {
+      uv[i * 2] = u
+      uv[i * 2 + 1] = v
+    }
+    geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2))
+    if (!geo.getAttribute('normal')) geo.computeVertexNormals()
+    const s = o.s ?? 1
+    if (s !== 1) geo.scale(s, s, s)
+    if (o.ry) geo.rotateY(o.ry)
+    geo.translate(o.x || 0, o.y || 0, o.z || 0)
+    geo.setAttribute('aEmissive', new THREE.BufferAttribute(new Float32Array(count).fill(o.emissive || 0), 1))
+    geo.setAttribute('aSpin', new THREE.BufferAttribute(new Float32Array(count), 1))
+    geo.setAttribute('aPivot', new THREE.BufferAttribute(new Float32Array(count * 3), 3))
+    this.parts.push(geo)
+    return this
+  }
   /** Scatter `count` copies of a part around a ring, jittered so it never reads as a pattern. */
   ring(name, count, radius, rand, o = {}) {
     for (let i = 0; i < count; i++) {
@@ -216,6 +246,79 @@ const KINDS = {
     return 'Reactor'
   },
 
+  /**
+   * The Brain's landmark: a deep-space dish on a mast, feed horn on three struts, beacon at
+   * the focus. The pack has no antenna, so this one is lathed from a parabola and pinned to
+   * the pack's white swatch; the mast and struts take the grey structural one.
+   */
+  dish(c, rand) {
+    c.add('basemodule_E')
+    c.add('containers_D', { x: 1.25, z: -0.9, ry: rand() * 6.28 })
+
+    const mastH = 1.5
+    c.geom(new THREE.CylinderGeometry(0.11, 0.17, mastH, 10), CELL.GREY, { y: DECK + mastH / 2 })
+    c.geom(new THREE.CylinderGeometry(0.26, 0.26, 0.22, 12), CELL.SLATE, { y: DECK + mastH })
+
+    // Dish and feed, built on their own axis (+y) and then tilted together toward the sky.
+    const R = 1.35
+    const K = 0.24 // depth = K * r^2, focus at 1 / (4K)
+    const profile = []
+    for (let i = 0; i <= 14; i++) {
+      const x = (i / 14) * R
+      profile.push(new THREE.Vector2(x, K * x * x))
+    }
+    const bowl = new THREE.LatheGeometry(profile, 32)
+    const rim = new THREE.TorusGeometry(R, 0.035, 8, 40)
+    rim.rotateX(Math.PI / 2)
+    rim.translate(0, K * R * R, 0)
+    const focus = 1 / (4 * K)
+    const horn = new THREE.CylinderGeometry(0.09, 0.05, 0.28, 8)
+    horn.translate(0, focus, 0)
+    const struts = []
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2
+      const foot = new THREE.Vector3(Math.cos(a) * R * 0.82, K * (R * 0.82) ** 2, Math.sin(a) * R * 0.82)
+      const tip = new THREE.Vector3(0, focus - 0.08, 0)
+      const len = foot.distanceTo(tip)
+      const strut = new THREE.CylinderGeometry(0.022, 0.022, len, 5)
+      const mid = foot.clone().add(tip).multiplyScalar(0.5)
+      const dir = tip.clone().sub(foot).normalize()
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir)
+      strut.applyQuaternion(q)
+      strut.translate(mid.x, mid.y, mid.z)
+      struts.push(strut)
+    }
+    const tilt = -0.95 // radians about X: face up and toward the front of the plot
+    const place = (g) => {
+      g.rotateX(tilt)
+      g.translate(0, DECK + mastH + 0.18, 0)
+      return g
+    }
+    const bowlTwin = bowl.clone()
+    c.geom(place(bowl), CELL.WHITE)
+    c.geom(place(rim), CELL.SLATE)
+    c.geom(place(horn), CELL.GREY)
+    for (const s of struts) c.geom(place(s), CELL.GREY)
+    // The beacon at the feed, lit: it is what reads as "receiving" from across the colony.
+    const beacon = new THREE.SphereGeometry(0.075, 10, 8)
+    beacon.translate(0, focus + 0.18, 0)
+    c.geom(place(beacon), CELL.RED, { emissive: 1 })
+    // The lathe faces one way and the material is single-sided, so the bowl needs an
+    // inward-facing twin or it is culled from exactly the angle you look at it from.
+    const inner = bowlTwin
+    const idx = inner.index.array
+    for (let i = 0; i < idx.length; i += 3) {
+      const t = idx[i + 1]
+      idx[i + 1] = idx[i + 2]
+      idx[i + 2] = t
+    }
+    const nrm = inner.attributes.normal.array
+    for (let i = 0; i < nrm.length; i++) nrm[i] = -nrm[i]
+    inner.translate(0, 0.012, 0)
+    c.geom(place(inner), CELL.WHITE)
+    return 'Antenna'
+  },
+
   tower(c, rand) {
     c.add('structure_tall')
     c.add('lights', { y: 2.0, s: 0.7 })
@@ -249,7 +352,7 @@ const KINDS = {
   },
 }
 
-const KIND_IDS = Object.keys(KINDS)
+const KIND_IDS = Object.keys(KINDS).filter((k) => k !== 'dish')
 
 // ── the reveal shader ─────────────────────────────────────────────────────────────────
 

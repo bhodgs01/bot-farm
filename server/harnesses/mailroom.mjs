@@ -1,10 +1,10 @@
 /**
  * Harness adapter: the Mailroom — unread inbound mail as astronauts.
  *
- * Every unread message in the business inbox (blake@kcproto.com, read through Janine's
+ * Every message sitting in the business inbox (blake@kcproto.com, read through Janine's
  * Gmail OAuth) is one astronaut. It walks out of the ship to the client hex its sender
- * belongs to and holds a mail glyph until the message is read or replied, at which point
- * it disappears from the scan and walks home. A message carrying a printable model file
+ * belongs to. Unread mail holds a mail glyph; read mail just stands there, and after three
+ * days it sits down and sleeps. Archive it out of the inbox and it walks home. A message carrying a printable model file
  * is a print request instead: same walk, printer glyph, Print Service hex.
  *
  * Read-only. The adapter never modifies, labels or sends anything.
@@ -21,7 +21,7 @@ const MAILBOX = process.env.MAILROOM_ADDRESS || 'blake@kcproto.com'
 /** How long a mail scan is reused before Gmail is asked again. */
 const MAIL_TTL_MS = 60 * 1000
 /** Ignore anything older than this; a month-old unread mail is not "what is going on". */
-const QUERY = 'in:inbox is:unread -category:promotions -category:social -category:updates newer_than:30d'
+const QUERY = 'in:inbox -category:promotions -category:social -category:updates newer_than:30d'
 const PRINT_FILES = /\.(stl|3mf|step|stp|obj|iges|igs|f3d|scad)(\b|$)/i
 const PRINT_WORDS = /\b(print|printing|3d|slice|filament|pla|petg)\b/i
 const MAX_MESSAGES = 60
@@ -29,7 +29,7 @@ const MAX_MESSAGES = 60
 /**
  * Where a sender's mail lands. First match wins; `domain` matches the address domain
  * (and its subdomains), `match` is tested against "Name <address> | Subject".
- * Unmatched mail stands on the Unfiled hex so nothing is ever invisible.
+ * Unmatched mail stands on the Inbox hex so nothing is ever invisible.
  */
 export const CLIENTS = [
   { zone: 'CorrosionDC',       domain: ['corrosiondc.com'] },
@@ -120,7 +120,7 @@ function zoneFor(meta, isPrint) {
     if (c.domain && domain && c.domain.some((d) => domain === d || domain.endsWith('.' + d))) return c.zone
     if (c.match && c.match.test(hay)) return c.zone
   }
-  return isPrint ? 'Print Service' : 'Unfiled'
+  return isPrint ? 'Print Service' : 'Inbox'
 }
 
 // ------------------------------------------------------------------------------------------
@@ -142,23 +142,24 @@ async function fetchThreads() {
     if (IGNORE_SENDERS.test(address)) continue
     const isPrint = printIds.has(meta.id) || PRINT_FILES.test(meta.subject) || (PRINT_WORDS.test(meta.subject) && PRINT_WORDS.test(meta.snippet))
     const zone = zoneFor(meta, isPrint)
+    const unread = meta.labels.includes('UNREAD')
     out.push({
       id: `mail:${meta.id}`,
-      kind: isPrint ? 'print' : 'mail',
+      kind: isPrint ? 'print' : unread ? 'mail' : 'inbox',
       title: meta.subject.slice(0, 120),
       preview: `${name} · ${meta.snippet}`.slice(0, 240),
       project: zone,
       projectPath: `mail://${zone.toLowerCase().replace(/\s+/g, '-')}`,
       worktree: '',
       cwd: address,
-      gitBranch: isPrint ? 'print request' : 'email',
+      gitBranch: isPrint ? 'print request' : unread ? 'unread' : 'read',
       model: name,
       effort: '',
       createdAt: meta.at,
       lastActivityAt: meta.at,
       lastFocusedAt: 0,
       running: false,
-      unread: true,
+      unread,
       hasError: false,
       starred: meta.labels.includes('STARRED'),
       routine: '',

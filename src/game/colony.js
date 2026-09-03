@@ -46,7 +46,7 @@ const LIVE_GROWTH = 0.004
 /** How many zones' positions to remember, including repos with nothing running in them. */
 const LAYOUT_MEMORY = 80
 
-export const STATUS_ORDER = ['blocked', 'mail', 'print', 'waiting', 'working', 'watching', 'celebrating', 'idle', 'sleeping']
+export const STATUS_ORDER = ['blocked', 'mail', 'print', 'waiting', 'working', 'watching', 'printing', 'celebrating', 'idle', 'sleeping']
 
 export const STATUS_LABEL = {
   working: 'Working',
@@ -54,6 +54,7 @@ export const STATUS_LABEL = {
   mail: 'New mail',
   print: 'Print request',
   watching: 'Streaming',
+  printing: 'Printing',
   blocked: 'Blocked',
   celebrating: 'Shipped',
   idle: 'Idle',
@@ -68,6 +69,7 @@ export function statusFor(thread, now = Date.now()) {
   if (thread.kind === 'mail') return 'mail'
   if (thread.kind === 'print') return 'print'
   if (thread.kind === 'watching') return 'watching'
+  if (thread.kind === 'printing') return 'printing'
   if (thread.hasError) return 'blocked'
   if (thread.running) return 'working'
   if (thread.prState === 'MERGED') return 'celebrating'
@@ -86,6 +88,7 @@ const BADGE_FOR = {
   mail: BADGE.mail,
   print: BADGE.print,
   watching: BADGE.watching,
+  printing: BADGE.printing,
   blocked: BADGE.blocked,
   working: BADGE.working,
   celebrating: BADGE.done,
@@ -164,7 +167,7 @@ export class Colony {
     this.activePlots = new Set()
     this._dustTint = new THREE.Color(this.planet.ground.high)
     this._c = new THREE.Color()
-    this.stats = { agents: 0, projects: 0, working: 0, waiting: 0, mail: 0, print: 0, watching: 0, blocked: 0, done: 0 }
+    this.stats = { agents: 0, projects: 0, working: 0, waiting: 0, mail: 0, print: 0, watching: 0, printing: 0, blocked: 0, done: 0 }
 
     this._buildTerrain()
   }
@@ -307,7 +310,7 @@ export class Colony {
         if (stats[status] !== undefined) stats[status]++
         const wantsYou = status === 'waiting' || status === 'blocked' || status === 'mail' || status === 'print'
         if (wantsYou) urgent.add(plot.id)
-        if (wantsYou || status === 'working' || status === 'watching') active.add(plot.id)
+        if (wantsYou || status === 'working' || status === 'watching' || status === 'printing') active.add(plot.id)
         stats.agents++
 
         const building = this._syncBuilding(thread, plot, i)
@@ -442,7 +445,7 @@ export class Colony {
     const target = 1
 
     if (!entry) {
-      const mesh = createBuilding({ seed: hashString(thread.id), accent: plot.accent })
+      const mesh = createBuilding({ seed: hashString(thread.id), accent: plot.accent, kind: thread.landmark || null })
       const pos = plot.worldSlot(index)
       mesh.position.copy(pos)
       mesh.rotation.y = ((hashString(thread.id) >>> 8) % 360) * (Math.PI / 180)
@@ -740,7 +743,7 @@ export class Colony {
       // under it. Everything thrown off an astronaut has to land back on the same surface.
       const ground = agent.groundY || 0
 
-      if (agent.state === 'at-site' && (agent.status === 'working' || agent.status === 'watching')) {
+      if (agent.state === 'at-site' && (agent.status === 'working' || agent.status === 'watching' || agent.status === 'printing')) {
         // Sparks on the downbeat of the hammer swing, not every frame.
         const swing = Math.sin(agent.workSwing)
         if (swing < -0.75 && !agent._sparked) {

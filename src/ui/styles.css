@@ -1349,3 +1349,22 @@ kbd {
   }
 }
 .bot-crossing-canvas { cursor: grab; }
+
+/* Hover preview for an astronaut: what it is, what state it is in, its first line. */
+.hover-tip {
+  position: fixed;
+  z-index: 40;
+  pointer-events: none;
+  max-width: 320px;
+  padding: 8px 11px 9px;
+  border-radius: 10px;
+  background: rgba(12, 14, 20, 0.93);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  color: #e6e8ef;
+  font-size: 12px;
+  line-height: 1.35;
+}
+.hover-tip b { display: block; font-weight: 600; color: #fff; }
+.hover-tip i { display: block; font-style: normal; font-size: 11px; opacity: 0.6; margin: 1px 0 3px; }
+.hover-tip span { display: block; opacity: 0.85; }

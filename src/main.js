@@ -57,6 +57,27 @@ let selectedId = null
 /** Which zone's sidebar is open. A repo, not a thread — they outlive the threads on them. */
 let selectedProject = null
 let hoverId = null
+// Hovering an astronaut shows what it is: a mail's sender and first line, a print's job.
+const hoverTip = document.createElement('div')
+hoverTip.className = 'hover-tip'
+hoverTip.hidden = true
+document.body.appendChild(hoverTip)
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+function showHoverTip(agent, e) {
+  const t = agent?.thread
+  if (!t) {
+    hoverTip.hidden = true
+    return
+  }
+  const state = STATUS_LABEL[agent.status] || ''
+  const pct = Number.isFinite(t.progress) ? ` · ${Math.round(t.progress * 100)}%` : ''
+  hoverTip.innerHTML = `<b>${esc(t.title)}</b><i>${esc(state)}${pct}</i>` + (t.preview ? `<span>${esc(t.preview)}</span>` : '')
+  hoverTip.hidden = false
+  const w = hoverTip.offsetWidth
+  const h = hoverTip.offsetHeight
+  hoverTip.style.left = `${Math.min(e.clientX + 16, window.innerWidth - w - 8)}px`
+  hoverTip.style.top = `${Math.min(e.clientY + 18, window.innerHeight - h - 8)}px`
+}
 let statusCursor = 0
 let pendingSave = 0
 const hoverGround = new THREE.Vector3()
@@ -389,12 +410,14 @@ engine.canvas.addEventListener('pointermove', (e) => {
   // while the world is being dragged would flicker the hover ring across the whole colony.
   if (rig.interacting) {
     engine.canvas.style.cursor = rig._mode === 'orbit' ? 'move' : 'grabbing'
+    hoverTip.hidden = true
     return
   }
   const p = ndc(e)
   const agent = colony.pick(p.x, p.y, p.aspect)
   hoverId = agent?.id ?? null
   colony.astronauts.setHover(agent)
+  showHoverTip(agent, e)
   // Pointing at a quiet plot is what makes its name appear.
   const plot = plotUnder(e, p)
   colony.setHoveredPlot(plot)
@@ -439,6 +462,7 @@ engine.canvas.addEventListener('pointerup', (e) => {
 
 engine.canvas.addEventListener('pointerleave', () => {
   hoverId = null
+  hoverTip.hidden = true
   colony.astronauts.setHover(null)
   colony.setHoveredPlot(null)
 })

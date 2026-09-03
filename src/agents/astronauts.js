@@ -35,6 +35,7 @@ const AGENT_LOOK = {
   mail: { trim: 0xc9a24f, eye: [2.4, 1.8, 0.6] },
   print: { trim: 0x4fa3c9, eye: [0.6, 1.8, 2.7] },
   watching: { trim: 0xc9784f, eye: [2.6, 1.3, 0.5] },
+  printing: { trim: 0x4fb8a0, eye: [0.6, 2.3, 1.5] },
   blocked: { trim: 0xc94f4f, eye: [3.0, 0.5, 0.45] },
   celebrating: { trim: 0xc9a24f, eye: [2.9, 2.1, 0.6] },
   idle: { trim: 0x8b8b85, eye: [1.1, 1.5, 1.7] },
@@ -1015,7 +1016,7 @@ export class Astronauts {
       agent.faceFrame = FACE.idle
       return
     }
-    const rate = agent.status === 'working' || agent.status === 'watching' ? 0.22 : 0.55
+    const rate = agent.status === 'working' || agent.status === 'watching' || agent.status === 'printing' ? 0.22 : 0.55
     if (agent.faceTimer > rate) {
       agent.faceTimer = 0
       agent.faceIndex = (agent.faceIndex + 1) % loop.length
@@ -1049,6 +1050,7 @@ export class Astronauts {
       switch (agent.status) {
         case 'working':
         case 'watching':
+        case 'printing':
           key = 'work'
           break
         case 'waiting':

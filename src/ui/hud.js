@@ -43,6 +43,7 @@ const STAT_DEFS = [
   { key: 'mail', label: 'mail', cls: 'waiting' },
   { key: 'print', label: 'print requests', cls: 'waiting' },
   { key: 'watching', label: 'streaming', cls: 'working' },
+  { key: 'printing', label: 'printing', cls: 'working' },
   { key: 'blocked', label: 'blocked', cls: 'blocked' },
   { key: 'celebrating', label: 'shipped', cls: 'done' },
   { key: 'agents', label: 'crew', cls: 'idle' },
@@ -746,7 +747,7 @@ function escapeHtml(s) {
 
 /** Status → the colour family the top-bar counters already use for it. */
 function statusClass(status) {
-  if (status === 'working' || status === 'watching') return 'working'
+  if (status === 'working' || status === 'watching' || status === 'printing') return 'working'
   if (status === 'waiting' || status === 'mail' || status === 'print') return 'waiting'
   if (status === 'blocked') return 'blocked'
   if (status === 'celebrating') return 'done'
@@ -914,6 +915,7 @@ const TEMPLATE = `
       <div class="legend-row"><i class="badge" style="background:#3a2d10;color:#f0c46a">&#9993;</i> unread mail from that client, waiting patiently on its hex</div>
       <div class="legend-row"><i class="badge" style="background:#10303a;color:#7fd0f0">&#9113;</i> a print request came in</div>
       <div class="legend-row"><i class="badge" style="background:#3a2210;color:#f0a06a">&#9654;</i> somebody is watching Plex</div>
+      <div class="legend-row"><i class="badge" style="background:#103a30;color:#7ff0c0">&#9684;</i> a print in progress: the ring fills as it completes</div>
       <div class="legend-row"><i class="badge" style="background:#3d1c1c;color:#e88b8b">!</i> something is crashing, unready, or not answering</div>
       <div class="legend-row"><i class="badge" style="background:#16301f;color:#7fd39a">⚒</i> running right now, building</div>
       <div class="legend-row"><i class="badge" style="background:#332b12;color:#e6c67f">✓</i> shipped: good news worth a glance</div>

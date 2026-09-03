@@ -42,6 +42,7 @@ export const BADGE = {
   mail: 8, // unread inbound mail, standing patiently on its client's hex
   print: 9, // a print request: mail carrying a model file
   watching: 10, // a Plex stream in progress
+  printing: 11, // a print in progress: drawn as a ring that fills with completion, no glyph
 }
 
 /** Badge tint. Pushed past 1.0 so the bloom pass gives them a soft halo. */
@@ -57,6 +58,7 @@ const BADGE_COLOR = {
   8: [2.7, 1.9, 0.55],
   9: [0.6, 1.9, 2.8],
   10: [2.6, 1.2, 0.5],
+  11: [0.6, 2.3, 1.5],
 }
 
 /**
@@ -73,6 +75,7 @@ const FADE_BY_BADGE = {
   [BADGE.mail]: 0,
   [BADGE.print]: 0,
   [BADGE.watching]: 0.3,
+  [BADGE.printing]: 0,
   [BADGE.paused]: 0.6,
   [BADGE.sleeping]: 1,
 }
@@ -91,11 +94,14 @@ export class Indicators {
     this.sizes = new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1)
     // 1 = a badge that may fade out at distance, 0 = one that must always be readable.
     this.fades = new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1)
+    // 0..1 fills the ring badge clockwise from the top; below 0 means "draw the glyph instead".
+    this.progress = new THREE.InstancedBufferAttribute(new Float32Array(capacity).fill(-1), 1)
     for (const a of [this.frames, this.centers, this.sizes, this.fades]) a.setUsage(THREE.DynamicDrawUsage)
     geo.setAttribute('aFrame', this.frames)
     geo.setAttribute('aCenter', this.centers)
     geo.setAttribute('aSize', this.sizes)
     geo.setAttribute('aFade', this.fades)
+    geo.setAttribute('aProgress', this.progress)
 
     this.material = this._material()
     this.mesh = new THREE.InstancedMesh(geo, this.material, capacity)
@@ -139,10 +145,13 @@ export class Indicators {
            attribute vec3 aCenter;
            attribute float aSize;
            attribute float aFade;
+           attribute float aProgress;
            varying float vFade;
+           varying float vProgress;
+           varying vec2 vCell;
            uniform vec2 uFrameScale;`
         )
-        .replace('#include <uv_vertex>', `#include <uv_vertex>\n vMapUv = uv * uFrameScale + aFrame;`)
+        .replace('#include <uv_vertex>', `#include <uv_vertex>\n vMapUv = uv * uFrameScale + aFrame;\n vCell = uv;\n vProgress = aProgress;`)
         .replace(
           '#include <project_vertex>',
           `vec4 mvPosition = modelViewMatrix * vec4( aCenter, 1.0 );
@@ -166,7 +175,7 @@ export class Indicators {
         )
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <common>',
-        `#include <common>\n varying float vFade;\n uniform vec2 uFrameScale;`
+        `#include <common>\n varying float vFade;\n varying float vProgress;\n varying vec2 vCell;\n uniform vec2 uFrameScale;`
       )
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <map_fragment>',
@@ -190,7 +199,23 @@ export class Indicators {
          // offset silhouette is the shadow, and multiplying by alpha takes the colour to
          // black there without a second branch.
          diffuseColor.rgb = col * body;
-         diffuseColor.a = max( body, shadow * ( 1.0 - body ) * 0.55 ) * vFade;`
+         diffuseColor.a = max( body, shadow * ( 1.0 - body ) * 0.55 ) * vFade;
+
+         // A progress ring is drawn in place of the glyph: a dark disc, a dim track, and the
+         // status colour filling clockwise from twelve o'clock as far as the job has got.
+         if ( vProgress >= 0.0 ) {
+           vec2 c = vCell - 0.5;
+           float r = length( c ) * 2.0;
+           float track = smoothstep( 0.56, 0.62, r ) * ( 1.0 - smoothstep( 0.88, 0.94, r ) );
+           float disc = 1.0 - smoothstep( 0.60, 0.66, r );
+           float ang = atan( c.x, c.y );
+           float turn = ( ang < 0.0 ? ang + 6.2831853 : ang ) / 6.2831853;
+           float done = 1.0 - smoothstep( vProgress, vProgress + 0.01, turn );
+           vec3 ringCol = mix( vec3( 0.16, 0.17, 0.2 ), vColor.rgb, done );
+           float ringBody = max( track, disc );
+           diffuseColor.rgb = mix( plate, ringCol, track ) * ringBody;
+           diffuseColor.a = ringBody * vFade;
+         }`
       )
       shader.fragmentShader = shader.fragmentShader.replace('#include <color_fragment>', '')
     }
@@ -203,6 +228,7 @@ export class Indicators {
     const centers = this.centers.array
     const sizes = this.sizes.array
     const fades = this.fades.array
+    const progress = this.progress.array
     let n = 0
 
     for (const agent of agents) {
@@ -229,6 +255,8 @@ export class Indicators {
       // Urgent badges breathe a little so they pull the eye across a busy colony.
       sizes[n] = urgent ? 0.166 + Math.sin(elapsed * 4.2 + agent.phase) * 0.013 : 0.126
       fades[n] = FADE_BY_BADGE[badge] ?? 1
+      const p = badge === BADGE.printing ? Number(agent.thread?.progress) : NaN
+      progress[n] = Number.isFinite(p) ? Math.max(0, Math.min(1, p)) : badge === BADGE.printing ? 0 : -1
 
       const c = BADGE_COLOR[badge] || [1, 1, 1]
       this._color.setRGB(c[0], c[1], c[2])
@@ -241,6 +269,7 @@ export class Indicators {
     this.centers.needsUpdate = true
     this.sizes.needsUpdate = true
     this.fades.needsUpdate = true
+    this.progress.needsUpdate = true
     this.mesh.instanceColor.needsUpdate = true
     this.mesh.instanceMatrix.needsUpdate = false
   }

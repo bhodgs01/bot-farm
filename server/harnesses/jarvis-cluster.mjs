@@ -47,7 +47,7 @@ const PROBE_TTL_MS = 30 * 1000
  * Mapping is by namespace on purpose — it is the one thing Flux keeps honest.
  */
 export const ROSTER = [
-  { id: 'mem',     name: 'Mem',     emoji: '🧠', role: 'second brain',         zone: 'KC Proto',          ns: ['graph-explorer', 'qdrant', 'neo4j', 'rag-parser'],           url: 'https://brain.kcproto.com' },
+  { id: 'mem',     name: 'Mem',     emoji: '🧠', role: 'second brain',         zone: 'Brain',           landmark: 'dish',          ns: ['graph-explorer', 'qdrant', 'neo4j', 'rag-parser'],           url: 'https://brain.kcproto.com' },
   { id: 'vera',    name: 'Vera',    emoji: '🎙️', role: 'voice AI',             zone: 'KC Proto',          ns: ['jarvis-hud', 'jarvis-watch'],                                url: 'https://hud.kcproto.com' },
   { id: 'janine',  name: 'Janine',  emoji: '💁‍♀️', role: 'email receptionist',   zone: 'KC Proto',          ns: ['janine', 'janine2'],                                         url: 'https://janine.kcproto.com' },
   { id: 'cole',    name: 'COLE',    emoji: '🛡️', role: 'incident response',    zone: 'Watchdog',          ns: ['watchdog', 'anthropic-watch'],                 url: 'https://watchdog.kcproto.com' },
@@ -68,11 +68,11 @@ export const ROSTER = [
   { id: 'olga',    name: 'Olga',    emoji: '🧑‍🏫', role: 'recruit intel',        zone: 'NGV Talent',        ns: ['recruit-intel', 'recruiter-bot', 'recruit-form', 'ngv-sales'], url: 'https://recruiter-bot.kcproto.com' },
   { id: 'dwight',  name: 'Dwight',  emoji: '🚜', role: 'inventory',            zone: 'NED Builds',        ns: ['nedbuilds-pro', 'small-business', 'ned-estimates'],          url: 'https://small-biz.kcproto.com' },
   { id: 'leo',     name: 'Leo',     emoji: '📣', role: 'listing announcer',    zone: 'NED Builds',        ns: ['ned-ar-bot'],                                                url: '' },
-  { id: 'snoop',   name: 'Snoop',   emoji: '📈', role: 'trader',               zone: 'Side Hustles',      ns: ['trade-bot'],                                                 url: 'https://trade-bot.kcproto.com' },
-  { id: 'marty',   name: 'Marty',   emoji: '🏃', role: 'shorts poster',        zone: 'Side Hustles',      ns: ['shorts-player'],                                             url: '' },
-  { id: 'hank',    name: 'Hank',    emoji: '📒', role: 'bookkeeper',           zone: 'Side Hustles',      ns: ['books'],                                                     url: '' },
-  { id: 'gordon',  name: 'Gordon',  emoji: '👨‍🍳', role: 'schema roast',         zone: 'Side Hustles',      ns: ['roast-bot'],                                                 url: 'https://schemacheckerai.com' },
-  { id: 'vince',   name: 'Vince',   emoji: '🕵️', role: 'sales hunter',         zone: 'Side Hustles',      ns: ['spambot'],                                                   url: 'https://prospector.kcproto.com', probe: 'https://prospector.kcproto.com' },
+  { id: 'snoop',   name: 'Snoop',   emoji: '📈', role: 'trader',               zone: 'Trade Floor',      ns: ['trade-bot'],                                                 url: 'https://trade-bot.kcproto.com' },
+  { id: 'marty',   name: 'Marty',   emoji: '🏃', role: 'shorts poster',        zone: 'Shorts',      ns: ['shorts-player'],                                             url: '' },
+  { id: 'hank',    name: 'Hank',    emoji: '📒', role: 'bookkeeper',           zone: 'Books',      ns: ['books'],                                                     url: '' },
+  { id: 'gordon',  name: 'Gordon',  emoji: '👨‍🍳', role: 'schema roast',         zone: 'Roast Bot',      ns: ['roast-bot'],                                                 url: 'https://schemacheckerai.com' },
+  { id: 'vince',   name: 'Vince',   emoji: '🕵️', role: 'sales hunter',         zone: 'Prospector',      ns: ['spambot'],                                                   url: 'https://prospector.kcproto.com', probe: 'https://prospector.kcproto.com' },
 ]
 
 const BAD_WAITING = new Set(['CrashLoopBackOff', 'ImagePullBackOff', 'ErrImagePull', 'CreateContainerConfigError', 'InvalidImageName'])
@@ -402,6 +402,7 @@ function deriveAgent(agent, snap, signals, probeUp) {
     hasTranscript: true,
     sizeBytes,
     source: 'k3s',
+    landmark: agent.landmark || '',
     canOpen: Boolean(agent.url),
     canArchive: false,
     ref: { agent: agent.id, url: agent.url },
@@ -437,7 +438,68 @@ async function scanThreads() {
   const [snap, signals] = await Promise.all([clusterSnapshot(), currentSignals()])
   const probes = await Promise.all(ROSTER.map((a) => (a.probe ? probe(a.probe) : Promise.resolve(null))))
   const agents = ROSTER.map((agent, i) => deriveAgent(agent, snap, signals, probes[i]))
-  return agents.concat(watchdogThreads(signals._watchdogServices || []))
+  return agents.concat(watchdogThreads(signals._watchdogServices || []), brainFeedThreads(snap))
+}
+
+/**
+ * Feeds arriving at the brain: every sync job in graph-explorer that is running right now
+ * is an astronaut hammering on the Brain hex; one that finished in the last ten minutes
+ * celebrates the ingest before walking home; one that failed slumps.
+ */
+const BRAIN_NS = 'graph-explorer'
+const BRAIN_DONE_WINDOW_MS = 10 * 60 * 1000
+function brainFeedThreads(snap) {
+  const now = Date.now()
+  const out = []
+  for (const pod of snap.pods.get(BRAIN_NS) || []) {
+    const owner = (pod.metadata?.ownerReferences || []).find((o) => o.kind === 'Job')
+    if (!owner) continue
+    const phase = pod.status?.phase
+    const started = Date.parse(pod.status?.startTime || '') || now
+    const finished = (pod.status?.containerStatuses || []).reduce(
+      (m, cs) => Math.max(m, Date.parse(cs.state?.terminated?.finishedAt || '') || 0),
+      0
+    )
+    if (phase === 'Succeeded' && now - finished > BRAIN_DONE_WINDOW_MS) continue
+    if (phase !== 'Running' && phase !== 'Succeeded' && phase !== 'Failed') continue
+    // Job names carry a schedule stamp: `feed-sync-29312345` -> `feed-sync`.
+    const feed = String(owner.name).replace(/-\d{5,}$/, '').replace(/-[a-z0-9]{5}$/, '')
+    const mins = Math.max(1, Math.round((now - started) / 60000))
+    out.push({
+      id: `brain:${owner.name}`,
+      title: `📡 ${feed}`,
+      preview:
+        phase === 'Running'
+          ? `feed syncing · ${mins} min in`
+          : phase === 'Succeeded'
+            ? `ingested ${Math.max(1, Math.round((now - finished) / 60000))} min ago`
+            : 'sync failed',
+      project: 'Brain',
+      projectPath: 'cluster://brain',
+      worktree: '',
+      cwd: BRAIN_NS,
+      gitBranch: feed,
+      model: phase.toLowerCase(),
+      effort: '',
+      createdAt: started,
+      lastActivityAt: finished || started,
+      lastFocusedAt: 0,
+      running: phase === 'Running',
+      unread: false,
+      hasError: phase === 'Failed',
+      starred: false,
+      routine: feed,
+      prState: phase === 'Succeeded' ? 'MERGED' : '',
+      archived: false,
+      hasTranscript: true,
+      sizeBytes: 1000 * (1 + mins * 20),
+      source: 'brain-jobs',
+      canOpen: true,
+      canArchive: false,
+      ref: { agent: 'mem', url: 'https://brain.kcproto.com' },
+    })
+  }
+  return out
 }
 
 /** One slumped astronaut per service the watchdog currently calls unhealthy. */
