@@ -30,15 +30,13 @@ async function accessToken() {
   return access.token
 }
 
-/** Midnight today and the end of Sunday, in Kansas City, as instants. */
+/** Midnight today and seven days on, in Kansas City, as instants: a rolling week. */
 function weekWindow(now = new Date()) {
   const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false, weekday: 'short' }).formatToParts(now).map((p) => [p.type, p.value]))
   const h = Number(parts.hour) % 24
   const m = Number(parts.minute)
   const startOfDay = new Date(now.getTime() - (h * 60 + m) * 60000 - (now.getSeconds() * 1000))
-  const dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts.weekday)
-  const daysLeft = dow === 0 ? 0 : 7 - dow
-  const endOfWeek = new Date(startOfDay.getTime() + (daysLeft + 1) * 86400000)
+  const endOfWeek = new Date(startOfDay.getTime() + 7 * 86400000)
   return { startOfDay, endOfWeek }
 }
 
@@ -72,7 +70,7 @@ async function fetchThreads() {
       const start = Date.parse(e.start?.dateTime || `${e.start?.date}T00:00:00-05:00`) || 0
       const end = Date.parse(e.end?.dateTime || `${e.end?.date}T00:00:00-05:00`) || start
       if (end <= now - 60 * 60 * 1000) continue
-      events.push({ id: e.id, title: e.summary || '(untitled)', start, end, allDay, where: e.location || '', link: e.htmlLink || '', cal: cal.summary || '', who: (e.attendees || []).filter((a) => !a.self).map((a) => a.displayName || a.email).slice(0, 4) })
+      events.push({ id: e.id, title: e.summary || '(untitled)', start, end, allDay, where: e.location || '', link: e.htmlLink || '', cal: cal.summary || '', who: (e.attendees || []).filter((a) => !a.self).map((a) => a.displayName || a.email).slice(0, 6), notes: String(e.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400), meet: e.hangoutLink || '' })
     }
   }
   events.sort((a, b) => a.start - b.start)
@@ -85,7 +83,7 @@ async function fetchThreads() {
     id: 'cal:week',
     kind: 'task',
     count: upcoming.length,
-    title: '📅 This week',
+    title: '📅 Next 7 days',
     preview: upcoming.length ? upcoming.slice(0, 16).map((e) => `- ${line(e)}`).join(String.fromCharCode(10)) + (upcoming.length > 16 ? `${String.fromCharCode(10)}... and ${upcoming.length - 16} more` : '') : 'Nothing left on the calendar this week',
     project: ZONE,
     projectPath: 'calendar://week',
@@ -126,6 +124,15 @@ async function fetchThreads() {
       projectPath: 'calendar://week',
       worktree: '',
       cwd: e.cal,
+      details: {
+        When: e.allDay ? `${fmtDay.format(e.start)} ${fmtDate.format(e.start)} · all day` : `${fmtDay.format(e.start)} ${fmtDate.format(e.start)} · ${fmtTime.format(e.start)} – ${fmtTime.format(e.end)}`,
+        In: e.start > now ? `${Math.round((e.start - now) / 3600000) < 48 ? `${Math.max(1, Math.round((e.start - now) / 3600000))} hours` : `${Math.round((e.start - now) / 86400000)} days`}` : 'now',
+        Where: e.where,
+        With: e.who.join(', '),
+        Calendar: e.cal,
+        Meet: e.meet,
+        Notes: e.notes,
+      },
       gitBranch: live ? 'happening now' : soon ? 'starting soon' : within ? 'within 24h' : fmtDay.format(e.start),
       model: '',
       effort: '',

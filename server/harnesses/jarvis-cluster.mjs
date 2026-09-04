@@ -368,6 +368,9 @@ async function appSignals() {
         end: Date.parse(b.status?.completionTimestamp || '') || 0,
         items: Number(b.status?.progress?.itemsBackedUp) || 0,
         errors: Number(b.status?.errors) || 0,
+        reason: String(b.status?.failureReason || '').replace(/\s+/g, ' ').slice(0, 300),
+        namespaces: (b.spec?.includedNamespaces || []).join(', '),
+        storage: b.spec?.storageLocation || '',
         schedule: b.metadata?.labels?.['velero.io/schedule-name'] || '',
       }))
       .sort((a, b) => b.start - a.start)
@@ -380,12 +383,24 @@ async function appSignals() {
     const ago = (t) => (t ? `${Math.round((now - t) / 3600000)}h ago` : 'never')
     out.velero = {
       alertKey: failed ? `failed:${last.name}` : stale ? `stale:${lastNightly ? lastNightly.name : 'none'}` : '',
+      details: last
+        ? {
+            'Last backup': last.name,
+            Phase: last.phase,
+            Reason: last.reason,
+            Items: last.items ? `${last.items.toLocaleString('en-US')} backed up` : '',
+            Namespaces: last.namespaces,
+            Storage: last.storage,
+            'Last nightly': lastNightly ? `${lastNightly.name} · ${lastNightly.phase} · ${ago(lastNightly.start)}` : '',
+            'Failed in a row': String(backups.filter((b, i) => i < 6 && /Failed/.test(b.phase)).length),
+          }
+        : undefined,
       running: inProgress.length > 0,
       error: Boolean(failed || stale),
       message: inProgress.length
         ? `backing up now: ${inProgress[0].name}`
         : failed
-          ? `last backup ${last.phase}: ${last.name} (${last.errors} errors)`
+          ? `last backup ${last.phase}: ${last.name}${last.reason ? ` · ${last.reason.slice(0, 140)}` : ''}`
           : stale
             ? `no nightly backup in ${lastNightly ? ago(lastNightly.start) : 'sight'}`
             : `nightly ${lastNightly.phase} ${ago(lastNightly.start)} · ${lastNightly.items.toLocaleString('en-US')} items · ${backups.length} backups kept`,
@@ -586,6 +601,7 @@ function deriveAgent(agent, snap, signals, probeUp) {
     source: 'k3s',
     landmark: agent.landmark || '',
     roof: sig.roof || '',
+    details: sig.details,
     alertKey: problems.length ? sig.alertKey || problems.join(' | ') : '',
     canOpen: Boolean(agent.url),
     canArchive: false,
