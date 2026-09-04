@@ -1278,6 +1278,21 @@ kbd {
   text-align: center;
 }
 
+/* The colony in the robot's hands, as big as the screen allows, floating while we wait. */
+.boot .art {
+  display: block;
+  width: min(78vmin, 820px);
+  height: auto;
+  margin: 0 auto 10px;
+  filter: drop-shadow(0 40px 60px rgba(0, 0, 0, 0.55));
+  animation: boot-bob 3.2s ease-in-out infinite;
+}
+
+@keyframes boot-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-14px); }
+}
+
 .boot h1 {
   margin: 0 0 6px;
   font-size: 19px;
@@ -1358,6 +1373,7 @@ kbd {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .boot .art { animation: none; }
   * {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;

@@ -42,6 +42,7 @@ const app = document.getElementById('app')
 app.insertAdjacentHTML(
   'beforeend',
   `<div class="boot"><div class="inner">
+     <img class="art" src="/boot-art.webp" alt="" width="1024" height="1024" decoding="async">
      <h1>Bot Farm</h1>
      <p>Scanning for agent threads…</p>
      <div class="bar"><i></i></div>
