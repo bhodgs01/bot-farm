@@ -494,6 +494,39 @@ const KINDS = {
     return 'Workbench'
   },
 
+  /**
+   * A newsstand: the Newsroom's landmark. A kiosk with a counter, a back wall, an awning
+   * in the zone's colour, a stack of the morning's papers on the counter and a headline
+   * board out front.
+   */
+  newsstand(c) {
+    const box = (w, h, d, cell, o = {}) => c.geom(new THREE.BoxGeometry(w, h, d), cell, o)
+    box(1.9, 0.12, 1.5, CELL.SLATE, { y: 0.06 })
+    // back wall and two sides
+    box(1.7, 1.5, 0.12, CELL.GREY, { y: 0.12 + 0.75, z: -0.6 })
+    box(0.12, 1.5, 1.2, CELL.GREY, { x: -0.79, y: 0.12 + 0.75, z: -0.05 })
+    box(0.12, 1.5, 1.2, CELL.GREY, { x: 0.79, y: 0.12 + 0.75, z: -0.05 })
+    // counter across the front
+    box(1.7, 0.5, 0.5, CELL.WHITE, { y: 0.12 + 0.25, z: 0.3 })
+    box(1.8, 0.06, 0.6, CELL.SLATE, { y: 0.65, z: 0.3 })
+    // the roof, and the awning in the accent hanging out over the counter
+    box(1.9, 0.1, 1.5, CELL.SLATE, { y: 1.67, z: -0.05 })
+    box(1.9, 0.07, 0.7, CELL.TRIM, { y: 1.62, z: 0.85 })
+    box(0.05, 0.14, 0.7, CELL.TRIM, { x: -0.92, y: 1.52, z: 0.85 })
+    box(0.05, 0.14, 0.7, CELL.TRIM, { x: 0.92, y: 1.52, z: 0.85 })
+    // three stacks of papers on the counter, and shelves of them on the back wall
+    for (const x of [-0.5, 0, 0.5]) box(0.34, 0.12, 0.26, CELL.WHITE, { x, y: 0.74, z: 0.3 })
+    for (const y of [0.9, 1.25]) {
+      box(1.5, 0.04, 0.3, CELL.SLATE, { y, z: -0.4 })
+      for (const x of [-0.5, 0, 0.5]) box(0.34, 0.1, 0.22, CELL.WHITE, { x, y: y + 0.07, z: -0.4 })
+    }
+    // headline board out front, a sandwich board leaning by the counter
+    box(0.5, 0.6, 0.05, CELL.BLACK, { x: 1.15, y: 0.42, z: 0.55 })
+    box(0.46, 0.18, 0.06, CELL.WHITE, { x: 1.15, y: 0.6, z: 0.55 })
+    box(0.05, 0.3, 0.3, CELL.GREY, { x: 1.15, y: 0.27, z: 0.4 })
+    return 'Newsstand'
+  },
+
   /** A packed crate: a finished job waiting to be paid for and shipped. */
   crate(c, rand) {
     c.add(rand() > 0.5 ? 'cargo_A_packed' : 'cargo_B_packed')
@@ -795,7 +828,7 @@ const KINDS = {
   },
 }
 
-const KIND_IDS = Object.keys(KINDS).filter((k) => !['dish', 'printer', 'rack', 'planter', 'theater', 'pumpjack', 'bench', 'crate', 'deck', 'gazebo', 'kennel', 'desk', 'yard', 'apartment'].includes(k))
+const KIND_IDS = Object.keys(KINDS).filter((k) => !['dish', 'printer', 'rack', 'planter', 'theater', 'pumpjack', 'bench', 'crate', 'deck', 'gazebo', 'kennel', 'desk', 'yard', 'apartment', 'newsstand'].includes(k))
 
 // ── the reveal shader ─────────────────────────────────────────────────────────────────
 

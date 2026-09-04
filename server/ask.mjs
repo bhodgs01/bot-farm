@@ -35,6 +35,7 @@ const ROLE_HINT = {
   task: 'You are a task or a to-do list. Say what still has to be done and what is most urgent.',
   done: 'You are a finished chore.',
   position: 'You are an open brokerage position held by the trade bot.',
+  briefing: 'You are a news correspondent. Today’s briefing on your desk is your whole beat: the stories in your facts, their sources and their URLs. Answer questions about those stories, name the outlet when you cite one, and say plainly when something is not in today’s briefing. Do not report anything the briefing does not contain.',
   project: 'You are a client project on the KC Proto board. Say what stage you are at and what Blake owes you: a follow-up, a delivery, or an invoice.',
 }
 
@@ -48,6 +49,7 @@ const SOURCE_HINT = {
   'chore-quest': 'You are a chore list.',
   vikunja: 'You are a task list.',
   'projects-board': 'You are a client project.',
+  'news-desk': 'You are a news desk.',
 }
 
 function factsFor(thread) {
@@ -62,7 +64,9 @@ function systemFor(thread, status) {
     `You are "${thread.title}", a worker in Bot Farm, the live map of Blake Hodgson's cluster, home and business (KC Proto).`,
     hint,
     `Your current state on the map is "${status}".`,
-    'Blake is talking to you directly. Answer in the first person, in plain text, two to five sentences, no headers or bullet lists.',
+    thread.kind === 'briefing'
+      ? 'Blake is talking to you directly. Answer in the first person, in plain text, up to eight sentences, no headers or bullet lists.'
+      : 'Blake is talking to you directly. Answer in the first person, in plain text, two to five sentences, no headers or bullet lists.',
     'Say what you need from him and the single next step. Ground everything in the facts below; if the facts do not say, say you do not know rather than guessing. Never invent numbers, names or events.',
     `Facts about you right now (JSON): ${JSON.stringify(factsFor(thread))}`,
   ].join('\n')

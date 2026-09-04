@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>The Daily Orbit</title>
+<meta name="description" content="Three desks, one morning briefing. Politics, Tech & AI, Self-hosted." />
+<meta name="theme-color" content="#0b0c0f" />
+<link rel="icon" href="/icon-192.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0b0c0f;
+    --bg-2: #101217;
+    --ink: #ece9e1;
+    --ink-2: #b9b6ae;
+    --mute: #858a95;
+    --line: rgba(236, 233, 225, 0.1);
+    --line-2: rgba(236, 233, 225, 0.2);
+    --politics: #d3a94e;
+    --tech: #6fb1e8;
+    --selfhosted: #7cc48a;
+    --serif: 'Instrument Serif', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+    --sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    --max: 1240px;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--bg); color-scheme: dark; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 16px/1.6 var(--sans);
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  a { color: inherit; text-decoration: none; }
+  button { font: inherit; color: inherit; }
+  ::selection { background: var(--ink); color: var(--bg); }
+
+  /* a faint paper grain so the black is not flat */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; pointer-events: none; z-index: 0;
+    background:
+      radial-gradient(1200px 600px at 50% -10%, rgba(236, 233, 225, 0.05), transparent 60%),
+      repeating-linear-gradient(0deg, rgba(255,255,255,0.012) 0 1px, transparent 1px 3px);
+  }
+  .wrap { position: relative; z-index: 1; max-width: var(--max); margin: 0 auto; padding: 0 24px; }
+
+  /* ── masthead ─────────────────────────────────────────────────────────── */
+  .mast { padding: 40px 0 0; }
+  .eyebrow {
+    font-size: 11px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--mute);
+    display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
+  }
+  .eyebrow .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ink); opacity: .7; }
+  h1 {
+    font-family: var(--serif); font-weight: 400; font-size: clamp(56px, 9vw, 112px);
+    line-height: 0.95; letter-spacing: -0.02em; margin: 14px 0 12px;
+  }
+  h1 em { font-style: italic; color: var(--ink-2); }
+  .dateline {
+    display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; flex-wrap: wrap;
+    padding: 14px 0; border-top: 1px solid var(--line-2); border-bottom: 1px solid var(--line);
+    position: relative;
+  }
+  .dateline::before { content: ''; position: absolute; left: 0; right: 0; top: 3px; border-top: 1px solid var(--line); }
+  .dateline .today { font-family: var(--serif); font-size: 24px; letter-spacing: -0.01em; }
+  .dateline .meta { color: var(--mute); font-size: 13px; }
+  .days { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .pill {
+    border: 1px solid var(--line-2); background: transparent; color: var(--ink-2);
+    border-radius: 999px; padding: 5px 12px; font-size: 12px; cursor: pointer;
+    transition: background .18s ease-out, color .18s ease-out, border-color .18s ease-out;
+  }
+  .pill:hover { border-color: var(--ink); color: var(--ink); }
+  .pill.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .pill.empty { opacity: .45; }
+
+  /* ── ticker: the one moving thing ────────────────────────────────────── */
+  .ticker {
+    position: relative; overflow: hidden; border-bottom: 1px solid var(--line);
+    padding: 10px 0; font-size: 13px; color: var(--ink-2); white-space: nowrap;
+    mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent);
+  }
+  .ticker .track { display: inline-flex; gap: 48px; padding-right: 48px; animation: slide var(--dur, 90s) linear infinite; will-change: transform; }
+  .ticker:hover .track { animation-play-state: paused; }
+  .ticker .t { display: inline-flex; align-items: center; gap: 10px; }
+  .ticker .t i { width: 5px; height: 5px; border-radius: 50%; background: var(--c, var(--ink)); flex: none; }
+  .ticker .t span { color: var(--mute); }
+  @keyframes slide { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+  /* ── desks ────────────────────────────────────────────────────────────── */
+  .desks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-top: 8px; }
+  .desk { padding: 28px 28px 32px; border-right: 1px solid var(--line); min-width: 0; --c: var(--ink); opacity: 0; transform: translateY(10px); animation: rise .6s ease-out forwards; }
+  .desk:nth-child(1) { padding-left: 0; --c: var(--politics); animation-delay: .05s; }
+  .desk:nth-child(2) { --c: var(--tech); animation-delay: .15s; }
+  .desk:nth-child(3) { border-right: 0; padding-right: 0; --c: var(--selfhosted); animation-delay: .25s; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+
+  .desk-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+  .desk-head .name { display: flex; align-items: center; gap: 10px; font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink); }
+  .desk-head .name i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 22%, transparent); }
+  .desk-head .state { font-size: 12px; color: var(--mute); white-space: nowrap; }
+  .desk-head .state.unread { color: var(--c); }
+
+  .lead .n, .story .n { font-family: var(--serif); font-size: 13px; color: var(--mute); letter-spacing: .04em; }
+  .lead h2 {
+    font-family: var(--serif); font-weight: 400; font-size: clamp(28px, 2.6vw, 36px); line-height: 1.08; letter-spacing: -0.015em; margin: 6px 0 12px;
+  }
+  .lead h2 a, .story h3 a { background-image: linear-gradient(var(--c), var(--c)); background-size: 0 1px; background-repeat: no-repeat; background-position: 0 100%; transition: background-size .25s ease-out; }
+  .lead h2 a:hover, .story h3 a:hover { background-size: 100% 1px; }
+  .lead p { margin: 0 0 10px; color: var(--ink-2); font-size: 15px; }
+  .why { color: var(--mute); font-size: 14px; }
+  .why b { color: var(--ink-2); font-weight: 500; }
+  .src { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--mute); margin-top: 10px; }
+  .src .chip { border: 1px solid var(--line-2); border-radius: 999px; padding: 2px 9px; color: var(--ink-2); }
+
+  .rest { list-style: none; margin: 22px 0 0; padding: 0; border-top: 1px solid var(--line); }
+  .story { padding: 16px 0; border-bottom: 1px solid var(--line); }
+  .story h3 { font-family: var(--serif); font-weight: 400; font-size: 21px; line-height: 1.2; letter-spacing: -0.01em; margin: 4px 0 6px; }
+  .story p { margin: 0; color: var(--ink-2); font-size: 14px; }
+  .story .why { margin-top: 6px; font-size: 13px; }
+
+  .desk-foot { display: flex; gap: 10px; margin-top: 22px; align-items: center; }
+  .btn {
+    border: 1px solid var(--line-2); background: transparent; border-radius: 999px; padding: 8px 14px; font-size: 13px; cursor: pointer; white-space: nowrap;
+    transition: transform .15s ease-out, background .18s ease-out, color .18s ease-out, border-color .18s ease-out;
+  }
+  .btn:hover { transform: translateY(-1px); border-color: var(--ink); }
+  .btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .btn.primary:hover { background: #fff; }
+  .btn.done { color: var(--mute); border-style: dashed; cursor: default; transform: none; }
+  .btn[disabled] { opacity: .5; cursor: default; transform: none; }
+
+  .empty { padding: 30px 0; color: var(--mute); font-size: 14px; }
+  .empty .big { font-family: var(--serif); font-size: 30px; color: var(--ink-2); line-height: 1.1; margin-bottom: 10px; }
+  .empty.err .big { color: #d98b7a; }
+  .writing i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--c); margin-right: 8px; animation: blink 1.6s ease-in-out infinite; vertical-align: 1px; }
+  @keyframes blink { 50% { opacity: .25; } }
+
+  /* ── foot ─────────────────────────────────────────────────────────────── */
+  .foot { margin: 48px 0 40px; padding-top: 16px; border-top: 1px solid var(--line-2); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; align-items: center; color: var(--mute); font-size: 13px; }
+  .foot .links { display: flex; gap: 10px; align-items: center; }
+  .foot a.link:hover { color: var(--ink); }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-size: 13px; opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none; z-index: 5; }
+  .toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+  @media (max-width: 960px) {
+    .desks { grid-template-columns: 1fr; }
+    .desk, .desk:nth-child(1), .desk:nth-child(3) { padding: 26px 0; border-right: 0; border-bottom: 1px solid var(--line-2); }
+    .desk:nth-child(3) { border-bottom: 0; }
+    .lead h2 { font-size: 30px; }
+  }
+  @media (max-width: 600px) {
+    .wrap { padding: 0 18px; }
+    .mast { padding-top: 26px; }
+    h1 { font-size: 15vw; }
+    .dateline { flex-direction: column; align-items: flex-start; }
+    .days { justify-content: flex-start; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .ticker .track { animation: none; }
+    .ticker { overflow-x: auto; }
+    .desk { animation: none; opacity: 1; transform: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="mast">
+    <div class="eyebrow"><span>Bot Farm</span><i class="dot"></i><span>News desk</span><i class="dot"></i><span>Kansas City</span></div>
+    <h1>The Daily <em>Orbit</em></h1>
+    <div class="dateline">
+      <div>
+        <div class="today" id="today">Loading the morning edition…</div>
+        <div class="meta" id="meta"></div>
+      </div>
+      <div class="days" id="days"></div>
+    </div>
+  </header>
+
+  <div class="ticker" id="ticker" hidden><div class="track" id="track"></div></div>
+
+  <main class="desks" id="desks"></main>
+
+  <footer class="foot">
+    <div id="foot-meta">Three desks, one morning briefing.</div>
+    <div class="links">
+      <button class="btn" id="btn-all">Mark all read</button>
+      <button class="btn" id="btn-refresh" title="Write today’s briefings again">Rewrite today</button>
+      <a class="link btn" href="/" id="map-link">Open the map ↗</a>
+    </div>
+  </footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const $ = (s, el = document) => el.querySelector(s)
+  const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
+  const TZ = 'America/Chicago'
+  const MAP_URL = location.hostname.startsWith('news.') ? 'https://bot-farm.' + location.hostname.replace(/^news\./, '') + '/' : '/'
+  $('#map-link').href = MAP_URL
+
+  let data = null
+  let selected = new URLSearchParams(location.search).get('d') || ''
+
+  const longDate = (date) => {
+    const [y, m, d] = date.split('-').map(Number)
+    return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC' })
+  }
+  const shortDate = (date) => {
+    const [y, m, d] = date.split('-').map(Number)
+    return new Date(Date.UTC(y, m - 1, d, 12)).toLocaleDateString('en-US', { weekday: 'short', day: 'numeric', timeZone: 'UTC' })
+  }
+  const clock = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: TZ })
+
+  let toastTimer
+  function toast(msg) {
+    const t = $('#toast')
+    t.textContent = msg
+    t.classList.add('on')
+    clearTimeout(toastTimer)
+    toastTimer = setTimeout(() => t.classList.remove('on'), 2600)
+  }
+
+  async function post(path, body) {
+    const res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) })
+    const json = await res.json().catch(() => ({}))
+    if (res.status === 401) {
+      window.open(json.signIn || '/api/act/auth', '_blank', 'noopener')
+      throw new Error('Sign in first: a tab just opened. Then try again.')
+    }
+    if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`)
+    return json
+  }
+
+  async function load() {
+    const res = await fetch('/api/news', { cache: 'no-store' })
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    data = await res.json()
+    if (!selected || !data.days.some((d) => d.date === selected)) selected = data.days[0]?.date || data.today
+    render()
+  }
+
+  const dayDoc = () => data.days.find((d) => d.date === selected) || { date: selected, topics: {}, read: {} }
+
+  function render() {
+    const doc = dayDoc()
+    const isToday = selected === data.today
+    const edition = data.days.length - data.days.findIndex((d) => d.date === selected)
+    $('#today').textContent = longDate(selected)
+    const stamps = data.topics.map((t) => doc.topics[t.id]?.generatedAt).filter(Boolean)
+    const latest = stamps.length ? Math.max(...stamps) : 0
+    $('#meta').textContent = [
+      isToday ? "Today’s edition" : `Edition of ${longDate(selected)}`,
+      Number.isFinite(edition) && edition > 0 ? `No. ${edition}` : '',
+      latest ? `written ${clock(latest)} CT by ${data.provider || 'the desks'} with web search` : data.provider ? `written by ${data.provider} with web search` : '',
+    ].filter(Boolean).join(' · ')
+
+    // the day pills: what is on disk, newest first, today always present
+    const dates = [...new Set([data.today, ...data.days.map((d) => d.date)])].sort().reverse().slice(0, 14)
+    $('#days').innerHTML = dates.map((d) => {
+      const has = data.days.find((x) => x.date === d)
+      const n = has ? Object.values(has.topics).filter((t) => t.stories?.length).length : 0
+      return `<button class="pill ${d === selected ? 'on' : ''} ${n ? '' : 'empty'}" data-d="${d}" title="${n} of ${data.topics.length} desks">${d === data.today ? 'Today' : esc(shortDate(d))}</button>`
+    }).join('')
+    for (const b of document.querySelectorAll('.pill')) b.addEventListener('click', () => { selected = b.dataset.d; history.replaceState(null, '', selected === data.today ? location.pathname : `?d=${selected}`); render() })
+
+    // the ticker: every headline of the day, twice over so the loop is seamless
+    const all = data.topics.flatMap((t) => (doc.topics[t.id]?.stories || []).map((s) => ({ ...s, topic: t.id, desk: t.name })))
+    const ticker = $('#ticker')
+    if (all.length) {
+      const items = all.map((s) => `<span class="t" style="--c: var(--${esc(s.topic)})"><i></i>${esc(s.headline)} <span>${esc(s.source)}</span></span>`).join('')
+      $('#track').innerHTML = items + items
+      $('#track').style.setProperty('--dur', `${Math.max(40, all.length * 7)}s`)
+      ticker.hidden = false
+    } else ticker.hidden = true
+
+    $('#desks').innerHTML = data.topics.map((t, i) => deskHtml(t, doc, isToday)).join('')
+    for (const b of document.querySelectorAll('[data-read]')) b.addEventListener('click', () => markRead(b.dataset.read, true))
+    for (const b of document.querySelectorAll('[data-write]')) b.addEventListener('click', () => rewrite(b.dataset.write))
+
+    const unread = data.topics.filter((t) => doc.topics[t.id]?.stories?.length && !doc.read?.[t.id])
+    $('#btn-all').hidden = unread.length === 0
+    $('#btn-refresh').hidden = !isToday
+    $('#foot-meta').textContent = all.length ? `${all.length} stories across ${data.topics.length} desks · ${unread.length ? `${unread.length} unread` : 'all read'}` : 'Three desks, one morning briefing.'
+    if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: 'start' })
+
+    // while the presses are running, keep looking
+    clearTimeout(pollTimer)
+    const busy = isToday && data.topics.some((t) => !doc.topics[t.id]?.stories?.length)
+    if (busy) pollTimer = setTimeout(() => load().catch(() => {}), 45 * 1000)
+  }
+  let pollTimer
+
+  function deskHtml(t, doc, isToday) {
+    const b = doc.topics[t.id]
+    const stories = b?.stories || []
+    const read = Boolean(doc.read?.[t.id])
+    const writing = (data.generating || []).includes(`${t.id}:${doc.date}`)
+    const state = stories.length ? (read ? 'read' : 'unread') : writing ? 'writing' : ''
+    let body
+    if (stories.length) {
+      const [lead, ...rest] = stories
+      body = `
+        <article class="lead">
+          <div class="n">01</div>
+          <h2><a href="${esc(lead.url)}" target="_blank" rel="noopener">${esc(lead.headline)}</a></h2>
+          <p>${esc(lead.summary)}</p>
+          ${lead.why ? `<p class="why"><b>Why it matters.</b> ${esc(lead.why)}</p>` : ''}
+          <div class="src"><span class="chip">${esc(lead.source)}</span>${lead.published ? `<span>${esc(lead.published)}</span>` : ''}</div>
+        </article>
+        <ol class="rest">
+          ${rest.map((s, i) => `
+            <li class="story">
+              <div class="n">${String(i + 2).padStart(2, '0')}</div>
+              <h3><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.headline)}</a></h3>
+              <p>${esc(s.summary)}</p>
+              ${s.why ? `<p class="why"><b>Why it matters.</b> ${esc(s.why)}</p>` : ''}
+              <div class="src"><span class="chip">${esc(s.source)}</span>${s.published ? `<span>${esc(s.published)}</span>` : ''}</div>
+            </li>`).join('')}
+        </ol>
+        <div class="desk-foot">
+          ${read ? `<button class="btn done" disabled>Read ✓</button>` : `<button class="btn primary" data-read="${t.id}">Mark read</button>`}
+          <a class="btn" href="${MAP_URL}" title="The ${esc(t.desk)} correspondent takes questions on the map">Ask the desk ↗</a>
+        </div>`
+    } else if (writing) {
+      body = `<div class="empty writing"><div class="big"><i></i>Writing this morning’s briefing</div>Searching the wires. A minute or two.</div>`
+    } else if (b?.error) {
+      body = `<div class="empty err"><div class="big">The presses jammed</div>${esc(b.error)}${isToday ? `<div class="desk-foot"><button class="btn" data-write="${t.id}">Try again</button></div>` : ''}</div>`
+    } else if (isToday) {
+      body = `<div class="empty"><div class="big">Presses warming up</div>The briefing lands after ${data.hour}:00 CT.${data.provider ? `<div class="desk-foot"><button class="btn" data-write="${t.id}">Write it now</button></div>` : ''}</div>`
+    } else {
+      body = `<div class="empty"><div class="big">No paper that day</div></div>`
+    }
+    return `
+      <section class="desk" id="${t.id}">
+        <div class="desk-head">
+          <div class="name"><i></i>${esc(t.name)}</div>
+          <div class="state ${state}">${stories.length ? `${stories.length} stories · ${read ? 'read' : 'unread'}` : state === 'writing' ? 'writing' : ''}</div>
+        </div>
+        ${body}
+      </section>`
+  }
+
+  async function markRead(topic, on) {
+    try {
+      await post('/api/act/news', { topic, date: selected, on })
+      const doc = dayDoc()
+      doc.read = { ...(doc.read || {}), [topic]: on }
+      render()
+      toast(on ? 'Marked read' : 'Marked unread')
+    } catch (err) { toast(String(err.message || err)) }
+  }
+
+  async function rewrite(topic) {
+    try {
+      await post('/api/act/news/refresh', topic ? { topic } : {})
+      toast(topic ? 'Rewriting that desk' : 'Rewriting all three desks')
+      data.generating = (topic ? [topic] : data.topics.map((t) => t.id)).map((id) => `${id}:${data.today}`)
+      render()
+      setTimeout(() => load().catch(() => {}), 20 * 1000)
+    } catch (err) { toast(String(err.message || err)) }
+  }
+
+  $('#btn-all').addEventListener('click', async () => {
+    const doc = dayDoc()
+    for (const t of data.topics) if (doc.topics[t.id]?.stories?.length && !doc.read?.[t.id]) await markRead(t.id, true)
+  })
+  $('#btn-refresh').addEventListener('click', () => rewrite(''))
+
+  load().catch((err) => {
+    $('#today').textContent = 'The paper did not arrive'
+    $('#meta').textContent = String(err.message || err)
+  })
+  // a fresh look every few minutes so a tab left open notices the morning edition
+  setInterval(() => load().catch(() => {}), 5 * 60 * 1000)
+})()
+</script>
+</body>
+</html>

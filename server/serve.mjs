@@ -3,6 +3,7 @@ import fsp from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { apiMiddleware } from './api.mjs'
+import { startScheduler } from './news.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const DIST = path.join(here, '..', 'dist')
@@ -22,6 +23,16 @@ const TYPES = {
   '.woff2': 'font/woff2',
 }
 
+/**
+ * The news page has its own hostname (news.kcproto.com) pointed at this same server: on that
+ * host the root is the paper, not the map. Everything else, including /api, is unchanged.
+ */
+const NEWS_HOSTS = (process.env.NEWS_HOSTS || 'news.').split(',').map((s) => s.trim()).filter(Boolean)
+const isNewsHost = (host) => {
+  const h = String(host || '').split(':')[0].toLowerCase()
+  return NEWS_HOSTS.some((n) => (n.endsWith('.') ? h.startsWith(n) : h === n))
+}
+
 /** Resolve inside dist/ only — a request can never climb out with `..`. */
 function resolveInDist(pathname) {
   const rel = decodeURIComponent(pathname).replace(/^\/+/, '')
@@ -36,7 +47,7 @@ const server = http.createServer(async (req, res) => {
     return apiMiddleware(req, res, null)
   }
 
-  let file = resolveInDist(url.pathname)
+  let file = resolveInDist(isNewsHost(req.headers.host) && url.pathname === '/' ? '/news/index.html' : url.pathname)
   if (!file) {
     res.writeHead(403).end('Forbidden')
     return
@@ -62,4 +73,5 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`Bot Farm → http://${HOST}:${PORT}`)
+  startScheduler()
 })

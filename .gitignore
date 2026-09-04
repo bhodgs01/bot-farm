@@ -21,3 +21,5 @@ recordings
 
 # Local screenshots and dev-server logs.
 logs
+
+data/news/

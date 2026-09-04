@@ -14,6 +14,8 @@ import {
 import { ask, chatEnabled } from './ask.mjs'
 import { setProjectStatus, closeTask } from './act.mjs'
 import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
+import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGenerate, topicById, todayKC, newsEnabled } from './news.mjs'
+import { refreshNews } from './harnesses/news.mjs'
 
 /**
  * The id of the build being served: the hash Vite put in the main bundle's file name.
@@ -179,6 +181,7 @@ function chatAllowed(who) {
 
 /** The same first-match precedence the page uses, so the worker describes itself the way the map draws it. */
 function statusWord(t) {
+  if (t.kind === 'briefing') return t.unread ? 'fresh briefing, unread' : t.running ? 'writing' : t.hasError ? 'no briefing today' : t.stories?.length ? 'briefing read' : 'waiting for the morning'
   if (t.kind === 'mail') return 'new mail'
   if (t.kind === 'print') return 'print request'
   if (t.kind === 'watching') return 'streaming'
@@ -378,6 +381,45 @@ export async function apiMiddleware(req, res, next) {
       if (!thread) return send(res, 404, { error: 'That worker has walked off the map' })
       const reply = await ask({ thread, status: statusWord(thread), message })
       return send(res, 200, { reply })
+    }
+
+    // The paper: every briefing on disk for the last two weeks, plus the read flags.
+    if (url.pathname === '/api/news' && req.method === 'GET') {
+      return send(res, 200, await newsSnapshot(14))
+    }
+
+    // Mark a briefing read (or unread). Same gate as every other write.
+    if (url.pathname === '/api/act/news' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to mark briefings read', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      const { topic, date, on } = await readJsonBody(req, 16 * 1024)
+      if (!topicById(String(topic || ''))) return send(res, 400, { error: 'Bad topic' })
+      try {
+        const read = await newsMarkRead(String(topic), String(date || todayKC()), on !== false, who)
+        refreshNews()
+        return send(res, 200, { ok: true, read })
+      } catch (err) {
+        return send(res, 400, { error: String(err?.message || err) })
+      }
+    }
+
+    // Write today's briefing again, on request. One topic, or all three when none is named.
+    if (url.pathname === '/api/act/news/refresh' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to refresh the paper', signIn: '/api/act/auth' })
+      if (!chatAllowed(`news:${who}`)) return send(res, 429, { error: 'Slow down' })
+      if (!newsEnabled()) return send(res, 503, { error: 'No news key on this server' })
+      const { topic } = await readJsonBody(req, 16 * 1024)
+      const ids = topic ? [String(topic)] : (await newsSnapshot(1)).topics.map((t) => t.id)
+      if (ids.some((id) => !topicById(id))) return send(res, 400, { error: 'Bad topic' })
+      console.log(`news: ${who} asked for a rewrite of ${ids.join(', ')}`)
+      // Fire and return: a briefing takes a minute or two, longer than the tunnel will wait.
+      ;(async () => {
+        for (const id of ids) await newsGenerate(id, todayKC(), { force: true })
+        refreshNews()
+      })().catch((err) => console.warn('news refresh:', err.message))
+      return send(res, 202, { ok: true, writing: ids })
     }
 
     if (url.pathname === '/api/harnesses' && req.method === 'GET') {

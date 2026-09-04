@@ -24,6 +24,7 @@ import {
   actTask,
   actAck,
   actStar,
+  actNews,
 } from './game/api.js'
 
 /**
@@ -167,6 +168,12 @@ const actions = {
       if (status === 'ack' || status === 'unack') {
         await actAck(thread.id, status === 'ack')
         hud.toast(status === 'ack' ? `Flag removed on ${thread.title}. It comes back if the failure changes.` : `Flag restored on ${thread.title}`)
+        setTimeout(poll, 300)
+        return
+      }
+      if (thread.harness === 'news' && status === 'read') {
+        await actNews(thread.ref?.topic, thread.ref?.date, true)
+        hud.toast(`Read: ${thread.title}`)
         setTimeout(poll, 300)
         return
       }

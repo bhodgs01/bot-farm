@@ -544,7 +544,7 @@ export class Hud {
     details.hidden = entries.length === 0
     // Stage buttons: what this thread can be moved to next.
     const stage = this.$('.thread-pop .stage')
-    const STAGE_LABEL = { active: 'Make active', in_process: 'Start work', completed: 'Mark complete', paid: 'Paid ✓', done: 'Close ticket ✓', ack: 'Remove flag', unack: 'Flag again', star: '★ Star', unstar: 'Unstar' }
+    const STAGE_LABEL = { active: 'Make active', in_process: 'Start work', completed: 'Mark complete', paid: 'Paid ✓', done: 'Close ticket ✓', read: 'Read ✓', ack: 'Remove flag', unack: 'Flag again', star: '★ Star', unstar: 'Unstar' }
     // A flagged worker offers to have the flag removed; an acknowledged one offers it back.
     const acts = (Array.isArray(thread.actions) ? thread.actions : []).concat(thread.hasError ? ['ack'] : thread.acked ? ['unack'] : []).concat(thread.watched ? ['unstar'] : ['star'])
     stage.innerHTML = acts.map((a) => `<button class="btn ${a === 'paid' || a === 'done' ? 'primary' : ''}" data-stage="${escapeHtml(a)}">${escapeHtml(STAGE_LABEL[a] || a)}</button>`).join('')
