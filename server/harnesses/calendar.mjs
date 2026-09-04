@@ -46,26 +46,39 @@ const fmtDay = new Intl.DateTimeFormat('en-US', { timeZone: TZ, weekday: 'short'
 const fmtTime = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit' })
 const fmtDate = new Intl.DateTimeFormat('en-US', { timeZone: TZ, month: 'short', day: 'numeric' })
 
+async function gapi(path, token) {
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/${path}`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000) })
+  if (!res.ok) throw new Error(`calendar ${path.split('?')[0]} -> ${res.status}`)
+  return res.json()
+}
+
 async function fetchThreads() {
   const token = await accessToken()
   const { startOfDay, endOfWeek } = weekWindow()
-  const q = new URLSearchParams({ timeMin: startOfDay.toISOString(), timeMax: endOfWeek.toISOString(), singleEvents: 'true', orderBy: 'startTime', maxResults: '60' })
-  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CAL_ID)}/events?${q}`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000) })
-  if (!res.ok) throw new Error(`calendar → ${res.status}`)
-  const json = await res.json()
   const now = Date.now()
-  const events = (json.items || [])
-    .filter((e) => e.status !== 'cancelled')
-    .map((e) => {
+  // Every calendar this account can see: its own, and any Blake shares with it.
+  const cals = CAL_ID === 'primary' ? (await gapi('users/me/calendarList?minAccessRole=reader', token)).items || [] : [{ id: CAL_ID, summary: CAL_ID }]
+  const q = new URLSearchParams({ timeMin: startOfDay.toISOString(), timeMax: endOfWeek.toISOString(), singleEvents: 'true', orderBy: 'startTime', maxResults: '80' })
+  const lists = await Promise.all(
+    cals.map((c) => gapi(`calendars/${encodeURIComponent(c.id)}/events?${q}`, token).then((j) => ({ cal: c, items: j.items || [] })).catch(() => ({ cal: c, items: [] })))
+  )
+  const seen = new Set()
+  const events = []
+  for (const { cal, items } of lists) {
+    for (const e of items) {
+      if (e.status === 'cancelled' || seen.has(e.id)) continue
+      seen.add(e.id)
       const allDay = Boolean(e.start?.date)
       const start = Date.parse(e.start?.dateTime || `${e.start?.date}T00:00:00-05:00`) || 0
       const end = Date.parse(e.end?.dateTime || `${e.end?.date}T00:00:00-05:00`) || start
-      return { id: e.id, title: e.summary || '(untitled)', start, end, allDay, where: e.location || '', link: e.htmlLink || '', who: (e.attendees || []).filter((a) => !a.self).map((a) => a.displayName || a.email).slice(0, 4) }
-    })
-    .filter((e) => e.end > now - 60 * 60 * 1000)
+      if (end <= now - 60 * 60 * 1000) continue
+      events.push({ id: e.id, title: e.summary || '(untitled)', start, end, allDay, where: e.location || '', link: e.htmlLink || '', cal: cal.summary || '', who: (e.attendees || []).filter((a) => !a.self).map((a) => a.displayName || a.email).slice(0, 4) })
+    }
+  }
+  events.sort((a, b) => a.start - b.start)
 
   const out = []
-  const line = (e) => `${fmtDay.format(e.start)} ${e.allDay ? 'all day' : fmtTime.format(e.start)} · ${e.title}${e.where ? ` @ ${e.where}` : ''}`
+  const line = (e) => `${fmtDay.format(e.start)} ${e.allDay ? 'all day' : fmtTime.format(e.start)} - ${e.title}${e.where ? ` @ ${e.where}` : ''}`
   const upcoming = events.filter((e) => e.end > now)
   const next = upcoming.find((e) => !e.allDay) || upcoming[0]
   out.push({
@@ -73,19 +86,19 @@ async function fetchThreads() {
     kind: 'task',
     count: upcoming.length,
     title: '📅 This week',
-    preview: upcoming.length ? upcoming.slice(0, 14).map((e) => `• ${line(e)}`).join(String.fromCharCode(10)) + (upcoming.length > 14 ? `\n… and ${upcoming.length - 14} more` : '') : 'Nothing left on the calendar this week',
+    preview: upcoming.length ? upcoming.slice(0, 16).map((e) => `- ${line(e)}`).join(String.fromCharCode(10)) + (upcoming.length > 16 ? `${String.fromCharCode(10)}... and ${upcoming.length - 16} more` : '') : 'Nothing left on the calendar this week',
     project: ZONE,
     projectPath: 'calendar://week',
     worktree: '',
-    cwd: CAL_ID,
+    cwd: cals.map((c) => c.summary).filter(Boolean).join(', '),
     gitBranch: next ? `next: ${fmtDay.format(next.start)} ${next.allDay ? '' : fmtTime.format(next.start)}`.trim() : 'clear',
-    model: `${fmtDate.format(startOfDay)} – ${fmtDate.format(endOfWeek.getTime() - 1)}`,
+    model: `${fmtDate.format(startOfDay)} - ${fmtDate.format(endOfWeek.getTime() - 1)}`,
     effort: '',
     createdAt: 0,
     lastActivityAt: now,
     lastFocusedAt: 0,
     running: false,
-    unread: Boolean(next && !next.allDay && next.start - now < SOON_MS && next.start > now - 15 * 60000),
+    unread: false,
     hasError: false,
     starred: false,
     routine: '',
@@ -99,26 +112,28 @@ async function fetchThreads() {
     ref: { link: 'https://calendar.google.com/calendar/u/0/r/week' },
   })
 
-  for (const e of events.filter((e) => e.start < now + DAY_MS && e.end > now)) {
+  // Every event still to come this week is a person; only the next 24 hours raise a hand.
+  for (const e of upcoming) {
     const live = e.start <= now && e.end > now
+    const within = e.start - now < DAY_MS
     const soon = !live && e.start - now < SOON_MS
     out.push({
       id: `cal:${e.id}`,
       kind: 'task',
-      title: `${live ? '🔴' : '🗓️'} ${e.title}`.slice(0, 120),
-      preview: [`${fmtDay.format(e.start)} ${e.allDay ? 'all day' : `${fmtTime.format(e.start)} – ${fmtTime.format(e.end)}`}`, e.where, e.who.length ? `with ${e.who.join(', ')}` : ''].filter(Boolean).join(' · '),
+      title: `${live ? '🔴' : within ? '🗓️' : '📆'} ${e.title}`.slice(0, 120),
+      preview: [`${fmtDay.format(e.start)} ${e.allDay ? 'all day' : `${fmtTime.format(e.start)} - ${fmtTime.format(e.end)}`}`, e.where, e.who.length ? `with ${e.who.join(', ')}` : '', e.cal].filter(Boolean).join(' · '),
       project: ZONE,
-      projectPath: 'calendar://today',
+      projectPath: 'calendar://week',
       worktree: '',
-      cwd: 'next 24h',
-      gitBranch: live ? 'happening now' : soon ? 'starting soon' : 'within 24h',
+      cwd: e.cal,
+      gitBranch: live ? 'happening now' : soon ? 'starting soon' : within ? 'within 24h' : fmtDay.format(e.start),
       model: '',
       effort: '',
-      createdAt: e.start - 86400000,
+      createdAt: e.start - 7 * 86400000,
       lastActivityAt: now,
       lastFocusedAt: 0,
       running: live,
-      unread: !live,
+      unread: within && !live,
       hasError: false,
       starred: false,
       routine: '',
