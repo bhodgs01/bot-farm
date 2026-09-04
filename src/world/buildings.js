@@ -377,6 +377,43 @@ const KINDS = {
     return 'Planter'
   },
 
+  /**
+   * The Plex hex's landmark: a cinema. A lit screen on two posts with a dark frame, four
+   * rows of seats facing it, a projector on a post at the back, and a little marquee light.
+   * The screen glows on its own at night; who is in the seats is the astronauts' business.
+   */
+  theater(c, rand) {
+    const box = (w, h, d, cell, o = {}) => c.geom(new THREE.BoxGeometry(w, h, d), cell, o)
+    // floor slab and a low stage under the screen
+    box(3.2, 0.1, 2.9, CELL.SLATE, { y: 0.05 })
+    box(2.9, 0.14, 0.6, CELL.GREY, { y: 0.17, z: -1.05 })
+    // posts, frame, screen
+    box(0.08, 1.7, 0.08, CELL.GREY, { x: -1.2, y: 0.95, z: -1.2 })
+    box(0.08, 1.7, 0.08, CELL.GREY, { x: 1.2, y: 0.95, z: -1.2 })
+    box(2.6, 1.5, 0.06, CELL.BLACK, { y: 1.15, z: -1.2 })
+    box(2.4, 1.3, 0.05, CELL.WHITE, { y: 1.15, z: -1.16, emissive: 0.9 })
+    // seats: four rows, five across, red cushions on dark bases, stepped up toward the back
+    for (let r = 0; r < 4; r++) {
+      for (let i = 0; i < 5; i++) {
+        const x = -1.0 + i * 0.5
+        const z = -0.35 + r * 0.42
+        const y = 0.1 + r * 0.07
+        box(0.36, 0.1, 0.34, CELL.BLACK, { x, y: y + 0.12, z })
+        box(0.36, 0.22, 0.34, CELL.RED, { x, y: y + 0.28, z })
+        box(0.36, 0.34, 0.08, CELL.RED, { x, y: y + 0.45, z: z + 0.15 })
+      }
+      box(3.0, 0.07, 0.5, CELL.SLATE, { y: 0.1 + r * 0.07 + 0.03, z: -0.35 + r * 0.42 })
+    }
+    // projector on a post at the back, lens lit
+    box(0.1, 1.5, 0.1, CELL.GREY, { y: 0.85, z: 1.35 })
+    box(0.42, 0.24, 0.5, CELL.SLATE, { y: 1.7, z: 1.35 })
+    box(0.1, 0.1, 0.08, CELL.RED, { y: 1.7, z: 1.06, emissive: 1 })
+    // marquee light on each post
+    box(0.14, 0.14, 0.14, CELL.RED, { x: -1.2, y: 1.88, z: -1.2, emissive: 0.8 })
+    box(0.14, 0.14, 0.14, CELL.RED, { x: 1.2, y: 1.88, z: -1.2, emissive: 0.8 })
+    return 'Theater'
+  },
+
   tower(c, rand) {
     c.add('structure_tall')
     c.add('lights', { y: 2.0, s: 0.7 })
@@ -410,7 +447,7 @@ const KINDS = {
   },
 }
 
-const KIND_IDS = Object.keys(KINDS).filter((k) => !['dish', 'printer', 'rack', 'planter'].includes(k))
+const KIND_IDS = Object.keys(KINDS).filter((k) => !['dish', 'printer', 'rack', 'planter', 'theater'].includes(k))
 
 // ── the reveal shader ─────────────────────────────────────────────────────────────────
 

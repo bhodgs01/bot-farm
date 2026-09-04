@@ -61,7 +61,7 @@ export const ROSTER = [
   { id: 'frances', name: 'Frances', emoji: '🩺', role: 'caregiver AI',         zone: 'Frances',           ns: ['caregiver'],                                                 url: 'https://caregiver.kcproto.com' },
   { id: 'grader',  name: 'Grader',  emoji: '🧮', role: 'compliance grader',    zone: 'CyberGrade',        ns: ['cybergrade', 'cybergrade-api'],                              url: '' },
   { id: 'franky',  name: 'Franky',  emoji: '🚀', role: 'xprize',               zone: 'Franky',            ns: ['franky'],                                                    url: '' },
-  { id: 'plex',    name: 'Plex',    emoji: '📺', role: 'media server',         zone: 'Plex',            landmark: 'pad',              ns: ['plex'],                                                      url: 'https://app.plex.tv/desktop' },
+  { id: 'plex',    name: 'Plex',    emoji: '📺', role: 'media server',         zone: 'Plex',            landmark: 'theater',              ns: ['plex'],                                                      url: 'https://app.plex.tv/desktop' },
   { id: 'core',    name: 'Core',    emoji: '🛰️', role: 'control plane',        zone: 'Cluster',           ns: ['kube-system'],                                               url: 'https://grafana.kcproto.com', landmark: 'solar' },
   { id: 'house',   name: 'House',   emoji: '🏠', role: 'home assistant',       zone: 'Home',              ns: ['home-assistant'],                                            url: 'https://homeassistant.kcproto.com', landmark: 'habitat' },
   { id: 'biff',    name: 'Biff',    emoji: '🧑‍💼', role: 'club operations',      zone: 'KC AI Club',      landmark: 'lab',        ns: ['aiclub'],                                                    url: 'https://ai-club.kcproto.com/#/biff' },
@@ -305,7 +305,7 @@ async function probe(url) {
  */
 async function appSignals() {
   const out = {}
-  const [biff, cluster, watchdog, shorts, feeds, trader, syncthing, velero, pot] = await Promise.all([
+  const [biff, cluster, watchdog, shorts, feeds, trader, syncthing, velero, pot, plexSessions] = await Promise.all([
     fetchJson(`${AGENTS_BASE}/api/biff`),
     fetchJson(`${AGENTS_BASE}/api/cluster`),
     fetchJson(`${WATCHDOG_BASE}/api/state`),
@@ -315,7 +315,27 @@ async function appSignals() {
     fetchJson(process.env.SYNCTHING_STATUS_URL || 'http://syncthing-dashboard.syncthing.svc.cluster.local:3200/api/status'),
     kubeGet('/apis/velero.io/v1/namespaces/velero/backups').catch(() => null),
     fetchJson(`${process.env.TRADE_BOT_URL || 'https://trade-bot.kcproto.com'}/api/aggregate`),
+    process.env.PLEX_TOKEN
+      ? fetch(`${process.env.PLEX_URL || 'http://plex-fallback.plex.svc.cluster.local:32400'}/status/sessions`, { headers: { Accept: 'application/json', 'X-Plex-Token': process.env.PLEX_TOKEN }, signal: AbortSignal.timeout(8000) })
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null)
+      : Promise.resolve(null),
   ])
+
+  // The theater: the screen is lit when somebody is watching, and the roof says how many.
+  if (plexSessions && plexSessions.MediaContainer) {
+    const list = plexSessions.MediaContainer.Metadata || []
+    const now = Date.now()
+    out.plex = {
+      running: list.length > 0,
+      roof: list.length ? `${list.length} watching` : 'screen dark',
+      message: list.length
+        ? list.map((m) => `${m.User?.title || 'someone'} · ${m.grandparentTitle ? `${m.grandparentTitle}: ${m.title}` : m.title}${m.Player?.state === 'paused' ? ' (paused)' : ''}`).join(' | ')
+        : 'nobody watching',
+      activityAt: list.length ? now : 0,
+      work: list.length,
+    }
+  }
 
   if (syncthing && Array.isArray(syncthing.instances)) {
     const inst = syncthing.instances

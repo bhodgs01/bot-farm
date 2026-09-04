@@ -56,6 +56,7 @@ const ZONE_ACCENT = {
   Home: 0xc97f4f,
   Inbox: 0xc96442,
   'Trade Floor': 0x3fa8a0,
+  Plex: 0xc95c5c,
   'Active Projects': 0xc96442,
   'In Process': 0xb8942a,
   Completed: 0x4f9a63,
