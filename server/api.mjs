@@ -439,7 +439,21 @@ export async function apiMiddleware(req, res, next) {
       if (build && theirs !== build && !(theirs === 'dev' && !process.env.COLONY_PUBLIC)) {
         return send(res, 409, { error: 'stale build', build })
       }
-      return send(res, 200, await writeState(await readJsonBody(req)))
+      const next = await readJsonBody(req)
+      // A layout that keeps almost none of the zones where they were is not an edit, it is
+      // a page that never loaded the file laying the colony out from scratch. Refuse it
+      // unless the caller says the rewrite is deliberate.
+      const current = await readState()
+      const before = current.plots || {}
+      const after = asObject(next.plots)
+      const known = Object.keys(before).filter((z) => z in after)
+      const kept = known.filter((z) => JSON.stringify(before[z]) === JSON.stringify(after[z])).length
+      const deliberate = req.headers['x-botfarm-layout'] === 'rewrite'
+      if (Object.keys(before).length >= 5 && known.length >= 5 && kept / known.length < 0.3 && !deliberate) {
+        console.warn(`state: refused a layout rewrite (${kept}/${known.length} zones kept)`)
+        return send(res, 409, { error: 'layout rewrite refused', kept, known: known.length })
+      }
+      return send(res, 200, await writeState(next))
     }
 
     if (url.pathname === '/api/open' && req.method === 'POST') {

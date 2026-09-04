@@ -57,6 +57,9 @@ const rig = new CameraRig(engine.camera, engine.canvas, settings)
 const colony = new Colony(engine.scene, settings, engine.camera, engine.renderer)
 
 let state = { archived: [], archivedAt: {}, opened: [], plots: {}, seen: {} }
+// Set once the saved state has actually arrived. A page that booted while the server was
+// restarting has an empty layout in hand, and saving that would re-lay the whole colony.
+let stateLoaded = false
 let threads = []
 /** Last legend built for the bottom bar, kept so the open zone's chip can light up between polls. */
 let legendProjects = []
@@ -761,7 +764,9 @@ async function adoptRemoteState() {
   }
   // A release landed since this page loaded: reload rather than keep saving an old layout.
   if (remote?.build && remote.build !== BUILD && BUILD !== 'dev' && reloadForBuild(remote.build)) return
-  if (!remote?.updatedAt || remote.updatedAt === state.updatedAt) return
+  if (!remote?.updatedAt) return
+  stateLoaded = true // the file is in hand now even if the boot-time fetch failed
+  if (remote.updatedAt === state.updatedAt) return
   state.updatedAt = remote.updatedAt
   state.plots = remote.plots || {}
   state.archived = remote.archived || []
@@ -787,6 +792,7 @@ async function poll() {
 
 function queueSave() {
   clearTimeout(pendingSave)
+  if (!stateLoaded) return
   pendingSave = setTimeout(async () => {
     try {
       const saved = await saveState(state)
@@ -807,6 +813,7 @@ async function boot() {
     fetchState()
       .then((s) => {
         state = s
+        stateLoaded = true
         // Before the first roster: zones come back to the ground they were on last time.
         colony.restoreLayout(state.plots)
         // And the settings, but only for a browser that has none of its own — an explicit
