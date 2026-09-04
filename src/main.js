@@ -54,8 +54,6 @@ if (!hasStoredSettings()) settings.applyPreset(DEFAULT_PRESET)
 const engine = new Engine(settings).mount(app)
 const rig = new CameraRig(engine.camera, engine.canvas, settings)
 const colony = new Colony(engine.scene, settings, engine.camera, engine.renderer)
-// Debug handle for headless checks and the console; nothing in the app reads it.
-window.__botfarm = { actions, colony, settings }
 
 let state = { archived: [], archivedAt: {}, opened: [], plots: {}, seen: {} }
 let threads = []
@@ -926,6 +924,9 @@ engine.add({
 })
 
 engine.start()
+// Debug handle for headless checks and the console; nothing in the app reads it.
+window.__botfarm = { actions, colony, settings }
+
 boot()
 
 // Handy for poking at the running colony from the console.
