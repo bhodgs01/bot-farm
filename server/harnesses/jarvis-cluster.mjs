@@ -73,7 +73,6 @@ export const ROSTER = [
   { id: 'dwight',  name: 'Dwight',  emoji: '🚜', role: 'inventory',            zone: 'NED Builds',        ns: ['nedbuilds-pro', 'small-business', 'ned-estimates'],          url: 'https://small-biz.kcproto.com' },
   { id: 'leo',     name: 'Leo',     emoji: '📣', role: 'listing announcer',    zone: 'NED Builds',        ns: ['ned-ar-bot'],                                                url: '' },
   { id: 'snoop',   name: 'Snoop',   emoji: '📈', role: 'trader',               zone: 'Trade Floor',     landmark: 'reactor',      ns: [],  url: 'https://trade-bot.kcproto.com', probe: 'https://trade-bot.kcproto.com/api/health' },
-  { id: 'marty',   name: 'Marty',   emoji: '🏃', role: 'shorts poster',        zone: 'Shorts',      ns: ['shorts-player'],                                             url: '' },
   { id: 'hank',    name: 'Hank',    emoji: '📒', role: 'bookkeeper',           zone: 'Books',      ns: ['books'],                                                     url: '' },
   { id: 'gordon',  name: 'Gordon',  emoji: '👨‍🍳', role: 'schema roast',         zone: 'Roast Bot',      ns: ['roast-bot'],                                                 url: 'https://schemacheckerai.com' },
   { id: 'vince',   name: 'Vince',   emoji: '🕵️', role: 'sales hunter',         zone: 'Prospector',      ns: ['spambot'],                                                   url: 'https://prospector.kcproto.com', probe: 'https://prospector.kcproto.com' },

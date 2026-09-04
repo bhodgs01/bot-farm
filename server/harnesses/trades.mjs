@@ -19,13 +19,58 @@ const money = (v) => {
 }
 const pct = (v) => `${(Number(v) || 0) >= 0 ? '+' : ''}${((Number(v) || 0) * 100).toFixed(1)}%`
 
+/** What the tickers actually are, so the floor reads like a market and not a ticker tape. */
+const NAMES = { QQQ: 'Nasdaq 100', SPY: 'S&P 500', DIA: 'Dow', IWM: 'Russell 2000', GLD: 'Gold', TLT: 'Long bonds', SQQQ: 'Nasdaq short', XLK: 'Tech', VIXY: 'VIX' }
+
 async function fetchThreads() {
   const res = await fetch(`${BASE}/api/status`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(15000) })
   if (!res.ok) throw new Error(`trade-bot status → ${res.status}`)
   const d = await res.json()
+  // The pot: real money, one line per investor, behind the replicator.
+  const pot = await fetch(`${BASE}/api/aggregate`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(15000) })
+    .then((r) => (r.ok ? r.json() : null))
+    .catch(() => null)
   const now = Date.now()
   const cycleAt = Date.parse(d.lastCycleTime || '') || 0
   const out = []
+  if (pot && Number(pot.totalAUM)) {
+    const total = Number(pot.totalAUM) || 0
+    const profit = Number(pot.totalProfit) || 0
+    const ret = Number(pot.totalReturn) || 0
+    const deposits = Number(pot.totalDeposits) || 0
+    const hist = Array.isArray(pot.potHistory) ? pot.potHistory : []
+    const last = hist[hist.length - 1]
+    out.push({
+      id: 'trade:pot',
+      kind: 'position',
+      roof: `$${total.toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
+      title: '💰 Live pot',
+      preview: `$${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · ${money(profit)} (${ret >= 0 ? '+' : ''}${ret.toFixed(1)}%) on $${deposits.toLocaleString('en-US', { maximumFractionDigits: 0 })} deposited · ${Number(pot.totalInvestors) || 1} investor${Number(pot.totalInvestors) === 1 ? '' : 's'}${last?.date ? ` · marked ${String(last.date).slice(0, 10)}` : ''}`,
+      project: ZONE,
+      projectPath: 'trade://pot',
+      worktree: '',
+      cwd: 'live',
+      gitBranch: `${ret >= 0 ? '+' : ''}${ret.toFixed(1)}% all time`,
+      model: money(profit),
+      effort: '',
+      createdAt: 0,
+      lastActivityAt: cycleAt || now,
+      lastFocusedAt: 0,
+      running: false,
+      unread: false,
+      hasError: profit < 0,
+      starred: true,
+      routine: '',
+      prState: '',
+      archived: false,
+      hasTranscript: false,
+      sizeBytes: Math.round(1000 * (1 + total / 10)),
+      source: 'trade-bot',
+      canOpen: true,
+      canArchive: false,
+      ref: { symbol: 'pot' },
+    })
+  }
   for (const p of Array.isArray(d.positions) ? d.positions : []) {
     const plpc = Number(p.unrealized_plpc) || 0
     const today = Number(p.change_today) || 0
@@ -35,7 +80,7 @@ async function fetchThreads() {
     out.push({
       id: `trade:${p.symbol}`,
       kind: 'position',
-      title: `${p.side === 'short' ? '📉' : '📈'} ${p.symbol} · ${p.qty} sh`,
+      title: `${p.side === 'short' ? '📉' : '📈'} ${NAMES[p.symbol] ? `${NAMES[p.symbol]} (${p.symbol})` : p.symbol} · ${p.qty} sh`,
       preview: `${money(p.unrealized_pl)} (${pct(plpc)}) · today ${pct(today)} · ${Number(p.avg_entry_price).toFixed(2)} → ${Number(p.current_price).toFixed(2)} · $${Math.round(value).toLocaleString('en-US')}`,
       project: ZONE,
       projectPath: 'trade://positions',
