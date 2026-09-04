@@ -1,9 +1,9 @@
 /**
  * Harness adapter: Vikunja — every open task is an astronaut on its client's hex.
  *
- * A task with nothing special about it just stands there, so a client with three open
- * tickets shows three people beside its agent. One that is due within a day or marked
- * high priority holds a `?`; one that is overdue slumps with a `!`. Done tasks are gone.
+ * Every open ticket stands beside its client's agent with a hand up and a `?`: an open
+ * ticket is, by definition, waiting on Blake. Overdue ones raise the `!` instead. The card
+ * carries the whole ticket and a button that closes it (see server/act.mjs).
  *
  * Read-only: GET /projects, then GET /projects/{id}/tasks per project.
  * Env: VIKUNJA_TOKEN, VIKUNJA_URL optional.
@@ -70,6 +70,7 @@ async function fetchThreads() {
         const soon = due && !overdue && due - now < SOON_MS
         const high = Number(t.priority) >= 4
         const labels = (t.labels || []).map((l) => l.title).filter(Boolean)
+        const desc = String(t.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
         const when = due ? (overdue ? `overdue since ${new Date(due).toLocaleDateString('en-US')}` : `due ${new Date(due).toLocaleDateString('en-US')}`) : 'no due date'
         out.push({
           id: `task:${t.id}`,
@@ -87,8 +88,20 @@ async function fetchThreads() {
           lastActivityAt: validDate(t.updated) || validDate(t.created) || now,
           lastFocusedAt: 0,
           running: false,
-          unread: Boolean(soon || high),
+          unread: !overdue,
           hasError: Boolean(overdue),
+          actions: ['done'],
+          details: {
+            Ticket: `#${t.id}`,
+            Project: p.title,
+            Due: due ? new Date(due).toLocaleString('en-US') : '',
+            Priority: Number(t.priority) ? ['', 'low', 'medium', 'high', 'urgent', 'DO NOW'][Number(t.priority)] || String(t.priority) : '',
+            Labels: labels.join(', '),
+            Assigned: (t.assignees || []).map((a) => a.name || a.username).filter(Boolean).join(', '),
+            Created: validDate(t.created) ? new Date(validDate(t.created)).toLocaleDateString('en-US') : '',
+            Updated: validDate(t.updated) ? new Date(validDate(t.updated)).toLocaleDateString('en-US') : '',
+            Description: desc.slice(0, 1200),
+          },
           starred: Boolean(t.is_favorite),
           routine: '',
           prState: '',
@@ -149,6 +162,10 @@ async function fetchThreads() {
 }
 
 let cache = { at: 0, data: null, inflight: null }
+/** Forget the last read after a write. */
+export function refreshTasks() {
+  cache = { at: 0, data: cache.data, inflight: null }
+}
 async function scanThreads() {
   const age = Date.now() - cache.at
   if (cache.data && age < TTL_MS) return cache.data

@@ -41,3 +41,9 @@ export const revealFolder = (folder) => post('/api/reveal', { folder })
 
 /** Ask a worker what it needs. Gated at the edge; a 401 carries where to sign in. */
 export const askWorker = (thread, message) => post('/api/ask', { id: thread.id, message })
+
+/** Move a project to another stage on the board. Gated at the edge like chat. */
+export const actProject = (projectId, status) => post('/api/act/project', { id: projectId, status })
+
+/** Close a Vikunja ticket. Same gate. */
+export const actTask = (taskId) => post('/api/act/task', { id: taskId })

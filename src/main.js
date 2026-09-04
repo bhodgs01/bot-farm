@@ -18,6 +18,8 @@ import {
   newSession,
   revealFolder,
   askWorker,
+  actProject,
+  actTask,
 } from './game/api.js'
 
 /**
@@ -145,6 +147,32 @@ const actions = {
   focusThread: (id) => {
     if (!id || !colony.agentFor(id)) return
     select(id, { fly: true })
+  },
+
+  /** Move a project to another stage, from the card's buttons or a drag. */
+  stageThread: async (status, id = selectedId) => {
+    const thread = threads.find((t) => t.id === id)
+    if (!thread) return
+    try {
+      if (thread.harness === 'tasks' && status === 'done') {
+        await actTask(thread.ref?.task)
+        hud.toast(`Closed: ${thread.title} — heading home`)
+        colony.ship.ping()
+      } else if (thread.harness === 'projects') {
+        await actProject(thread.ref?.id, status)
+        hud.toast(status === 'paid' ? `${thread.title} is paid — heading home` : `${thread.title} → ${status.replace('_', ' ')}`)
+        if (status === 'paid') colony.ship.ping()
+      } else return
+      setTimeout(poll, 800)
+    } catch (err) {
+      const msg = String(err?.message || err)
+      if (/sign in/i.test(msg) || /401/.test(msg) || /Failed to fetch/i.test(msg)) {
+        hud.toast('Sign in first — a tab just opened', 'err')
+        window.open('/api/act/auth', '_blank', 'noopener')
+      } else {
+        hud.toast(msg, 'err')
+      }
+    }
   },
 
   /** Ask the selected worker something. The reply lands in the card's transcript. */
@@ -435,9 +463,69 @@ function ndc(e) {
   }
 }
 
+// ── drag a project between its hexes ───────────────────────────────────────────────────
+
+/** Which board stage each project hex stands for. Dropping elsewhere does nothing. */
+const STAGE_OF_ZONE = { 'Active Projects': 'active', 'In Process': 'in_process', Completed: 'completed' }
+const dragTip = document.createElement('div')
+dragTip.className = 'drag-tip'
+dragTip.hidden = true
+document.body.appendChild(dragTip)
+let drag = null // { id, title, x, y, moved }
+
+// Capture phase, so the camera never sees a press that begins on a project astronaut.
+engine.canvas.addEventListener(
+  'pointerdown',
+  (e) => {
+    if (e.button !== 0) return
+    const p = ndc(e)
+    const agent = colony.pick(p.x, p.y, p.aspect)
+    if (!agent || agent.thread?.harness !== 'projects') return
+    e.stopImmediatePropagation()
+    e.preventDefault()
+    drag = { id: agent.id, title: agent.thread.title, x: e.clientX, y: e.clientY, moved: false }
+    engine.canvas.setPointerCapture?.(e.pointerId)
+  },
+  { capture: true }
+)
+window.addEventListener('pointermove', (e) => {
+  if (!drag) return
+  if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6) return
+  drag.moved = true
+  const ground = rig.groundPoint(e.clientX, e.clientY, hoverGround)
+  const plot = ground ? colony.plotAt(ground.x, ground.z) : null
+  colony.setHoveredPlot(plot)
+  const stage = plot && STAGE_OF_ZONE[plot.name]
+  dragTip.textContent = stage ? `Move ${drag.title} → ${plot.name}` : `${drag.title}: drop on Active, In Process or Completed`
+  dragTip.hidden = false
+  dragTip.style.left = `${e.clientX + 14}px`
+  dragTip.style.top = `${e.clientY + 16}px`
+  engine.canvas.style.cursor = stage ? 'copy' : 'grabbing'
+})
+window.addEventListener('pointerup', (e) => {
+  if (!drag) return
+  const d = drag
+  drag = null
+  dragTip.hidden = true
+  engine.canvas.style.cursor = 'grab'
+  if (!d.moved) {
+    select(d.id, {})
+    return
+  }
+  const ground = rig.groundPoint(e.clientX, e.clientY, hoverGround)
+  const plot = ground ? colony.plotAt(ground.x, ground.z) : null
+  const stage = plot && STAGE_OF_ZONE[plot.name]
+  const thread = threads.find((t) => t.id === d.id)
+  if (!stage || !thread) return
+  if (thread.project === plot.name) return
+  select(d.id, {})
+  actions.stageThread(stage, d.id)
+})
+
 engine.canvas.addEventListener('pointermove', (e) => {
   // Mid-drag the cursor is the grab hand and nothing else: running a pick every move event
   // while the world is being dragged would flicker the hover ring across the whole colony.
+  if (drag) return
   if (rig.interacting) {
     engine.canvas.style.cursor = rig._mode === 'orbit' ? 'move' : 'grabbing'
     hoverTip.hidden = true

@@ -534,6 +534,19 @@ export class Hud {
     bits.push(`<span>${ago(thread.lastActivityAt)}</span>`)
     meta.innerHTML = bits.join('')
 
+    // Everything the source knows, as a small table, for threads that carry details.
+    const details = this.$('.thread-pop .details')
+    const entries = Object.entries(thread.details || {}).filter(([, v]) => v !== '' && v != null)
+    details.innerHTML = entries.map(([k, v]) => `<div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(String(v))}</div>`).join('')
+    details.hidden = entries.length === 0
+    // Stage buttons: what this thread can be moved to next.
+    const stage = this.$('.thread-pop .stage')
+    const STAGE_LABEL = { active: 'Make active', in_process: 'Start work', completed: 'Mark complete', paid: 'Paid ✓', done: 'Close ticket ✓' }
+    const acts = Array.isArray(thread.actions) ? thread.actions : []
+    stage.innerHTML = acts.map((a) => `<button class="btn ${a === 'paid' || a === 'done' ? 'primary' : ''}" data-stage="${escapeHtml(a)}">${escapeHtml(STAGE_LABEL[a] || a)}</button>`).join('')
+    stage.hidden = acts.length === 0
+    for (const b of stage.querySelectorAll('button')) b.addEventListener('click', () => this.actions.stageThread?.(b.dataset.stage))
+
     const pct = Math.round((this.actions.progressFor?.(thread.id) ?? 0) * 100)
     this.$('.thread-pop .progress > i').style.width = `${pct}%`
     this.$('.thread-pop .progress > i').style.background = hex(agent.trim.getHex())
@@ -992,6 +1005,8 @@ const TEMPLATE = `
     <button class="btn icon ghost" id="btn-deselect" title="Deselect (Esc)">${ICON.close}</button>
   </div>
   <div class="progress"><i></i></div>
+  <div class="details"></div>
+  <div class="stage"></div>
   <div class="pair">
     <button class="btn primary" id="btn-open" title="Open this thread in the harness it came from (Enter)">${ICON.open} Open</button>
     <button class="btn" id="btn-archive" title="Archive — this astronaut walks back to the ship (A)">${ICON.archive} Archive</button>

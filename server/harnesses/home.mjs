@@ -16,15 +16,30 @@
 
 const TOKEN = process.env.HA_TOKEN || ''
 const HA_URL = process.env.HA_URL || 'http://home-assistant.home-assistant.svc.cluster.local:8123'
-const OPEN_URL = process.env.HA_OPEN_URL || 'https://ha.kcproto.com'
+const OPEN_URL = process.env.HA_OPEN_URL || 'https://homeassistant.kcproto.com'
 const PLANT_DRY = Number(process.env.HA_PLANT_DRY) || 50
 const TTL_MS = 15 * 1000
 const ZONE = 'Home'
 const GARDEN = 'Garden'
 
-const DOOR_CLASSES = new Set(['door', 'window', 'garage_door', 'opening'])
-/** Sensor names that are not doors even though they are contact sensors. */
-const NOT_A_DOOR = /mail/i
+/**
+ * The doors that count. The house has contact sensors on the washer, dryer and mailbox
+ * too, and those are not doors. Override with HA_DOORS as JSON {entity_id: label}.
+ */
+const DOORS = (() => {
+  try {
+    if (process.env.HA_DOORS) return JSON.parse(process.env.HA_DOORS)
+  } catch {}
+  return {
+    'binary_sensor.contact_sensor_5': 'Front door',
+    'binary_sensor.contact_sensor_6': 'Back door',
+    'binary_sensor.contact_sensor_4': 'Door to garage',
+    'binary_sensor.contact_sensor': 'Cave door',
+    'cover.garage_door_opener_door': 'Garage door',
+  }
+})()
+/** Motion that means somebody is at the house, not somebody walking through the living room. */
+const OUTSIDE = /front|door|garage|driveway|porch|yard|gate/i
 const VISITOR_CLASSES = new Set(['motion', 'occupancy', 'presence', 'moving'])
 const DESK = /at_desk|desk_occupancy/i
 
@@ -62,6 +77,13 @@ function base(entityId, attrs, kind, extra = {}) {
   }
 }
 
+/** `Basement corner leak sensor Water Leak Sensor` → `Basement corner`. */
+function leakName(attrs, entityId) {
+  const raw = String(attrs.friendly_name || entityId.split('.')[1])
+  const cleaned = raw.replace(/\s*water leak sensor\s*$/i, '').replace(/\s*leak sensor\s*$/i, '').replace(/\s*water sensor\s*$/i, '').trim()
+  return cleaned || raw
+}
+
 /** `Front door sensor Contact Sensor` → `Front door`. */
 function doorName(attrs, entityId) {
   const raw = String(attrs.friendly_name || entityId.split('.')[1])
@@ -91,6 +113,8 @@ async function fetchThreads() {
   const out = []
   const seenPlants = new Set()
   const doors = [] // { name, open, changed }
+  const leaks = [] // { name, wet, offline, changed }
+  const laundry = [] // { name, since }
 
   for (const s of states) {
     const id = s.entity_id
@@ -106,14 +130,20 @@ async function fetchThreads() {
       continue
     }
 
-    // A group entity (it lists members in attributes.entity_id) is a roll-up, not a door.
-    if (domain === 'binary_sensor' && Array.isArray(a.entity_id)) continue
-    if (domain === 'binary_sensor' && (DOOR_CLASSES.has(cls) || /door|window/i.test(id)) && !VISITOR_CLASSES.has(cls) && !/motion|obstruction|button|motor|dry_contact/i.test(id) && !NOT_A_DOOR.test(a.friendly_name || id)) {
-      if (s.state === 'on' || s.state === 'off') doors.push({ name: doorName(a, id), open: s.state === 'on', changed })
+    if (DOORS[id]) {
+      const state = String(s.state)
+      if (domain === 'cover' ? /^(open|closed|opening|closing)$/.test(state) : /^(on|off)$/.test(state)) {
+        doors.push({ name: DOORS[id], open: domain === 'cover' ? state !== 'closed' : state === 'on', changed })
+      }
       continue
     }
-    if (domain === 'cover' && (cls === 'garage' || cls === 'garage_door' || cls === 'door' || cls === 'gate')) {
-      if (s.state === 'open' || s.state === 'closed' || s.state === 'opening' || s.state === 'closing') doors.push({ name: doorName(a, id), open: s.state !== 'closed', changed })
+    if (domain === 'binary_sensor' && cls === 'moisture' && /leak|water/i.test(id)) {
+      if (s.state === 'on' || s.state === 'off') leaks.push({ name: leakName(a, id), wet: s.state === 'on', changed })
+      else leaks.push({ name: leakName(a, id), wet: false, offline: true, changed })
+      continue
+    }
+    if (domain === 'input_boolean' && /^(laundry_sitting|dryer_sitting|washing_machine_is_done)$/.test(id.split('.')[1])) {
+      if (s.state === 'on') laundry.push({ name: id.includes('dryer') ? 'Dryer' : 'Washer', since: changed })
       continue
     }
 
@@ -124,7 +154,7 @@ async function fetchThreads() {
         out.push(base(id, a, 'person', { title: 'Blake at desk', preview: 'at the desk, working', branch: 'desk', running: true, changed }))
         continue
       }
-      if (VISITOR_CLASSES.has(cls)) {
+      if (VISITOR_CLASSES.has(cls) && OUTSIDE.test(id + ' ' + (a.friendly_name || ''))) {
         out.push(base(id, a, 'visitor', { preview: `${a.friendly_name || id}: movement right now`, branch: 'motion', changed }))
         continue
       }
@@ -171,6 +201,44 @@ async function fetchThreads() {
       sizeBytes: 1000 * (1 + doors.length * 30),
     })
     t.count = open.length
+    out.push(t)
+  }
+
+  // Leaks: one keeper for the three sensors. Red only when one is wet.
+  if (leaks.length) {
+    const wet = leaks.filter((l) => l.wet)
+    const offline = leaks.filter((l) => l.offline)
+    const t = base('house.leaks', {}, 'leaks', {
+      title: '💧 Leak sensors',
+      preview: [
+        wet.length ? `WATER: ${wet.map((l) => l.name).join(', ')}` : 'All dry',
+        `watching: ${leaks.filter((l) => !l.offline).map((l) => l.name).join(', ') || 'none'}`,
+        offline.length ? `offline: ${offline.map((l) => l.name).join(', ')}` : '',
+      ].filter(Boolean).join(String.fromCharCode(10)),
+      branch: wet.length ? `${wet.length} wet` : 'dry',
+      model: `${leaks.length - offline.length} sensors`,
+      error: wet.length > 0,
+      sizeBytes: 3000,
+    })
+    t.count = wet.length
+    out.push(t)
+  }
+
+  // Laundry: the washer or dryer finished and nobody came. The automations flip a boolean.
+  if (laundry.length) {
+    const since = laundry.map((l) => Date.parse(l.since || '') || 0).filter(Boolean)
+    const oldest = since.length ? Math.min(...since) : Date.now()
+    const hrs = Math.max(1, Math.round((Date.now() - oldest) / 3600000))
+    const t = base('house.laundry', {}, 'laundry', {
+      title: '🧺 Laundry',
+      preview: laundry.map((l) => `${l.name} has been sitting for ${Math.max(1, Math.round((Date.now() - (Date.parse(l.since || '') || Date.now())) / 3600000))}h`).join(String.fromCharCode(10)),
+      branch: `${laundry.map((l) => l.name.toLowerCase()).join(' + ')} sitting`,
+      model: `${hrs}h`,
+      changed: new Date(oldest).toISOString(),
+      sizeBytes: 3000,
+    })
+    t.unread = true
+    t.count = laundry.length
     out.push(t)
   }
 

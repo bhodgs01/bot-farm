@@ -1426,3 +1426,13 @@ kbd {
 /* Collapsed Bot Farm panel: only the brand bar stays. */
 .side.collapsed .stats,
 .side.collapsed .side-body { display: none; }
+
+/* Details table and stage buttons on a card. */
+.thread-pop .details { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 12px; max-height: 190px; overflow: auto; }
+.thread-pop .details[hidden], .thread-pop .stage[hidden] { display: none; }
+.thread-pop .details .k { opacity: 0.55; white-space: nowrap; }
+.thread-pop .details .v { overflow-wrap: anywhere; }
+.thread-pop .stage { display: flex; gap: 6px; flex-wrap: wrap; }
+.thread-pop .stage .btn { flex: 1 1 auto; }
+/* Dragging a project between hexes. */
+.drag-tip { position: fixed; z-index: 45; pointer-events: none; padding: 6px 10px; border-radius: 9px; background: rgba(12,14,20,0.93); border: 1px solid rgba(255,255,255,0.12); color: #fff; font-size: 12.5px; }

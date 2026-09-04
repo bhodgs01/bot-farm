@@ -12,6 +12,7 @@ import {
   setThreadArchived,
 } from './scan.mjs'
 import { ask, chatEnabled } from './ask.mjs'
+import { setProjectStatus, closeTask } from './act.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = process.env.BOT_CROSSING_DATA || path.join(here, '..', 'data')
@@ -280,6 +281,41 @@ export async function apiMiddleware(req, res, next) {
       const who = chatIdentity(req)
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
       return res.end(`<!doctype html><meta charset=utf-8><title>Bot Farm</title><body style="font:15px system-ui;background:#0f1117;color:#e6e8ef;display:grid;place-items:center;height:100vh;margin:0"><div>${who ? 'Signed in. You can close this tab and talk to the workers.' : 'Signed in, but this address is not on the list for worker chat.'}</div>`)
+    }
+
+    if (url.pathname === '/api/act/auth' && req.method === 'GET') {
+      const who = chatIdentity(req)
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
+      return res.end(`<!doctype html><meta charset=utf-8><title>Bot Farm</title><body style="font:15px system-ui;background:#0f1117;color:#e6e8ef;display:grid;place-items:center;height:100vh;margin:0"><div>${who ? 'Signed in. You can close this tab and move things on the map.' : 'Signed in, but this address is not on the list for actions.'}</div>`)
+    }
+
+    if (url.pathname === '/api/act/task' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to close tickets', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      const { id } = await readJsonBody(req, 16 * 1024)
+      const n = Number(id)
+      if (!Number.isInteger(n) || n <= 0) return send(res, 400, { error: 'Bad ticket id' })
+      try {
+        const task = await closeTask({ id: n, who })
+        return send(res, 200, { ok: true, done: Boolean(task.done) })
+      } catch (err) {
+        return send(res, 409, { ok: false, error: String(err?.message || err) })
+      }
+    }
+
+    if (url.pathname === '/api/act/project' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to change the board', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      const { id, status } = await readJsonBody(req, 16 * 1024)
+      if (typeof id !== 'string' || !/^[A-Za-z0-9_-]{1,64}$/.test(id)) return send(res, 400, { error: 'Bad project id' })
+      try {
+        const project = await setProjectStatus({ id, status: String(status || ''), who })
+        return send(res, 200, { ok: true, status: project.status })
+      } catch (err) {
+        return send(res, 409, { ok: false, error: String(err?.message || err) })
+      }
     }
 
     if (url.pathname === '/api/ask' && req.method === 'POST') {

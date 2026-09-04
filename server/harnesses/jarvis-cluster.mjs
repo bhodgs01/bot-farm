@@ -384,7 +384,9 @@ async function appSignals() {
     const last = Number(trader.account.last_equity) || equity
     const day = equity - last
     const paper = /^PA/i.test(String(trader.account.account_number || ''))
+    const cash = Number(trader.account.cash) || 0
     out.snoop = {
+      roof: `$${cash >= 10000 ? `${(cash / 1000).toFixed(1)}k` : Math.round(cash).toLocaleString('en-US')} cash`,
       running: Boolean(cycleAt) && Date.now() - cycleAt < 20 * 60 * 1000,
       error: Boolean(trader.lastError),
       message: trader.lastError
@@ -562,6 +564,7 @@ function deriveAgent(agent, snap, signals, probeUp) {
     sizeBytes,
     source: 'k3s',
     landmark: agent.landmark || '',
+    roof: sig.roof || '',
     canOpen: Boolean(agent.url),
     canArchive: false,
     ref: { agent: agent.id, url: agent.url },
