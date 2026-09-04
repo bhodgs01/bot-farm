@@ -153,8 +153,18 @@ class Composer {
     if (o.ry) geo.rotateY(o.ry)
     geo.translate(o.x || 0, o.y || 0, o.z || 0)
     geo.setAttribute('aEmissive', new THREE.BufferAttribute(new Float32Array(count).fill(o.emissive || 0), 1))
-    geo.setAttribute('aSpin', new THREE.BufferAttribute(new Float32Array(count), 1))
-    geo.setAttribute('aPivot', new THREE.BufferAttribute(new Float32Array(count * 3), 3))
+    const rate = o.spin || 0
+    const spin = new Float32Array(count).fill(rate)
+    const pivot = new Float32Array(count * 3)
+    if (rate) {
+      for (let i = 0; i < count; i++) {
+        pivot[i * 3] = o.x || 0
+        pivot[i * 3 + 1] = o.y || 0
+        pivot[i * 3 + 2] = o.z || 0
+      }
+    }
+    geo.setAttribute('aSpin', new THREE.BufferAttribute(spin, 1))
+    geo.setAttribute('aPivot', new THREE.BufferAttribute(pivot, 3))
     this.parts.push(geo)
     return this
   }
@@ -414,6 +424,120 @@ const KINDS = {
     return 'Theater'
   },
 
+  /**
+   * CorrosionDC's landmark: a pumpjack. Concrete base, an A-frame samson post, the walking
+   * beam with a horsehead at the well end, a counterweight crank turning at the back, and
+   * the wellhead pipe. The crank is the moving part; the beam holds its nod.
+   */
+  pumpjack(c) {
+    const box = (w, h, d, cell, o = {}) => c.geom(new THREE.BoxGeometry(w, h, d), cell, o)
+    box(2.6, 0.14, 1.2, CELL.SLATE, { y: 0.07 })
+    // samson post: two legs leaning in to a cap
+    for (const s of [-1, 1]) {
+      const leg = new THREE.BoxGeometry(0.1, 1.7, 0.1)
+      leg.rotateZ(s * 0.22)
+      c.geom(leg, CELL.GREY, { x: s * 0.2, y: 0.95, z: 0 })
+      const leg2 = new THREE.BoxGeometry(0.1, 1.7, 0.1)
+      leg2.rotateX(s * 0.22)
+      c.geom(leg2, CELL.GREY, { x: 0, y: 0.95, z: s * 0.2 })
+    }
+    box(0.3, 0.12, 0.3, CELL.GREY, { y: 1.78 })
+    // walking beam, nodded toward the well
+    const beam = new THREE.BoxGeometry(2.3, 0.12, 0.16)
+    beam.rotateZ(0.12)
+    c.geom(beam, CELL.GREY, { y: 1.9 })
+    // horsehead at the well end
+    const head = new THREE.BoxGeometry(0.22, 0.5, 0.24)
+    head.rotateZ(0.12)
+    c.geom(head, CELL.RED, { x: -1.18, y: 1.62 })
+    box(0.05, 0.9, 0.05, CELL.BLACK, { x: -1.18, y: 0.95 })
+    // wellhead
+    c.geom(new THREE.CylinderGeometry(0.12, 0.14, 0.5, 10), CELL.BLACK, { x: -1.18, y: 0.39 })
+    c.geom(new THREE.CylinderGeometry(0.06, 0.06, 0.7, 8), CELL.GREY, { x: -1.18, y: 0.9 })
+    // gearbox and the counterweight crank at the back: a disc on an axle along Z, turning
+    box(0.6, 0.5, 0.6, CELL.SLATE, { x: 0.95, y: 0.39 })
+    const crank = new THREE.CylinderGeometry(0.34, 0.34, 0.08, 20)
+    crank.rotateX(Math.PI / 2)
+    c.geom(crank, CELL.BLACK, { x: 0.95, y: 0.9, z: 0.34, spin: 1.1 })
+    const weight = new THREE.BoxGeometry(0.16, 0.16, 0.1)
+    weight.translate(0, 0.24, 0)
+    c.geom(weight, CELL.RED, { x: 0.95, y: 0.9, z: 0.4, spin: 1.1 })
+    // pitman arm up to the beam
+    const arm = new THREE.BoxGeometry(0.05, 1.0, 0.05)
+    arm.rotateZ(-0.1)
+    c.geom(arm, CELL.GREY, { x: 1.0, y: 1.45, z: 0.34 })
+    // a tank and a pipe run
+    c.geom(new THREE.CylinderGeometry(0.32, 0.32, 0.7, 14), CELL.SLATE, { x: 0.2, y: 0.42, z: -0.85 })
+    return 'Pumpjack'
+  },
+
+  /**
+   * A workbench: table, vise, a pegboard with a few tools, a stool. What a project looks
+   * like while it is on the bench.
+   */
+  bench(c, rand) {
+    const box = (w, h, d, cell, o = {}) => c.geom(new THREE.BoxGeometry(w, h, d), cell, o)
+    box(1.5, 0.08, 0.7, CELL.TRIM, { y: 0.74 })
+    for (const [x, z] of [[-0.65, -0.28], [0.65, -0.28], [-0.65, 0.28], [0.65, 0.28]]) box(0.08, 0.7, 0.08, CELL.SLATE, { x, y: 0.35, z })
+    box(1.3, 0.04, 0.5, CELL.SLATE, { y: 0.22 })
+    // vise at one end
+    box(0.22, 0.16, 0.18, CELL.BLACK, { x: 0.55, y: 0.86, z: 0 })
+    c.geom(new THREE.CylinderGeometry(0.02, 0.02, 0.3, 6), CELL.GREY, { x: 0.55, y: 0.86, z: 0.16 })
+    // pegboard behind, with hanging tools
+    box(1.4, 0.8, 0.05, CELL.SLATE, { y: 1.3, z: -0.38 })
+    for (let i = 0; i < 4; i++) box(0.05, 0.28 + rand() * 0.1, 0.05, i % 2 ? CELL.RED : CELL.GREY, { x: -0.5 + i * 0.33, y: 1.28, z: -0.33 })
+    // a couple of parts on the bench and a stool
+    box(0.2, 0.12, 0.14, CELL.WHITE, { x: -0.3, y: 0.84, z: 0.1 })
+    box(0.14, 0.14, 0.14, CELL.RED, { x: -0.05, y: 0.85, z: -0.12 })
+    c.geom(new THREE.CylinderGeometry(0.16, 0.16, 0.05, 12), CELL.SLATE, { x: 0.2, y: 0.5, z: 0.7 })
+    c.geom(new THREE.CylinderGeometry(0.03, 0.03, 0.48, 6), CELL.GREY, { x: 0.2, y: 0.24, z: 0.7 })
+    return 'Workbench'
+  },
+
+  /** A packed crate: a finished job waiting to be paid for and shipped. */
+  crate(c, rand) {
+    c.add(rand() > 0.5 ? 'cargo_A_packed' : 'cargo_B_packed')
+    c.add('cargo_A', { x: 0.9, z: 0.5, ry: rand() * 6.28, s: 0.7 })
+    return 'Crate'
+  },
+
+  /** A deck: boards in the zone's colour on joists, with railing posts and a bench. */
+  deck(c) {
+    const box = (w, h, d, cell, o = {}) => c.geom(new THREE.BoxGeometry(w, h, d), cell, o)
+    for (let i = 0; i < 9; i++) box(0.26, 0.06, 2.2, CELL.TRIM, { x: -1.2 + i * 0.3, y: 0.42 })
+    for (const z of [-1.0, 0, 1.0]) box(2.8, 0.14, 0.12, CELL.SLATE, { y: 0.32, z })
+    for (const [x, z] of [[-1.35, -1.05], [-1.35, 1.05], [1.35, -1.05], [1.35, 1.05], [0, -1.05], [0, 1.05]]) {
+      box(0.1, 0.42, 0.1, CELL.SLATE, { x, y: 0.2, z })
+      box(0.08, 0.9, 0.08, CELL.GREY, { x, y: 0.9, z })
+    }
+    for (const z of [-1.05, 1.05]) box(2.8, 0.06, 0.06, CELL.GREY, { y: 1.33, z })
+    for (const x of [-1.35, 1.35]) box(0.06, 0.06, 2.2, CELL.GREY, { x, y: 1.33 })
+    // steps down and a bench
+    box(0.8, 0.12, 0.3, CELL.TRIM, { x: 1.7, y: 0.28, z: 0 })
+    box(0.8, 0.12, 0.3, CELL.TRIM, { x: 2.0, y: 0.14, z: 0 })
+    box(1.2, 0.06, 0.3, CELL.SLATE, { x: -0.4, y: 0.72, z: -0.7 })
+    return 'Deck'
+  },
+
+  /** A gazebo: six posts, a low rail, an eight-sided roof with a finial, a lantern under it. */
+  gazebo(c) {
+    const box = (w, h, d, cell, o = {}) => c.geom(new THREE.BoxGeometry(w, h, d), cell, o)
+    c.geom(new THREE.CylinderGeometry(1.35, 1.35, 0.14, 8), CELL.SLATE, { y: 0.07 })
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2
+      box(0.09, 1.6, 0.09, CELL.WHITE, { x: Math.cos(a) * 1.1, y: 0.94, z: Math.sin(a) * 1.1 })
+    }
+    const rail = new THREE.TorusGeometry(1.1, 0.03, 6, 24)
+    rail.rotateX(Math.PI / 2)
+    c.geom(rail, CELL.WHITE, { y: 0.6 })
+    const roof = new THREE.ConeGeometry(1.55, 0.85, 8)
+    c.geom(roof, CELL.RED, { y: 2.15 })
+    c.geom(new THREE.CylinderGeometry(0.16, 0.16, 0.08, 8), CELL.WHITE, { y: 1.78 })
+    c.geom(new THREE.SphereGeometry(0.09, 8, 6), CELL.WHITE, { y: 2.62 })
+    c.geom(new THREE.SphereGeometry(0.1, 8, 6), CELL.RED, { y: 1.55, emissive: 0.9 })
+    return 'Gazebo'
+  },
+
   tower(c, rand) {
     c.add('structure_tall')
     c.add('lights', { y: 2.0, s: 0.7 })
@@ -447,7 +571,7 @@ const KINDS = {
   },
 }
 
-const KIND_IDS = Object.keys(KINDS).filter((k) => !['dish', 'printer', 'rack', 'planter', 'theater'].includes(k))
+const KIND_IDS = Object.keys(KINDS).filter((k) => !['dish', 'printer', 'rack', 'planter', 'theater', 'pumpjack', 'bench', 'crate', 'deck', 'gazebo'].includes(k))
 
 // ── the reveal shader ─────────────────────────────────────────────────────────────────
 

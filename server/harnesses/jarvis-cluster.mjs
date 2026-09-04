@@ -66,10 +66,10 @@ export const ROSTER = [
   { id: 'house',   name: 'House',   emoji: '🏠', role: 'home assistant',       zone: 'Home',              ns: ['home-assistant'],                                            url: 'https://homeassistant.kcproto.com', landmark: 'habitat' },
   { id: 'biff',    name: 'Biff',    emoji: '🧑‍💼', role: 'club operations',      zone: 'KC AI Club',      landmark: 'lab',        ns: ['aiclub'],                                                    url: 'https://ai-club.kcproto.com/#/biff' },
   { id: 'marc',    name: 'Marc',    emoji: '🌿', role: 'landscape ops',        zone: 'Embassy Landscape', ns: ['marc', 'aspire-portal', 'irrigation-mapper', 'inspire-fallback'], url: 'https://inspire.kcproto.com' },
-  { id: 'rusty',   name: 'Rusty',   emoji: '⛽', role: 'oil wells',            zone: 'CorrosionDC',       ns: ['corrosiondc'],                                               url: 'https://wellz.kcproto.com' },
+  { id: 'rusty',   name: 'Rusty',   emoji: '⛽', role: 'oil wells',            zone: 'CorrosionDC',       landmark: 'pumpjack', ns: ['corrosiondc'],                                               url: 'https://wellz.kcproto.com' },
   { id: 'olga',    name: 'Olga',    emoji: '🧑‍🏫', role: 'recruit intel',        zone: 'NGV Talent',        ns: ['recruit-intel', 'recruiter-bot', 'recruit-form', 'ngv-sales'], url: 'https://recruiter-bot.kcproto.com' },
-  { id: 'dwight',  name: 'Dwight',  emoji: '🚜', role: 'inventory',            zone: 'NED Builds',        ns: ['nedbuilds-pro', 'small-business', 'ned-estimates'],          url: 'https://small-biz.kcproto.com' },
-  { id: 'leo',     name: 'Leo',     emoji: '📣', role: 'listing announcer',    zone: 'NED Builds',        ns: ['ned-ar-bot'],                                                url: '' },
+  { id: 'dwight',  name: 'Dwight',  emoji: '🚜', role: 'inventory',            zone: 'NED Builds',        landmark: 'deck', ns: ['nedbuilds-pro', 'small-business', 'ned-estimates'],          url: 'https://small-biz.kcproto.com' },
+  { id: 'leo',     name: 'Leo',     emoji: '📣', role: 'listing announcer',    zone: 'NED Builds',        landmark: 'gazebo', ns: ['ned-ar-bot'],                                                url: '' },
   { id: 'snoop',   name: 'Snoop',   emoji: '📈', role: 'trader',               zone: 'Trade Floor',     landmark: 'reactor',      ns: [],  url: 'https://trade-bot.kcproto.com', probe: 'https://trade-bot.kcproto.com/api/health' },
   { id: 'gordon',  name: 'Gordon',  emoji: '👨‍🍳', role: 'schema roast',         zone: 'Roast Bot',      ns: ['roast-bot'],                                                 url: 'https://schemacheckerai.com' },
 ]

@@ -57,6 +57,7 @@ async function fetchThreads() {
         project: ZONE_FOR_STATUS[p.status] || 'Active Projects',
         projectPath: `board://${p.status}`,
         status: p.status,
+        landmark: p.status === 'completed' ? 'crate' : 'bench',
         actions: NEXT[p.status] || [],
         details: {
           Client: p.client || '',
