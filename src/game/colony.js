@@ -62,7 +62,7 @@ const ZONE_ACCENT = {
   Completed: 0x4f9a63,
 }
 
-export const STATUS_ORDER = ['blocked', 'visitor', 'door', 'plant', 'mail', 'print', 'waiting', 'working', 'watching', 'printing', 'celebrating', 'idle', 'sleeping']
+export const STATUS_ORDER = ['blocked', 'visitor', 'door', 'plant', 'mail', 'print', 'waiting', 'working', 'watching', 'printing', 'celebrating', 'watched', 'idle', 'sleeping']
 
 export const STATUS_LABEL = {
   working: 'Working',
@@ -74,6 +74,7 @@ export const STATUS_LABEL = {
   door: 'Left open',
   plant: 'Needs water',
   visitor: 'Movement',
+  watched: 'Starred',
   blocked: 'Blocked',
   celebrating: 'Shipped',
   idle: 'Idle',
@@ -94,6 +95,8 @@ export function statusFor(thread, now = Date.now()) {
   if (thread.kind === 'visitor') return 'visitor'
   if (thread.kind === 'person') return thread.running ? 'working' : 'idle'
   if (thread.hasError) return 'blocked'
+  // A star is a note to self: it shows over anything that is not asking for Blake.
+  if (thread.watched && !thread.unread) return 'watched'
   if (thread.running) return 'working'
   if (thread.prState === 'MERGED') return 'celebrating'
   if (thread.unread) return 'waiting'
@@ -115,6 +118,7 @@ const BADGE_FOR = {
   door: BADGE.door,
   plant: BADGE.plant,
   visitor: BADGE.visitor,
+  watched: BADGE.watched,
   blocked: BADGE.blocked,
   working: BADGE.working,
   celebrating: BADGE.done,
@@ -211,7 +215,7 @@ export class Colony {
     this.activePlots = new Set()
     this._dustTint = new THREE.Color(this.planet.ground.high)
     this._c = new THREE.Color()
-    this.stats = { agents: 0, projects: 0, working: 0, waiting: 0, mail: 0, print: 0, watching: 0, printing: 0, door: 0, plant: 0, visitor: 0, blocked: 0, done: 0 }
+    this.stats = { agents: 0, projects: 0, working: 0, waiting: 0, mail: 0, print: 0, watching: 0, printing: 0, door: 0, plant: 0, visitor: 0, watched: 0, blocked: 0, done: 0 }
 
     this._buildTerrain()
   }

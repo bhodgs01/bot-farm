@@ -48,6 +48,7 @@ export const FACE_LOOPS = {
   door: [FACE.wait, FACE.alert, FACE.wait, FACE.wait],
   plant: [FACE.sad, FACE.sad, FACE.error, FACE.sad],
   visitor: [FACE.alert, FACE.alert, FACE.wait, FACE.alert],
+  watched: [FACE.happy, FACE.wait, FACE.happy, FACE.happy],
   broken: [FACE.error, FACE.error, FACE.sad, FACE.error],
   sleeping: [FACE.sleep],
 }

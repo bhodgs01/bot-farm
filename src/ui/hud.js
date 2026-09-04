@@ -47,6 +47,7 @@ const STAT_DEFS = [
   { key: 'door', label: 'doors open', cls: 'waiting' },
   { key: 'plant', label: 'thirsty plants', cls: 'waiting' },
   { key: 'visitor', label: 'movement', cls: 'blocked' },
+  { key: 'watched', label: 'starred', cls: 'done' },
   { key: 'blocked', label: 'blocked', cls: 'blocked' },
   { key: 'celebrating', label: 'shipped', cls: 'done' },
   { key: 'agents', label: 'crew', cls: 'idle' },
@@ -532,6 +533,7 @@ export class Hud {
     if (thread.gitBranch) bits.push(`<span class="tag">${escapeHtml(thread.gitBranch)}</span>`)
     if (thread.model) bits.push(`<span class="tag">${escapeHtml(shortModel(thread.model))}</span>`)
     if (thread.acked) bits.push(`<span class="tag" title="You removed this flag; it returns if the failure changes">flag removed</span>`)
+    if (thread.watched) bits.push(`<span class="tag">★ starred</span>`)
     bits.push(`<span>${ago(thread.lastActivityAt)}</span>`)
     meta.innerHTML = bits.join('')
 
@@ -542,9 +544,9 @@ export class Hud {
     details.hidden = entries.length === 0
     // Stage buttons: what this thread can be moved to next.
     const stage = this.$('.thread-pop .stage')
-    const STAGE_LABEL = { active: 'Make active', in_process: 'Start work', completed: 'Mark complete', paid: 'Paid ✓', done: 'Close ticket ✓', ack: 'Remove flag', unack: 'Flag again' }
+    const STAGE_LABEL = { active: 'Make active', in_process: 'Start work', completed: 'Mark complete', paid: 'Paid ✓', done: 'Close ticket ✓', ack: 'Remove flag', unack: 'Flag again', star: '★ Star', unstar: 'Unstar' }
     // A flagged worker offers to have the flag removed; an acknowledged one offers it back.
-    const acts = (Array.isArray(thread.actions) ? thread.actions : []).concat(thread.hasError ? ['ack'] : thread.acked ? ['unack'] : [])
+    const acts = (Array.isArray(thread.actions) ? thread.actions : []).concat(thread.hasError ? ['ack'] : thread.acked ? ['unack'] : []).concat(thread.watched ? ['unstar'] : ['star'])
     stage.innerHTML = acts.map((a) => `<button class="btn ${a === 'paid' || a === 'done' ? 'primary' : ''}" data-stage="${escapeHtml(a)}">${escapeHtml(STAGE_LABEL[a] || a)}</button>`).join('')
     stage.hidden = acts.length === 0
     for (const b of stage.querySelectorAll('button')) b.addEventListener('click', () => this.actions.stageThread?.(b.dataset.stage))
@@ -873,7 +875,7 @@ function statusClass(status) {
   if (['waiting', 'mail', 'print', 'door', 'plant'].includes(status)) return 'waiting'
   if (status === 'visitor') return 'blocked'
   if (status === 'blocked') return 'blocked'
-  if (status === 'celebrating') return 'done'
+  if (status === 'celebrating' || status === 'watched') return 'done'
   return 'idle'
 }
 
@@ -1063,6 +1065,7 @@ const TEMPLATE = `
       <div class="legend-row"><i class="badge" style="background:#3a2d10;color:#f0c46a">&#9707;</i> a door, window or garage left open</div>
       <div class="legend-row"><i class="badge" style="background:#14301a;color:#8fe0a0">&#128167;</i> a plant whose soil has gone dry</div>
       <div class="legend-row"><i class="badge" style="background:#3a1c14;color:#f0a08a">&#9673;</i> movement at the house right now</div>
+      <div class="legend-row"><i class="badge" style="background:#3a3010;color:#f0d46a">&#9733;</i> you starred it to keep an eye on it</div>
       <div class="legend-row"><i class="badge" style="background:#3d1c1c;color:#e88b8b">!</i> something is crashing, unready, or not answering</div>
       <div class="legend-row"><i class="badge" style="background:#16301f;color:#7fd39a">⚒</i> running right now, building</div>
       <div class="legend-row"><i class="badge" style="background:#332b12;color:#e6c67f">✓</i> shipped: good news worth a glance</div>

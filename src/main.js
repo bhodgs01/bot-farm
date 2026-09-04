@@ -21,6 +21,7 @@ import {
   actProject,
   actTask,
   actAck,
+  actStar,
 } from './game/api.js'
 
 /**
@@ -155,6 +156,12 @@ const actions = {
     const thread = threads.find((t) => t.id === id)
     if (!thread) return
     try {
+      if (status === 'star' || status === 'unstar') {
+        await actStar(thread.id, status === 'star')
+        hud.toast(status === 'star' ? `Starred ${thread.title}` : `Unstarred ${thread.title}`)
+        setTimeout(poll, 300)
+        return
+      }
       if (status === 'ack' || status === 'unack') {
         await actAck(thread.id, status === 'ack')
         hud.toast(status === 'ack' ? `Flag removed on ${thread.title}. It comes back if the failure changes.` : `Flag restored on ${thread.title}`)

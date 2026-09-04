@@ -50,3 +50,6 @@ export const actTask = (taskId) => post('/api/act/task', { id: taskId })
 
 /** Remove a known flag (or put it back). The flag returns on its own if the failure changes. */
 export const actAck = (threadId, on) => post('/api/act/ack', { id: threadId, on })
+
+/** Star (or unstar) a worker: a gold star over his head until you take it off. */
+export const actStar = (threadId, on) => post('/api/act/star', { id: threadId, on })

@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url'
 const here = path.dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = process.env.BOT_CROSSING_DATA || path.join(here, '..', 'data')
 const FILE = path.join(DATA_DIR, 'acks.json')
+const STARS = path.join(DATA_DIR, 'stars.json')
 
 let acks = null // id → { key, at, who }
 
@@ -68,6 +69,37 @@ export async function ack(thread, who) {
   map[thread.id] = { key: alertKeyOf(thread), at: Date.now(), who }
   await save()
   return map[thread.id]
+}
+
+// ── stars: keep an eye on something that is not flagged ─────────────────────────────
+let stars = null // id → { at, who }
+async function loadStars() {
+  if (stars) return stars
+  try {
+    const raw = JSON.parse(await fsp.readFile(STARS, 'utf8'))
+    stars = raw && typeof raw === 'object' ? raw : {}
+  } catch {
+    stars = {}
+  }
+  return stars
+}
+async function saveStars() {
+  await fsp.mkdir(DATA_DIR, { recursive: true })
+  const tmp = STARS + '.tmp'
+  await fsp.writeFile(tmp, JSON.stringify(stars, null, 2))
+  await fsp.rename(tmp, STARS)
+}
+export async function applyStars(threads) {
+  const map = await loadStars()
+  for (const t of threads) if (map[t.id]) t.watched = true
+  return threads
+}
+export async function setStar(id, on, who) {
+  const map = await loadStars()
+  if (on) map[id] = { at: Date.now(), who }
+  else delete map[id]
+  await saveStars()
+  return Boolean(map[id])
 }
 
 export async function unack(id) {

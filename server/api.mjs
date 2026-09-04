@@ -13,7 +13,7 @@ import {
 } from './scan.mjs'
 import { ask, chatEnabled } from './ask.mjs'
 import { setProjectStatus, closeTask } from './act.mjs'
-import { applyAcks, ack, unack } from './acks.mjs'
+import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = process.env.BOT_CROSSING_DATA || path.join(here, '..', 'data')
@@ -273,7 +273,7 @@ export async function apiMiddleware(req, res, next) {
 
   try {
     if (url.pathname === '/api/threads' && req.method === 'GET') {
-      const threads = await applyAcks(await reconcileArchived(await scanThreads()))
+      const threads = await applyStars(await applyAcks(await reconcileArchived(await scanThreads())))
       return send(res, 200, { threads, scannedAt: Date.now() })
     }
 
@@ -288,6 +288,17 @@ export async function apiMiddleware(req, res, next) {
       const who = chatIdentity(req)
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
       return res.end(`<!doctype html><meta charset=utf-8><title>Bot Farm</title><body style="font:15px system-ui;background:#0f1117;color:#e6e8ef;display:grid;place-items:center;height:100vh;margin:0"><div>${who ? 'Signed in. You can close this tab and move things on the map.' : 'Signed in, but this address is not on the list for actions.'}</div>`)
+    }
+
+    // Star a worker to keep an eye on it. A star is a note to self, not a signal from the source.
+    if (url.pathname === '/api/act/star' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to star things', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      const { id, on } = await readJsonBody(req, 16 * 1024)
+      if (typeof id !== 'string' || !id) return send(res, 400, { error: 'Bad id' })
+      const starred = await setStar(id, on !== false, who)
+      return send(res, 200, { ok: true, starred })
     }
 
     // Remove (or restore) a flag Blake already knows about. Pinned to the current failure.
