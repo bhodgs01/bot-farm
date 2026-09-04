@@ -15,12 +15,46 @@ const post = (url, payload) =>
 export const fetchThreads = () => req('/api/threads')
 export const fetchState = () => req('/api/state')
 
-export const saveState = (state) =>
-  req('/api/state', {
+/** The hash in this page's own bundle name; 'dev' under the Vite dev server. */
+export const BUILD = (() => {
+  for (const s of document.scripts) {
+    const m = (s.src || '').match(/assets\/index-([A-Za-z0-9_-]+)\.js/)
+    if (m) return m[1]
+  }
+  return 'dev'
+})()
+
+/**
+ * The server is serving a newer build than this page is running. Reload once so this tab
+ * stops saving a layout the rest of the world has moved past. The guard keeps a page that
+ * somehow still mismatches after a reload from looping.
+ */
+export function reloadForBuild(build) {
+  const key = `botfarm.reloaded.${build}`
+  try {
+    if (sessionStorage.getItem(key)) return false
+    sessionStorage.setItem(key, '1')
+  } catch {
+    /* no session storage: reload anyway, once is all we can promise */
+  }
+  location.reload()
+  return true
+}
+
+export const saveState = async (state) => {
+  const res = await fetch('/api/state', {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'X-Botfarm-Build': BUILD },
     body: JSON.stringify(state),
   })
+  const body = await res.json().catch(() => ({}))
+  if (res.status === 409 && body.build) {
+    reloadForBuild(body.build)
+    throw new Error('stale build')
+  }
+  if (!res.ok) throw new Error(body.error || `${res.status} ${res.statusText}`)
+  return body
+}
 
 /**
  * Hand a thread back to whichever harness owns it — the desktop app comes forward on its own.

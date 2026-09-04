@@ -13,6 +13,8 @@ import {
   fetchThreads,
   fetchState,
   saveState,
+  BUILD,
+  reloadForBuild,
   openThread,
   archiveThread,
   newSession,
@@ -748,6 +750,8 @@ async function adoptRemoteState() {
   } catch {
     return
   }
+  // A release landed since this page loaded: reload rather than keep saving an old layout.
+  if (remote?.build && remote.build !== BUILD && BUILD !== 'dev' && reloadForBuild(remote.build)) return
   if (!remote?.updatedAt || remote.updatedAt === state.updatedAt) return
   state.updatedAt = remote.updatedAt
   state.plots = remote.plots || {}

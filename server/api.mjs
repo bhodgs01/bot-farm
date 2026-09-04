@@ -15,6 +15,24 @@ import { ask, chatEnabled } from './ask.mjs'
 import { setProjectStatus, closeTask } from './act.mjs'
 import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
 
+/**
+ * The id of the build being served: the hash Vite put in the main bundle's file name.
+ * The page reads the same hash off its own script tag, so the two agree exactly when the
+ * page is running what the server is serving.
+ */
+let _build
+async function buildId() {
+  if (_build !== undefined) return _build
+  try {
+    const html = await fsp.readFile(path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dist', 'index.html'), 'utf8')
+    const m = html.match(/assets\/index-([A-Za-z0-9_-]+)\.js/)
+    _build = m ? m[1] : ''
+  } catch {
+    _build = ''
+  }
+  return _build
+}
+
 const here = path.dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = process.env.BOT_CROSSING_DATA || path.join(here, '..', 'data')
 const STATE_FILE = path.join(DATA_DIR, 'colony.json')
@@ -367,10 +385,18 @@ export async function apiMiddleware(req, res, next) {
     }
 
     if (url.pathname === '/api/state' && req.method === 'GET') {
-      return send(res, 200, await readState())
+      return send(res, 200, { ...(await readState()), build: await buildId() })
     }
 
+    // Only a page running the current build may write the layout. A tab left open across a
+    // release keeps re-saving whatever it has in memory, undoing every move made since,
+    // so a stale build is turned away and told to reload itself.
     if (url.pathname === '/api/state' && req.method === 'PUT') {
+      const build = await buildId()
+      const theirs = String(req.headers['x-botfarm-build'] || '')
+      if (build && theirs !== build && !(theirs === 'dev' && !process.env.COLONY_PUBLIC)) {
+        return send(res, 409, { error: 'stale build', build })
+      }
       return send(res, 200, await writeState(await readJsonBody(req)))
     }
 
