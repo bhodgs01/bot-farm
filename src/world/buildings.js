@@ -637,6 +637,7 @@ const KINDS = {
    * sprinkler, a mower, or a wheelbarrow with a rake.
    */
   yard(c, rand) {
+    const first = c.parts.length
     const box = (w, h, d, cell, o = {}) => c.geom(new THREE.BoxGeometry(w, h, d), cell, o)
     const bush = (x, z, s, y = 0) => c.geom(new THREE.SphereGeometry(s, 10, 8), CELL.TRIM, { x, y: y + s * 0.85, z })
     // lawn as a low slab with a mulch bed cut into one corner
@@ -645,7 +646,7 @@ const KINDS = {
     // flagstone path, stepping across the lawn
     for (let i = 0; i < 5; i++) box(0.38, 0.03, 0.3, CELL.GREY, { x: -1.1 + i * 0.5, y: 0.07, z: 0.85 + Math.sin(i * 1.7) * 0.12, ry: rand() * 0.5 - 0.25 })
     // clipped hedge along the back, with square shoulders
-    for (let i = 0; i < 6; i++) box(0.5, 0.6 + rand() * 0.08, 0.42, CELL.TRIM, { x: -1.25 + i * 0.5, y: 0.32, z: -1.12 })
+    for (let i = 0; i < 6; i++) box(0.44, 0.6 + rand() * 0.08, 0.42, CELL.TRIM, { x: -1.25 + i * 0.5, y: 0.32, z: -1.12 })
     // shrubs in the mulch bed
     bush(0.55, -0.85, 0.22)
     bush(1.0, -0.6, 0.18)
@@ -694,6 +695,14 @@ const KINDS = {
       rake.rotateX(0.35)
       c.geom(rake, CELL.ROCK, { x: 0.1, y: 0.6, z: -0.7 })
       box(0.34, 0.04, 0.03, CELL.BLACK, { x: 0.1, y: 0.06, z: -0.5 })
+    }
+    // A yard is a place, not a fixture: scale the lot up so it fills its ground. Spin
+    // pivots ride along, or the sprinkler would turn about a point it no longer sits on.
+    const S = 1.45
+    for (const g of c.parts.slice(first)) {
+      g.scale(S, S, S)
+      const pv = g.getAttribute('aPivot')
+      for (let i = 0; i < pv.count; i++) pv.setXYZ(i, pv.getX(i) * S, pv.getY(i) * S, pv.getZ(i) * S)
     }
     return 'Yard'
   },
