@@ -4,7 +4,7 @@
 // (the whole point of the map is that it is live), and treat the app shell as
 // network-first so a deploy shows up on the next load rather than after a cache flush.
 // Hashed build assets are immutable and can be cached forever. Bump CACHE to evict.
-const CACHE = 'botfarm-v1'
+const CACHE = 'botfarm-v2'
 
 self.addEventListener('install', (e) => {
   self.skipWaiting()
