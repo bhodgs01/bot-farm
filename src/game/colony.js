@@ -146,6 +146,23 @@ export function transcriptProgress(thread) {
   return THREE.MathUtils.clamp((Math.log10(size) - 3) / 3.5, 0.05, 1)
 }
 
+/** A five-point star, extruded, sized to sit over a helmet and still read from far away. */
+function starGeometry() {
+  const shape = new THREE.Shape()
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 === 0 ? 0.46 : 0.2
+    const a = (i / 10) * Math.PI * 2 - Math.PI / 2
+    const x = Math.cos(a) * r
+    const y = Math.sin(a) * r
+    if (i === 0) shape.moveTo(x, y)
+    else shape.lineTo(x, y)
+  }
+  shape.closePath()
+  const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.16, bevelEnabled: true, bevelThickness: 0.03, bevelSize: 0.03, bevelSegments: 1 })
+  geo.center()
+  return geo
+}
+
 /** Keep a beam rig planted under the astronaut it is lifting. */
 function g_follow(b, agent) {
   b.group.position.x = agent.pos.x
@@ -195,6 +212,10 @@ export class Colony {
     this.plotGroup = new THREE.Group()
     this.labelGroup = new THREE.Group()
     scene.add(this.plotGroup, this.labelGroup)
+    // Floating stars over the workers Blake starred: one turning gold star each.
+    this.starMarks = new Map()
+    this.starGeo = starGeometry()
+    this.starMat = new THREE.MeshBasicMaterial({ color: 0xffd35a, toneMapped: false })
     // Signal rings: a building whose thread is `receiving` (the dish, when a feed lands) sends rings up.
     this.rings = []
     this.ringClock = new Map()
@@ -725,6 +746,32 @@ export class Colony {
     return true
   }
 
+  _syncStarMarks(dt, elapsed) {
+    const seen = new Set()
+    for (const agent of this.astronauts.agents) {
+      if (!agent.thread?.watched || agent.state === 'gone' || agent.scale < 0.4) continue
+      seen.add(agent.id)
+      let m = this.starMarks.get(agent.id)
+      if (!m) {
+        m = new THREE.Mesh(this.starGeo, this.starMat)
+        m.renderOrder = 12
+        this.beamGroup.add(m)
+        this.starMarks.set(agent.id, m)
+      }
+      m.position.set(agent.pos.x, agent.pos.y + 2.7 + Math.sin(elapsed * 2.2 + agent.phase) * 0.08, agent.pos.z)
+      // A slow turn, never fully edge-on: it leans toward the camera as it spins.
+      m.rotation.y = Math.sin(elapsed * 1.1 + agent.phase) * 0.9
+      m.quaternion.setFromEuler(new THREE.Euler(0, Math.sin(elapsed * 1.1 + agent.phase) * 0.9, 0))
+      m.lookAt(this.camera.position.x, m.position.y, this.camera.position.z)
+      m.rotateY(Math.sin(elapsed * 1.1 + agent.phase) * 0.9)
+    }
+    for (const [id, m] of this.starMarks) {
+      if (seen.has(id)) continue
+      this.beamGroup.remove(m)
+      this.starMarks.delete(id)
+    }
+  }
+
   _syncSignals(dt) {
     for (const [id, entry] of this.buildings) {
       const t = this.threads.get(id)
@@ -898,6 +945,7 @@ export class Colony {
     this._syncPlates()
     this._syncBeams(dt)
     this._syncSignals(dt)
+    this._syncStarMarks(dt, elapsed)
     if (focus) this.sky.setFocus(focus)
     const cycled = this.sky.update(dt, elapsed, this.camera)
     if (cycled) this.settings.values.timeOfDay = this.sky.time

@@ -538,6 +538,42 @@ const KINDS = {
     return 'Gazebo'
   },
 
+  /**
+   * The Watchdog's landmark: the tall tower with its lights, a kennel beside it, and the
+   * dog itself sitting at the door: boxy, grey, red collar, ears up, watching the colony.
+   */
+  kennel(c) {
+    const box = (w, h, d, cell, o = {}) => c.geom(new THREE.BoxGeometry(w, h, d), cell, o)
+    c.add('structure_tall')
+    c.add('lights', { y: 2.0, s: 0.7 })
+    // kennel: a small hut with a pitched roof and a dark doorway
+    box(0.9, 0.6, 0.8, CELL.WHITE, { x: 1.35, y: 0.3, z: 0.6 })
+    const roof = new THREE.ConeGeometry(0.72, 0.42, 4)
+    roof.rotateY(Math.PI / 4)
+    c.geom(roof, CELL.RED, { x: 1.35, y: 0.81, z: 0.6 })
+    box(0.3, 0.36, 0.04, CELL.BLACK, { x: 1.35, y: 0.22, z: 1.0 })
+    // the dog, sitting, facing out from the kennel
+    const dx = 1.35
+    const dz = 1.45
+    box(0.3, 0.32, 0.5, CELL.GREY, { x: dx, y: 0.3, z: dz }) // body
+    box(0.26, 0.26, 0.3, CELL.GREY, { x: dx, y: 0.62, z: dz + 0.25 }) // head
+    box(0.16, 0.14, 0.16, CELL.SLATE, { x: dx, y: 0.56, z: dz + 0.45 }) // snout
+    box(0.06, 0.06, 0.05, CELL.BLACK, { x: dx, y: 0.6, z: dz + 0.54 }) // nose
+    box(0.06, 0.16, 0.05, CELL.GREY, { x: dx - 0.1, y: 0.82, z: dz + 0.2 }) // ears
+    box(0.06, 0.16, 0.05, CELL.GREY, { x: dx + 0.1, y: 0.82, z: dz + 0.2 })
+    box(0.28, 0.06, 0.06, CELL.RED, { x: dx, y: 0.5, z: dz + 0.16 }) // collar
+    box(0.08, 0.22, 0.08, CELL.GREY, { x: dx - 0.1, y: 0.11, z: dz + 0.16 }) // front legs
+    box(0.08, 0.22, 0.08, CELL.GREY, { x: dx + 0.1, y: 0.11, z: dz + 0.16 })
+    box(0.12, 0.14, 0.14, CELL.GREY, { x: dx - 0.12, y: 0.12, z: dz - 0.12 }) // haunches
+    box(0.12, 0.14, 0.14, CELL.GREY, { x: dx + 0.12, y: 0.12, z: dz - 0.12 })
+    const tail = new THREE.BoxGeometry(0.05, 0.05, 0.3)
+    tail.rotateX(-0.6)
+    c.geom(tail, CELL.GREY, { x: dx, y: 0.34, z: dz - 0.34 })
+    // a bowl
+    c.geom(new THREE.CylinderGeometry(0.12, 0.09, 0.07, 10), CELL.RED, { x: dx + 0.45, y: 0.04, z: dz + 0.1 })
+    return 'Kennel'
+  },
+
   tower(c, rand) {
     c.add('structure_tall')
     c.add('lights', { y: 2.0, s: 0.7 })
@@ -571,7 +607,7 @@ const KINDS = {
   },
 }
 
-const KIND_IDS = Object.keys(KINDS).filter((k) => !['dish', 'printer', 'rack', 'planter', 'theater', 'pumpjack', 'bench', 'crate', 'deck', 'gazebo'].includes(k))
+const KIND_IDS = Object.keys(KINDS).filter((k) => !['dish', 'printer', 'rack', 'planter', 'theater', 'pumpjack', 'bench', 'crate', 'deck', 'gazebo', 'kennel'].includes(k))
 
 // ── the reveal shader ─────────────────────────────────────────────────────────────────
 
