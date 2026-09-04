@@ -12,10 +12,12 @@
 
 const FARM_URL = process.env.PRINT_FARM_URL || 'http://print-farm.print-farm.svc.cluster.local'
 const OPEN_URL = process.env.PRINT_FARM_OPEN_URL || 'https://print.kcproto.com'
-const TTL_MS = 10 * 1000
+const TTL_MS = 30 * 1000
 const ORDERS_TTL_MS = 5 * 60 * 1000
 
-async function getJson(path, ms = 8000) {
+// The farm answers /api/fleet only after polling every printer, which takes 7-10 s when the
+// LAN is slow. A short timeout here does not make it faster; it makes the printers vanish.
+async function getJson(path, ms = 25000) {
   const res = await fetch(`${FARM_URL}${path}`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(ms) })
   if (!res.ok) throw new Error(`print-farm ${path} → ${res.status}`)
   return res.json()
@@ -153,10 +155,13 @@ async function scanThreads() {
 
 let detectCache = { at: 0, ok: false }
 async function detect() {
+  // Once the farm has answered, it exists: a slow poll must not un-detect it and empty
+  // the hex. Only the first contact is probed.
+  if (cache.data) return true
   if (Date.now() - detectCache.at < 60 * 1000) return detectCache.ok
   let ok = false
   try {
-    await getJson('/api/fleet', 5000)
+    await getJson('/api/fleet', 25000)
     ok = true
   } catch {
     ok = false
