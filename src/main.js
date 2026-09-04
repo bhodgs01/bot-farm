@@ -156,14 +156,15 @@ const actions = {
     try {
       if (thread.harness === 'tasks' && status === 'done') {
         await actTask(thread.ref?.task)
-        hud.toast(`Closed: ${thread.title} — heading home`)
-        colony.ship.ping()
+        hud.toast(`Closed: ${thread.title}`)
+        colony.beamUp(thread.id)
       } else if (thread.harness === 'projects') {
         await actProject(thread.ref?.id, status)
-        hud.toast(status === 'paid' ? `${thread.title} is paid — heading home` : `${thread.title} → ${status.replace('_', ' ')}`)
-        if (status === 'paid') colony.ship.ping()
+        hud.toast(status === 'paid' ? `${thread.title} is paid` : `${thread.title} → ${status.replace('_', ' ')}`)
+        if (status === 'paid') colony.beamUp(thread.id)
       } else return
-      setTimeout(poll, 800)
+      // Let the beam finish before the next poll notices the thread is gone.
+      setTimeout(poll, 3200)
     } catch (err) {
       const msg = String(err?.message || err)
       if (/sign in/i.test(msg) || /401/.test(msg) || /Failed to fetch/i.test(msg)) {

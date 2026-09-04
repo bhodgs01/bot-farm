@@ -142,6 +142,12 @@ export function transcriptProgress(thread) {
   return THREE.MathUtils.clamp((Math.log10(size) - 3) / 3.5, 0.05, 1)
 }
 
+/** Keep a beam rig planted under the astronaut it is lifting. */
+function g_follow(b, agent) {
+  b.group.position.x = agent.pos.x
+  b.group.position.z = agent.pos.z
+}
+
 export class Colony {
   constructor(scene, settings, camera, renderer) {
     this.scene = scene
@@ -185,6 +191,10 @@ export class Colony {
     this.plotGroup = new THREE.Group()
     this.labelGroup = new THREE.Group()
     scene.add(this.plotGroup, this.labelGroup)
+    // Beams: the send-off for a closed job, one saucer and light column per astronaut.
+    this.beams = new Map()
+    this.beamGroup = new THREE.Group()
+    scene.add(this.beamGroup)
     // Count plates by a badge (`thread.count`) and roof labels on buildings (`thread.roof`).
     this.plates = new Map()
     this.plateGroup = new THREE.Group()
@@ -656,6 +666,59 @@ export class Colony {
   }
 
   /**
+   * Beam an astronaut up. A saucer drops in over its head, a column of light comes down,
+   * the astronaut rises into it and is gone; the saucer leaves. This is what closing a job
+   * looks like — paid, done, shipped — unless a tile earns a send-off of its own.
+   */
+  beamUp(id) {
+    const agent = this.astronauts.byId.get(id)
+    if (!agent || !this.astronauts.beamUp(id)) return false
+    const g = new THREE.Group()
+    const beamMat = new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, toneMapped: false })
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 1.05, 9, 24, 1, true), beamMat)
+    beam.position.y = 4.5
+    const saucer = new THREE.Group()
+    const hull = new THREE.Mesh(new THREE.SphereGeometry(1.1, 24, 12), new THREE.MeshStandardMaterial({ color: 0xcfd6e2, metalness: 0.7, roughness: 0.3 }))
+    hull.scale.set(1, 0.22, 1)
+    const dome = new THREE.Mesh(new THREE.SphereGeometry(0.45, 20, 12, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.85, toneMapped: false }))
+    dome.position.y = 0.16
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.75, 0.05, 8, 40), new THREE.MeshBasicMaterial({ color: 0xffd27f, toneMapped: false }))
+    ring.rotation.x = Math.PI / 2
+    ring.position.y = -0.1
+    saucer.add(hull, dome, ring)
+    saucer.position.y = 14
+    g.add(beam, saucer)
+    g.position.set(agent.pos.x, agent.groundY || 0, agent.pos.z)
+    this.beamGroup.add(g)
+    this.beams.set(id, { group: g, beam, beamMat, saucer, t: 0 })
+    return true
+  }
+
+  _syncBeams(dt) {
+    for (const [id, b] of this.beams) {
+      b.t += dt
+      const agent = this.astronauts.byId.get(id)
+      if (agent && agent.state === 'beaming') g_follow(b, agent)
+      // 0-0.7s: saucer drops in. 0.4-2.6s: beam on. after 2.8s: beam off, saucer leaves.
+      const drop = Math.min(1, b.t / 0.7)
+      b.saucer.position.y = 14 - (14 - 9.3) * (1 - (1 - drop) * (1 - drop))
+      b.saucer.rotation.y += dt * 1.2
+      const on = b.t > 0.4 && b.t < 2.8
+      b.beamMat.opacity = THREE.MathUtils.damp(b.beamMat.opacity, on ? 0.34 : 0, on ? 6 : 4, dt)
+      b.beam.scale.x = b.beam.scale.z = 1 + Math.sin(b.t * 9) * 0.05
+      if (b.t > 3.0) b.saucer.position.y += dt * (12 + (b.t - 3.0) * 30)
+      if (b.t > 4.2) {
+        this.beamGroup.remove(b.group)
+        b.group.traverse((o) => {
+          o.geometry?.dispose?.()
+          o.material?.dispose?.()
+        })
+        this.beams.delete(id)
+      }
+    }
+  }
+
+  /**
    * Plates: a small number floating by an astronaut's badge when its thread carries a
    * `count` (three doors open, five chores left, two pods down), and a roof label on a
    * building when its thread carries `roof` (how many pods a node runs). Rebuilt only
@@ -766,6 +829,7 @@ export class Colony {
 
   update(dt, elapsed, focus) {
     this._syncPlates()
+    this._syncBeams(dt)
     if (focus) this.sky.setFocus(focus)
     const cycled = this.sky.update(dt, elapsed, this.camera)
     if (cycled) this.settings.values.timeOfDay = this.sky.time

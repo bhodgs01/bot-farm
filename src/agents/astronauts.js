@@ -478,7 +478,7 @@ export class Astronauts {
     }
 
     for (const agent of this.agents) {
-      if (!seen.has(agent.id) && agent.state !== 'leaving') this._sendHome(agent)
+      if (!seen.has(agent.id) && agent.state !== 'leaving' && agent.state !== 'beaming') this._sendHome(agent)
     }
     return this.agents.length
   }
@@ -606,6 +606,22 @@ export class Astronauts {
     if (agent) this._sendHome(agent)
   }
 
+  /**
+   * Beam an astronaut up: the send-off for a job Blake just closed. It stops where it is,
+   * rises into the light and shrinks away; the colony draws the beam and the saucer.
+   */
+  beamUp(id) {
+    const agent = this.byId.get(id)
+    if (!agent || agent.state === 'gone' || agent.state === 'beaming') return false
+    agent.state = 'beaming'
+    agent.stateAge = 0
+    agent.loop = null
+    agent.faceFrame = FACE.happy
+    agent.lift = 0
+    agent.pathVersion = -1
+    return true
+  }
+
   // ── per-frame simulation ────────────────────────────────────────────────────────────
 
   update(dt, elapsed) {
@@ -725,6 +741,14 @@ export class Astronauts {
         break
       }
 
+      case 'beaming': {
+        // Up the beam: a slow lift for the first moment, then away. Gone after ~2.6s.
+        agent.lift = (agent.lift || 0) + dt * (agent.stateAge < 0.6 ? 0.6 : 3.2)
+        agent.targetYaw += dt * 5
+        agent.scale = Math.max(0, 1 - Math.max(0, agent.stateAge - 0.8) / 1.6)
+        if (agent.stateAge > 2.6) agent.state = 'gone'
+        break
+      }
       case 'leaving': {
         agent.scale = Math.max(0, agent.scale - (dist < 1.4 ? dt * 2.2 : 0))
         this._walk(agent, toSite, dist, dt, 1.15)
@@ -769,7 +793,7 @@ export class Astronauts {
       agent.groundY =
         agent.groundY === null ? agent.groundAt : THREE.MathUtils.damp(agent.groundY, agent.groundAt, 14, dt)
     }
-    agent.pos.y = (agent.groundY || 0) + agent.hop
+    agent.pos.y = (agent.groundY || 0) + agent.hop + (agent.lift || 0)
   }
 
   /**
