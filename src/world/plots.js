@@ -54,8 +54,12 @@ export const DECK_TOP = 0.45
 const DECK_SKIRT = 0.4
 /** The whole prism: the rim you can see, plus the skirt buried under it. */
 const DECK_HEIGHT = DECK_TOP + DECK_SKIRT
-/** Building slots per cell: one in the middle and six around it. */
-const SLOTS_PER_CELL = 5
+/**
+ * Crew per cell before a zone claims a neighbour: one in the middle and six around it,
+ * the same seven places `_buildSlots` lays out. Claiming cells at a lower count than the
+ * slots that exist is how a zone ends up owning a hex nobody stands on.
+ */
+const SLOTS_PER_CELL = 7
 const MAX_CELLS = 9
 /** The lattice cell the ship owns. Nothing else may be placed there. */
 const SHIP_CELL = { q: -2, r: 1 }
