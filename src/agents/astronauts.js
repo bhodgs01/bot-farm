@@ -1061,8 +1061,11 @@ export class Astronauts {
           break
         // Mail waits patiently: no waving, the glyph over its head does the asking.
         case 'mail':
-        case 'print':
           key = 'idle'
+          break
+        // A print request wants a quote: hand up, like the rest of the queue.
+        case 'print':
+          key = 'wave'
           break
         case 'door':
           key = 'wave'

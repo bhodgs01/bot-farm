@@ -60,8 +60,6 @@ export const ROSTER = [
   { id: 'clawd',   name: 'Clawd',   emoji: '🦞', role: 'chaos gremlin',        zone: 'KC Proto',        landmark: 'silo',          ns: ['clawd-dashboard'],                                           url: 'https://agents.kcproto.com/clawd-chat.html', probe: process.env.CLAWD_PROBE || '' },
   { id: 'frances', name: 'Frances', emoji: '🩺', role: 'caregiver AI',         zone: 'Frances',           ns: ['caregiver'],                                                 url: 'https://caregiver.kcproto.com' },
   { id: 'grader',  name: 'Grader',  emoji: '🧮', role: 'compliance grader',    zone: 'CyberGrade',        ns: ['cybergrade', 'cybergrade-api'],                              url: '' },
-  { id: 'clayton', name: 'Clayton', emoji: '🎤', role: 'presentation host',    zone: 'Clayton',           ns: ['clayton'],                                                   url: '' },
-  { id: 'atlas',   name: 'Atlas',   emoji: '⌚', role: 'wearable demo',        zone: 'Atlas',             ns: ['atlas-demo'],                                                url: '' },
   { id: 'franky',  name: 'Franky',  emoji: '🚀', role: 'xprize',               zone: 'Franky',            ns: ['franky'],                                                    url: '' },
   { id: 'plex',    name: 'Plex',    emoji: '📺', role: 'media server',         zone: 'Plex',            landmark: 'pad',              ns: ['plex'],                                                      url: 'https://app.plex.tv/desktop' },
   { id: 'core',    name: 'Core',    emoji: '🛰️', role: 'control plane',        zone: 'Cluster',           ns: ['kube-system'],                                               url: 'https://grafana.kcproto.com', landmark: 'solar' },
@@ -73,9 +71,7 @@ export const ROSTER = [
   { id: 'dwight',  name: 'Dwight',  emoji: '🚜', role: 'inventory',            zone: 'NED Builds',        ns: ['nedbuilds-pro', 'small-business', 'ned-estimates'],          url: 'https://small-biz.kcproto.com' },
   { id: 'leo',     name: 'Leo',     emoji: '📣', role: 'listing announcer',    zone: 'NED Builds',        ns: ['ned-ar-bot'],                                                url: '' },
   { id: 'snoop',   name: 'Snoop',   emoji: '📈', role: 'trader',               zone: 'Trade Floor',     landmark: 'reactor',      ns: [],  url: 'https://trade-bot.kcproto.com', probe: 'https://trade-bot.kcproto.com/api/health' },
-  { id: 'hank',    name: 'Hank',    emoji: '📒', role: 'bookkeeper',           zone: 'Books',      ns: ['books'],                                                     url: '' },
   { id: 'gordon',  name: 'Gordon',  emoji: '👨‍🍳', role: 'schema roast',         zone: 'Roast Bot',      ns: ['roast-bot'],                                                 url: 'https://schemacheckerai.com' },
-  { id: 'vince',   name: 'Vince',   emoji: '🕵️', role: 'sales hunter',         zone: 'Prospector',      ns: ['spambot'],                                                   url: 'https://prospector.kcproto.com', probe: 'https://prospector.kcproto.com' },
 ]
 
 const BAD_WAITING = new Set(['CrashLoopBackOff', 'ImagePullBackOff', 'ErrImagePull', 'CreateContainerConfigError', 'InvalidImageName'])
