@@ -99,7 +99,9 @@ function fetchThreads() {
 let cache = { at: 0, data: null, inflight: null }
 /** Forget the last read: a flag just changed and the next scan must see it. */
 export function refreshNews() {
-  cache = { at: 0, data: cache.data, inflight: null }
+  // Dropping the data too: keeping it would hand the next poll the stale desk and the
+  // read one only after that, which is a button that does nothing until you look away.
+  cache = { at: 0, data: null, inflight: null }
 }
 async function scanThreads() {
   const age = Date.now() - cache.at

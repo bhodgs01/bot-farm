@@ -55,7 +55,7 @@ const engine = new Engine(settings).mount(app)
 const rig = new CameraRig(engine.camera, engine.canvas, settings)
 const colony = new Colony(engine.scene, settings, engine.camera, engine.renderer)
 // Debug handle for headless checks and the console; nothing in the app reads it.
-window.__botfarm = { colony, settings }
+window.__botfarm = { actions, colony, settings }
 
 let state = { archived: [], archivedAt: {}, opened: [], plots: {}, seen: {} }
 let threads = []
@@ -174,7 +174,10 @@ const actions = {
       if (thread.harness === 'news' && status === 'read') {
         await actNews(thread.ref?.topic, thread.ref?.date, true)
         hud.toast(`Read: ${thread.title}`)
-        setTimeout(poll, 300)
+        // Stand the correspondent down now; the next scan says the same thing.
+        Object.assign(thread, { unread: false, count: 0, actions: [], gitBranch: 'read', details: { ...(thread.details || {}), Status: 'read' } })
+        applyThreads(threads.slice())
+        setTimeout(poll, 1500)
         return
       }
       if (thread.harness === 'tasks' && status === 'done') {

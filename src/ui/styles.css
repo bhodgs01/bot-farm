@@ -1432,6 +1432,17 @@ kbd {
 .thread-pop .details[hidden], .thread-pop .stage[hidden] { display: none; }
 .thread-pop .details .k { opacity: 0.55; white-space: nowrap; }
 .thread-pop .details .v { overflow-wrap: anywhere; }
+.thread-pop .reader { display: grid; gap: 6px; font-size: 12px; padding: 9px 10px; border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 8px; background: rgba(255, 255, 255, 0.03); }
+.thread-pop .reader[hidden] { display: none; }
+.thread-pop .reader .n { opacity: 0.55; font-size: 11px; letter-spacing: 0.04em; text-transform: uppercase; }
+.thread-pop .reader .hl { font-weight: 600; font-size: 13px; line-height: 1.3; }
+.thread-pop .reader .sum { line-height: 1.45; }
+.thread-pop .reader .why { opacity: 0.75; font-style: italic; line-height: 1.4; }
+.thread-pop .reader .src { opacity: 0.6; font-size: 11px; }
+.thread-pop .reader .src a { color: inherit; opacity: 1; text-decoration: underline; }
+.thread-pop .reader .nav { display: flex; gap: 6px; margin-top: 2px; }
+.thread-pop .reader .nav .btn { flex: 1 1 auto; }
+.thread-pop .reader .nav .btn[disabled] { opacity: 0.35; }
 .thread-pop .stage { display: flex; gap: 6px; flex-wrap: wrap; }
 .thread-pop .stage .btn { flex: 1 1 auto; }
 /* Dragging a project between hexes. */

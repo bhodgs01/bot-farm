@@ -502,6 +502,48 @@ export class Hud {
   }
 
   /**
+   * The briefing, one story at a time. Next walks the desk's stories; the last one offers
+   * Done, which marks the briefing read and drops the correspondent's hand. Dismiss does the
+   * same without the walk, for a morning with no time. A read briefing can still be paged.
+   */
+  renderReader(thread) {
+    const box = this.$('.thread-pop .reader')
+    const stories = Array.isArray(thread.stories) ? thread.stories : []
+    if (!stories.length) {
+      box.hidden = true
+      box.innerHTML = ''
+      return
+    }
+    this._readerAt ||= new Map()
+    const n = stories.length
+    const i = Math.min(this._readerAt.get(thread.id) || 0, n - 1)
+    const s = stories[i]
+    const unread = Boolean(thread.unread)
+    const when = s.published ? ` · ${escapeHtml(String(s.published))}` : ''
+    const src = s.source ? `${escapeHtml(String(s.source))}${when}` : ''
+    box.innerHTML = `
+      <div class="n">Story ${i + 1} of ${n}${unread ? '' : ' · read'}</div>
+      <div class="hl">${escapeHtml(String(s.headline || ''))}</div>
+      ${s.summary ? `<div class="sum">${escapeHtml(String(s.summary))}</div>` : ''}
+      ${s.why ? `<div class="why">${escapeHtml(String(s.why))}</div>` : ''}
+      <div class="src">${src}${s.url ? ` <a href="${escapeHtml(String(s.url))}" target="_blank" rel="noopener">source ↗</a>` : ''}</div>
+      <div class="nav">
+        <button class="btn" data-go="-1" ${i === 0 ? 'disabled' : ''}>‹ Prev</button>
+        ${i < n - 1 ? `<button class="btn primary" data-go="1">Next ›</button>` : unread ? `<button class="btn primary" data-done="1">Done ✓</button>` : `<button class="btn" data-go="-${n}">Start over</button>`}
+        ${unread ? `<button class="btn ghost" data-done="1" title="Mark the whole briefing read">Dismiss</button>` : ''}
+      </div>`
+    box.hidden = false
+    for (const b of box.querySelectorAll('[data-go]')) {
+      b.addEventListener('click', () => {
+        this._readerAt.set(thread.id, Math.max(0, Math.min(n - 1, i + Number(b.dataset.go))))
+        this.renderReader(thread)
+        this._cardSize = null
+      })
+    }
+    for (const b of box.querySelectorAll('[data-done]')) b.addEventListener('click', () => this.actions.stageThread?.('read', thread.id))
+  }
+
+  /**
    * The selected thread, shown inside the zone sidebar rather than in a panel of its own —
    * one thread and its repo are the same context, and splitting them across the screen made
    * you look in two places to act on one astronaut.
@@ -539,14 +581,17 @@ export class Hud {
 
     // Everything the source knows, as a small table, for threads that carry details.
     const details = this.$('.thread-pop .details')
-    const entries = Object.entries(thread.details || {}).filter(([, v]) => v !== '' && v != null)
+    const hasStories = Array.isArray(thread.stories) && thread.stories.length > 0
+    // The reader shows the stories one at a time, so the headline list would say it twice.
+    const entries = Object.entries(thread.details || {}).filter(([k, v]) => v !== '' && v != null && !(hasStories && k === 'Headlines'))
     details.innerHTML = entries.map(([k, v]) => `<div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(String(v))}</div>`).join('')
     details.hidden = entries.length === 0
     // Stage buttons: what this thread can be moved to next.
     const stage = this.$('.thread-pop .stage')
     const STAGE_LABEL = { active: 'Make active', in_process: 'Start work', completed: 'Mark complete', paid: 'Paid ✓', done: 'Close ticket ✓', read: 'Read ✓', ack: 'Remove flag', unack: 'Flag again', star: '★ Star', unstar: 'Unstar' }
     // A flagged worker offers to have the flag removed; an acknowledged one offers it back.
-    const acts = (Array.isArray(thread.actions) ? thread.actions : []).concat(thread.hasError ? ['ack'] : thread.acked ? ['unack'] : []).concat(thread.watched ? ['unstar'] : ['star'])
+    this.renderReader(thread)
+    const acts = (Array.isArray(thread.actions) ? thread.actions : []).filter((a) => !(hasStories && a === 'read')).concat(thread.hasError ? ['ack'] : thread.acked ? ['unack'] : []).concat(thread.watched ? ['unstar'] : ['star'])
     stage.innerHTML = acts.map((a) => `<button class="btn ${a === 'paid' || a === 'done' ? 'primary' : ''}" data-stage="${escapeHtml(a)}">${escapeHtml(STAGE_LABEL[a] || a)}</button>`).join('')
     stage.hidden = acts.length === 0
     for (const b of stage.querySelectorAll('button')) b.addEventListener('click', () => this.actions.stageThread?.(b.dataset.stage))
@@ -1010,6 +1055,7 @@ const TEMPLATE = `
   </div>
   <div class="progress"><i></i></div>
   <div class="details"></div>
+  <div class="reader" hidden></div>
   <div class="stage"></div>
   <div class="pair">
     <button class="btn primary" id="btn-open" title="Open this thread in the harness it came from (Enter)">${ICON.open} Open</button>
