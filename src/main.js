@@ -736,11 +736,32 @@ function applyThreads(list) {
 }
 
 let polling = false
+/**
+ * Somebody else wrote the colony file (another tab, or the layout moved server-side):
+ * take their zone layout and archive list rather than overwrite them on the next save.
+ * The page's own saves stamp `state.updatedAt`, so a matching stamp means nothing new.
+ */
+async function adoptRemoteState() {
+  let remote
+  try {
+    remote = await fetchState()
+  } catch {
+    return
+  }
+  if (!remote?.updatedAt || remote.updatedAt === state.updatedAt) return
+  state.updatedAt = remote.updatedAt
+  state.plots = remote.plots || {}
+  state.archived = remote.archived || []
+  state.archivedAt = remote.archivedAt || {}
+  colony.restoreLayout(state.plots)
+}
+
 async function poll() {
   if (polling) return
   polling = true
   try {
     const res = await fetchThreads()
+    await adoptRemoteState()
     applyThreads(res.threads || [])
     hud.removeBoot()
   } catch (err) {
@@ -755,7 +776,8 @@ function queueSave() {
   clearTimeout(pendingSave)
   pendingSave = setTimeout(async () => {
     try {
-      await saveState(state)
+      const saved = await saveState(state)
+      if (saved?.updatedAt) state.updatedAt = saved.updatedAt
     } catch {
       /* the colony still runs; only the archive list is at risk, and it retries next time */
     }
