@@ -523,10 +523,12 @@ export class Hud {
     const src = s.source ? `${escapeHtml(String(s.source))}${when}` : ''
     box.innerHTML = `
       <div class="n">Story ${i + 1} of ${n}${unread ? '' : ' · read'}</div>
-      <div class="hl">${escapeHtml(String(s.headline || ''))}</div>
-      ${s.summary ? `<div class="sum">${escapeHtml(String(s.summary))}</div>` : ''}
-      ${s.why ? `<div class="why">${escapeHtml(String(s.why))}</div>` : ''}
-      <div class="src">${src}${s.url ? ` <a href="${escapeHtml(String(s.url))}" target="_blank" rel="noopener">source ↗</a>` : ''}</div>
+      <div class="body">
+        <div class="hl">${escapeHtml(String(s.headline || ''))}</div>
+        ${s.summary ? `<div class="sum">${escapeHtml(String(s.summary))}</div>` : ''}
+        ${s.why ? `<div class="why">${escapeHtml(String(s.why))}</div>` : ''}
+        <div class="src">${src}${s.url ? ` <a href="${escapeHtml(String(s.url))}" target="_blank" rel="noopener">source ↗</a>` : ''}</div>
+      </div>
       <div class="nav">
         <button class="btn" data-go="-1" ${i === 0 ? 'disabled' : ''}>‹ Prev</button>
         ${i < n - 1 ? `<button class="btn primary" data-go="1">Next ›</button>` : unread ? `<button class="btn primary" data-done="1">Done ✓</button>` : `<button class="btn" data-go="-${n}">Start over</button>`}
@@ -537,7 +539,9 @@ export class Hud {
       b.addEventListener('click', () => {
         this._readerAt.set(thread.id, Math.max(0, Math.min(n - 1, i + Number(b.dataset.go))))
         this.renderReader(thread)
-        this._cardSize = null
+        // The card just changed height; the placement clamp needs the real size, not a guess.
+        const card = this.$('.thread-pop')
+        this._cardSize = { w: card.offsetWidth, h: card.offsetHeight }
       })
     }
     for (const b of box.querySelectorAll('[data-done]')) b.addEventListener('click', () => this.actions.stageThread?.('read', thread.id))
