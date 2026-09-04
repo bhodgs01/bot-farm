@@ -60,6 +60,18 @@ const ZONE_ACCENT = {
   'Active Projects': 0xc96442,
   'In Process': 0xb8942a,
   Completed: 0x4f9a63,
+  'Embassy Landscape': 0x4f9a63,
+  Frances: 0x5c8fc9,
+}
+
+/**
+ * What a zone's buildings are when the source did not say: the whole hex dressed as one
+ * place, so every email on the Inbox gets a desk and every Embassy task a patch of yard.
+ */
+const ZONE_LANDMARK = {
+  Inbox: 'desk',
+  'Embassy Landscape': 'yard',
+  Frances: 'apartment',
 }
 
 export const STATUS_ORDER = ['blocked', 'visitor', 'door', 'plant', 'mail', 'print', 'waiting', 'working', 'watching', 'printing', 'celebrating', 'watched', 'idle', 'sleeping']
@@ -543,7 +555,7 @@ export class Colony {
     const target = 1
 
     if (!entry) {
-      const mesh = createBuilding({ seed: hashString(thread.id), accent: plot.accent, kind: thread.landmark || null })
+      const mesh = createBuilding({ seed: hashString(thread.id), accent: plot.accent, kind: thread.landmark || ZONE_LANDMARK[thread.project] || null })
       const pos = plot.worldSlot(index)
       mesh.position.copy(pos)
       mesh.rotation.y = ((hashString(thread.id) >>> 8) % 360) * (Math.PI / 180)
