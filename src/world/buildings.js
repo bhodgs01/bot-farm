@@ -45,6 +45,12 @@ export const buildingUniforms = {
  * gap at the plot's 4.4-unit slot spacing.
  */
 const BUILDING_SCALE = 1.45
+/**
+ * Per-kind size on top of BUILDING_SCALE. Set pieces are authored to fill a slot, but a
+ * printer or a workbench standing two astronauts tall reads as a monument, not a tool, and
+ * several of them on one hex collide. These bring the furniture back to astronaut scale.
+ */
+const KIND_SCALE = { printer: 0.55, bench: 0.5, yard: 0.55, desk: 0.75 }
 
 /** The top face of a base module — where roof modules and masts stack. */
 const DECK = 1.0
@@ -1178,13 +1184,14 @@ export function createBuilding({ seed = 1, accent = 0xc96442, kind = null } = {}
   const geo = c.finish()
   // Trimmed to fit a slot: the catalogue is authored on the pack's module grid and scaled
   // once here, so tuning the plot lattice never means re-tuning ten recipes.
-  geo.scale(BUILDING_SCALE, BUILDING_SCALE, BUILDING_SCALE)
+  const k = BUILDING_SCALE * (KIND_SCALE[chosen] || 1)
+  geo.scale(k, k, k)
   // `scale()` transforms position and normal and nothing else, so a custom attribute that
   // holds a *position* has to be taken along by hand. Miss this and a rotor turns about a
   // hub left behind at the unscaled height — the blades orbit a point below themselves.
   const pivot = geo.getAttribute('aPivot')
   if (pivot) {
-    for (let i = 0; i < pivot.count * 3; i++) pivot.array[i] *= BUILDING_SCALE
+    for (let i = 0; i < pivot.count * 3; i++) pivot.array[i] *= k
     pivot.needsUpdate = true
   }
   geo.computeBoundingBox()
