@@ -191,6 +191,10 @@ export class Colony {
     this.plotGroup = new THREE.Group()
     this.labelGroup = new THREE.Group()
     scene.add(this.plotGroup, this.labelGroup)
+    // Signal rings: a building whose thread is `receiving` (the dish, when a feed lands) sends rings up.
+    this.rings = []
+    this.ringClock = new Map()
+    this.ringGeo = new THREE.TorusGeometry(0.42, 0.035, 8, 40)
     // Beams: the send-off for a closed job, one saucer and light column per astronaut.
     this.beams = new Map()
     this.beamGroup = new THREE.Group()
@@ -343,7 +347,9 @@ export class Colony {
       const plot = this.plots.get(name)
       if (!plot) continue
       // Oldest thread first, so a given session keeps its slot as siblings come and go.
-      list.sort((a, b) => a.createdAt - b.createdAt)
+      // Threads that work at another thread's building come last, once the host exists.
+      list.sort((a, b) => (a.attachTo ? 1 : 0) - (b.attachTo ? 1 : 0) || a.createdAt - b.createdAt)
+      let attached = 0
 
       list.forEach((thread, i) => {
         const status = statusFor(thread, now)
@@ -352,6 +358,21 @@ export class Colony {
         if (wantsYou) urgent.add(plot.id)
         if (wantsYou || status === 'working' || status === 'watching' || status === 'printing') active.add(plot.id)
         stats.agents++
+
+        // A thread attached to another's building has no hut of its own: it walks to the
+        // host (a feed to the dish) and works there, fanned out so a crowd does not stack.
+        const host = thread.attachTo ? this.buildings.get(thread.attachTo) : null
+        if (host) {
+          const k = attached++
+          const site = this._workSite(plot, host, k)
+          const hx = host.mesh.position.x
+          const hz = host.mesh.position.z
+          const a0 = Math.atan2(site.z - hz, site.x - hx) + k * 0.8
+          const r = Math.hypot(site.x - hx, site.z - hz)
+          site.set(hx + Math.cos(a0) * r, 0, hz + Math.sin(a0) * r)
+          roster.push({ id: thread.id, thread, status, site, anchor: host.mesh.position.clone() })
+          return
+        }
 
         const building = this._syncBuilding(thread, plot, i)
         seenBuildings.add(thread.id)
@@ -372,6 +393,12 @@ export class Colony {
     // takes its building down and walks its astronaut back to the ship.
     for (const [id, entry] of this.buildings) {
       if (!seenBuildings.has(id)) this._removeBuilding(id, entry)
+    }
+
+    // A thread that leaves with `exit: 'beam'` is beamed up rather than walked home.
+    const liveIds = new Set(roster.map((r) => r.id))
+    for (const agent of this.astronauts.agents) {
+      if (!liveIds.has(agent.id) && agent.thread?.exit === 'beam' && !['gone', 'beaming', 'leaving'].includes(agent.state)) this.beamUp(agent.id)
     }
 
     this.threads = new Map(live.map((t) => [t.id, t]))
@@ -694,6 +721,42 @@ export class Colony {
     return true
   }
 
+  _syncSignals(dt) {
+    for (const [id, entry] of this.buildings) {
+      const t = this.threads.get(id)
+      if (!t?.receiving || entry.retiring) {
+        this.ringClock.delete(id)
+        continue
+      }
+      const clock = (this.ringClock.get(id) || 0) + dt
+      if (clock < 1.1) {
+        this.ringClock.set(id, clock)
+        continue
+      }
+      this.ringClock.set(id, 0)
+      const top = entry.mesh.geometry?.boundingBox?.max.y ?? 2
+      const mat = new THREE.MeshBasicMaterial({ color: 0x9fe8ff, transparent: true, opacity: 0.75, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })
+      const ring = new THREE.Mesh(this.ringGeo, mat)
+      ring.rotation.x = Math.PI / 2
+      ring.position.set(entry.mesh.position.x, entry.mesh.position.y + top * entry.progress + 0.2, entry.mesh.position.z)
+      this.beamGroup.add(ring)
+      this.rings.push({ mesh: ring, mat, t: 0 })
+    }
+    for (let i = this.rings.length - 1; i >= 0; i--) {
+      const r = this.rings[i]
+      r.t += dt
+      const k = r.t / 1.6
+      r.mesh.position.y += dt * 1.1
+      r.mesh.scale.setScalar(1 + k * 1.8)
+      r.mat.opacity = 0.75 * (1 - k)
+      if (k >= 1) {
+        this.beamGroup.remove(r.mesh)
+        r.mat.dispose()
+        this.rings.splice(i, 1)
+      }
+    }
+  }
+
   _syncBeams(dt) {
     for (const [id, b] of this.beams) {
       b.t += dt
@@ -830,6 +893,7 @@ export class Colony {
   update(dt, elapsed, focus) {
     this._syncPlates()
     this._syncBeams(dt)
+    this._syncSignals(dt)
     if (focus) this.sky.setFocus(focus)
     const cycled = this.sky.update(dt, elapsed, this.camera)
     if (cycled) this.settings.values.timeOfDay = this.sky.time

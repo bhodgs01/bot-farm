@@ -620,7 +620,16 @@ async function scanThreads() {
   const [snap, signals] = await Promise.all([clusterSnapshot(), currentSignals()])
   const probes = await Promise.all(ROSTER.map((a) => (a.probe ? probe(a.probe) : Promise.resolve(null))))
   const agents = ROSTER.map((agent, i) => deriveAgent(agent, snap, signals, probes[i]))
-  return agents.concat(watchdogThreads(signals._watchdogServices || []), brainFeedThreads(snap), nodeThreads(snap))
+  const brain = brainFeedThreads(snap)
+  // The dish is receiving while a feed job is running: rings rise off it, and its roof says so.
+  const mem = agents.find((a) => a.id === 'jarvis:mem')
+  if (mem) {
+    const arriving = brain.filter((b) => b.running).length
+    const landed = brain.filter((b) => b.prState === 'MERGED').length
+    mem.receiving = arriving > 0
+    mem.roof = arriving ? `${arriving} feed${arriving === 1 ? '' : 's'} arriving` : landed ? `${landed} landed` : 'listening'
+  }
+  return agents.concat(watchdogThreads(signals._watchdogServices || []), brain, nodeThreads(snap))
 }
 
 /**
@@ -643,15 +652,27 @@ function brainFeedThreads(snap) {
       0
     )
     if (phase === 'Succeeded' && now - finished > BRAIN_DONE_WINDOW_MS) continue
-    if (phase !== 'Running' && phase !== 'Succeeded' && phase !== 'Failed') continue
+    if (phase !== 'Running' && phase !== 'Pending' && phase !== 'Succeeded' && phase !== 'Failed') continue
     // Job names carry a schedule stamp: `feed-sync-29312345` -> `feed-sync`.
     const feed = String(owner.name).replace(/-\d{5,}$/, '').replace(/-[a-z0-9]{5}$/, '')
     const mins = Math.max(1, Math.round((now - started) / 60000))
     out.push({
       id: `brain:${owner.name}`,
+      attachTo: 'jarvis:mem',
+      exit: 'beam',
+      details: {
+        Feed: feed,
+        Job: owner.name,
+        Phase: phase,
+        Started: new Date(started).toLocaleString('en-US', { timeZone: 'America/Chicago' }),
+        Finished: finished ? new Date(finished).toLocaleString('en-US', { timeZone: 'America/Chicago' }) : '',
+        Duration: finished ? `${Math.max(1, Math.round((finished - started) / 60000))} min` : `${mins} min so far`,
+        Pod: pod.metadata?.name || '',
+        Node: pod.spec?.nodeName || '',
+      },
       title: `📡 ${feed}`,
       preview:
-        phase === 'Running'
+        phase === 'Running' || phase === 'Pending'
           ? `feed syncing · ${mins} min in`
           : phase === 'Succeeded'
             ? `ingested ${Math.max(1, Math.round((now - finished) / 60000))} min ago`
@@ -666,7 +687,7 @@ function brainFeedThreads(snap) {
       createdAt: started,
       lastActivityAt: finished || started,
       lastFocusedAt: 0,
-      running: phase === 'Running',
+      running: phase === 'Running' || phase === 'Pending',
       unread: false,
       hasError: phase === 'Failed',
       starred: false,
