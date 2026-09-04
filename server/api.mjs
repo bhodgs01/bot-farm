@@ -13,6 +13,7 @@ import {
 } from './scan.mjs'
 import { ask, chatEnabled } from './ask.mjs'
 import { setProjectStatus, closeTask } from './act.mjs'
+import { applyAcks, ack, unack } from './acks.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = process.env.BOT_CROSSING_DATA || path.join(here, '..', 'data')
@@ -272,7 +273,7 @@ export async function apiMiddleware(req, res, next) {
 
   try {
     if (url.pathname === '/api/threads' && req.method === 'GET') {
-      const threads = await reconcileArchived(await scanThreads())
+      const threads = await applyAcks(await reconcileArchived(await scanThreads()))
       return send(res, 200, { threads, scannedAt: Date.now() })
     }
 
@@ -287,6 +288,25 @@ export async function apiMiddleware(req, res, next) {
       const who = chatIdentity(req)
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' })
       return res.end(`<!doctype html><meta charset=utf-8><title>Bot Farm</title><body style="font:15px system-ui;background:#0f1117;color:#e6e8ef;display:grid;place-items:center;height:100vh;margin:0"><div>${who ? 'Signed in. You can close this tab and move things on the map.' : 'Signed in, but this address is not on the list for actions.'}</div>`)
+    }
+
+    // Remove (or restore) a flag Blake already knows about. Pinned to the current failure.
+    if (url.pathname === '/api/act/ack' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to change flags', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      const { id, on } = await readJsonBody(req, 16 * 1024)
+      if (typeof id !== 'string' || !id) return send(res, 400, { error: 'Bad id' })
+      if (on === false) {
+        await unack(id)
+        return send(res, 200, { ok: true, acked: false })
+      }
+      const thread = (await scanThreads()).find((t) => t.id === id)
+      if (!thread) return send(res, 404, { error: 'That worker is not on the map' })
+      if (!thread.hasError) return send(res, 200, { ok: true, acked: false, note: 'Nothing flagged on it' })
+      const a = await ack(thread, who)
+      console.log(`act: ${who} removed the flag on ${id} (${a.key.slice(0, 80)})`)
+      return send(res, 200, { ok: true, acked: true })
     }
 
     if (url.pathname === '/api/act/task' && req.method === 'POST') {

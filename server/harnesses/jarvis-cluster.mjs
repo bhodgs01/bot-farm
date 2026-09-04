@@ -379,6 +379,7 @@ async function appSignals() {
     const failed = last && /Failed/.test(last.phase)
     const ago = (t) => (t ? `${Math.round((now - t) / 3600000)}h ago` : 'never')
     out.velero = {
+      alertKey: failed ? `failed:${last.name}` : stale ? `stale:${lastNightly ? lastNightly.name : 'none'}` : '',
       running: inProgress.length > 0,
       error: Boolean(failed || stale),
       message: inProgress.length
@@ -585,6 +586,7 @@ function deriveAgent(agent, snap, signals, probeUp) {
     source: 'k3s',
     landmark: agent.landmark || '',
     roof: sig.roof || '',
+    alertKey: problems.length ? sig.alertKey || problems.join(' | ') : '',
     canOpen: Boolean(agent.url),
     canArchive: false,
     ref: { agent: agent.id, url: agent.url },

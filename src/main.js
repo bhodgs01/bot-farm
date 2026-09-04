@@ -20,6 +20,7 @@ import {
   askWorker,
   actProject,
   actTask,
+  actAck,
 } from './game/api.js'
 
 /**
@@ -154,6 +155,12 @@ const actions = {
     const thread = threads.find((t) => t.id === id)
     if (!thread) return
     try {
+      if (status === 'ack' || status === 'unack') {
+        await actAck(thread.id, status === 'ack')
+        hud.toast(status === 'ack' ? `Flag removed on ${thread.title}. It comes back if the failure changes.` : `Flag restored on ${thread.title}`)
+        setTimeout(poll, 300)
+        return
+      }
       if (thread.harness === 'tasks' && status === 'done') {
         await actTask(thread.ref?.task)
         hud.toast(`Closed: ${thread.title}`)

@@ -47,3 +47,6 @@ export const actProject = (projectId, status) => post('/api/act/project', { id: 
 
 /** Close a Vikunja ticket. Same gate. */
 export const actTask = (taskId) => post('/api/act/task', { id: taskId })
+
+/** Remove a known flag (or put it back). The flag returns on its own if the failure changes. */
+export const actAck = (threadId, on) => post('/api/act/ack', { id: threadId, on })

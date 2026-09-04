@@ -531,6 +531,7 @@ export class Hud {
     if (thread.worktree) bits.push(`<span class="tag">⑂ ${escapeHtml(thread.worktree)}</span>`)
     if (thread.gitBranch) bits.push(`<span class="tag">${escapeHtml(thread.gitBranch)}</span>`)
     if (thread.model) bits.push(`<span class="tag">${escapeHtml(shortModel(thread.model))}</span>`)
+    if (thread.acked) bits.push(`<span class="tag" title="You removed this flag; it returns if the failure changes">flag removed</span>`)
     bits.push(`<span>${ago(thread.lastActivityAt)}</span>`)
     meta.innerHTML = bits.join('')
 
@@ -541,8 +542,9 @@ export class Hud {
     details.hidden = entries.length === 0
     // Stage buttons: what this thread can be moved to next.
     const stage = this.$('.thread-pop .stage')
-    const STAGE_LABEL = { active: 'Make active', in_process: 'Start work', completed: 'Mark complete', paid: 'Paid ✓', done: 'Close ticket ✓' }
-    const acts = Array.isArray(thread.actions) ? thread.actions : []
+    const STAGE_LABEL = { active: 'Make active', in_process: 'Start work', completed: 'Mark complete', paid: 'Paid ✓', done: 'Close ticket ✓', ack: 'Remove flag', unack: 'Flag again' }
+    // A flagged worker offers to have the flag removed; an acknowledged one offers it back.
+    const acts = (Array.isArray(thread.actions) ? thread.actions : []).concat(thread.hasError ? ['ack'] : thread.acked ? ['unack'] : [])
     stage.innerHTML = acts.map((a) => `<button class="btn ${a === 'paid' || a === 'done' ? 'primary' : ''}" data-stage="${escapeHtml(a)}">${escapeHtml(STAGE_LABEL[a] || a)}</button>`).join('')
     stage.hidden = acts.length === 0
     for (const b of stage.querySelectorAll('button')) b.addEventListener('click', () => this.actions.stageThread?.(b.dataset.stage))
