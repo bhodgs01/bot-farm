@@ -310,7 +310,7 @@ async function probe(url) {
  */
 async function appSignals() {
   const out = {}
-  const [biff, cluster, watchdog, shorts, feeds, trader, syncthing, velero] = await Promise.all([
+  const [biff, cluster, watchdog, shorts, feeds, trader, syncthing, velero, pot] = await Promise.all([
     fetchJson(`${AGENTS_BASE}/api/biff`),
     fetchJson(`${AGENTS_BASE}/api/cluster`),
     fetchJson(`${WATCHDOG_BASE}/api/state`),
@@ -319,6 +319,7 @@ async function appSignals() {
     fetchJson(`${process.env.TRADE_BOT_URL || 'https://trade-bot.kcproto.com'}/api/status`),
     fetchJson(process.env.SYNCTHING_STATUS_URL || 'http://syncthing-dashboard.syncthing.svc.cluster.local:3200/api/status'),
     kubeGet('/apis/velero.io/v1/namespaces/velero/backups').catch(() => null),
+    fetchJson(`${process.env.TRADE_BOT_URL || 'https://trade-bot.kcproto.com'}/api/aggregate`),
   ])
 
   if (syncthing && Array.isArray(syncthing.instances)) {
@@ -384,14 +385,18 @@ async function appSignals() {
     const last = Number(trader.account.last_equity) || equity
     const day = equity - last
     const paper = /^PA/i.test(String(trader.account.account_number || ''))
-    const cash = Number(trader.account.cash) || 0
+    // The real money is the live pot behind the replicator, not the strategist's paper cash.
+    const live = Number(pot?.totalAUM) || 0
+    const liveProfit = Number(pot?.totalProfit) || 0
+    const livePct = Number(pot?.totalReturn) || 0
+    const money = (n) => `$${Math.round(n).toLocaleString('en-US')}`
     out.snoop = {
-      roof: `$${cash >= 10000 ? `${(cash / 1000).toFixed(1)}k` : Math.round(cash).toLocaleString('en-US')} cash`,
+      roof: live ? `${money(live)} live` : `${money(Number(trader.account.cash) || 0)} paper`,
       running: Boolean(cycleAt) && Date.now() - cycleAt < 20 * 60 * 1000,
       error: Boolean(trader.lastError),
       message: trader.lastError
         ? `bot error: ${String(trader.lastError).slice(0, 120)}`
-        : `${paper ? 'strategist (paper)' : 'LIVE'} · equity $${Math.round(equity).toLocaleString('en-US')} · today ${day >= 0 ? '+' : '-'}$${Math.abs(Math.round(day)).toLocaleString('en-US')} · ${(trader.positions || []).length} positions · ${Number(trader.dailyTradeCount) || 0} trades today`,
+        : `${live ? `LIVE pot $${live.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${liveProfit >= 0 ? '+' : '-'}$${Math.abs(liveProfit).toFixed(0)}, ${livePct >= 0 ? '+' : ''}${livePct.toFixed(1)}%) · ` : ''}strategist ${paper ? 'paper' : 'live'} equity ${money(equity)} today ${day >= 0 ? '+' : '-'}$${Math.abs(Math.round(day)).toLocaleString('en-US')} · ${(trader.positions || []).length} positions · ${Number(trader.dailyTradeCount) || 0} trades today`,
       activityAt: cycleAt,
       work: Number(trader.tradeCount) || 0,
     }

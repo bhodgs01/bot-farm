@@ -240,6 +240,9 @@ async function fetchThreads() {
     t.unread = true
     t.count = laundry.length
     out.push(t)
+  } else {
+    // The keeper is always there; he only raises a hand when something is sitting.
+    out.push(base('house.laundry', {}, 'laundry', { title: '🧺 Laundry', preview: 'Nothing sitting in the washer or dryer', branch: 'clear', model: 'washer + dryer', sizeBytes: 3000 }))
   }
 
   // The greenhouse itself: the Garden's landmark, kept by a gardener who reports the count.
