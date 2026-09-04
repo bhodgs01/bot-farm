@@ -15,6 +15,12 @@ const OPEN_URL = (process.env.VIKUNJA_OPEN_URL || 'https://tasks.kcproto.com').r
 const TTL_MS = 60 * 1000
 const SOON_MS = 24 * 60 * 60 * 1000
 
+/**
+ * Projects that are somebody else's to-do list, not Blake's. The Marc Coaching Hub writes
+ * follow-ups for Marc's own team into Vikunja; they are his to chase, not Blake's.
+ */
+const NOT_MINE = /coaching hub/i
+
 /** Vikunja project title → hex. Anything unlisted keeps its own title as the hex name. */
 const ZONE_FOR = [
   [/corrosion/i, 'CorrosionDC'],
@@ -51,7 +57,7 @@ async function fetchThreads() {
   const out = []
   await Promise.all(
     (Array.isArray(projects) ? projects : []).map(async (p) => {
-      if (p.is_archived) return
+      if (p.is_archived || NOT_MINE.test(p.title)) return
       const zone = ZONE_FOR.find(([re]) => re.test(p.title))?.[1] || p.title
       let tasks = []
       try {
