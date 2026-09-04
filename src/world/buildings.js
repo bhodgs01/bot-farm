@@ -50,7 +50,7 @@ const BUILDING_SCALE = 1.45
  * printer or a workbench standing two astronauts tall reads as a monument, not a tool, and
  * several of them on one hex collide. These bring the furniture back to astronaut scale.
  */
-const KIND_SCALE = { printer: 0.55, bench: 0.5, yard: 0.55, desk: 0.75 }
+const KIND_SCALE = { printer: 0.55, bench: 0.5, yard: 0.55, desk: 0.75, newsstand: 0.6 }
 
 /** The top face of a base module — where roof modules and masts stack. */
 const DECK = 1.0
