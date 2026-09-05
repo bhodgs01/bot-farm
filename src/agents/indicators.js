@@ -15,6 +15,7 @@ import {
   mdiWaterOff,
   mdiAccountAlert,
   mdiStar,
+  mdiInformation,
 } from '@mdi/js'
 
 /**
@@ -51,6 +52,7 @@ export const BADGE = {
   plant: 13, // a plant whose soil is dry
   visitor: 14, // motion at the house right now
   watched: 15, // a star Blake put there himself
+  info: 16, // something to know, nothing to do: a feed that landed, a position that is up
 }
 
 /** Badge tint. Pushed past 1.0 so the bloom pass gives them a soft halo. */
@@ -71,6 +73,7 @@ const BADGE_COLOR = {
   13: [0.7, 2.2, 0.9],
   14: [2.8, 0.9, 0.7],
   15: [2.7, 2.2, 0.6],
+  16: [0.7, 1.7, 2.8],
 }
 
 /**
@@ -304,7 +307,7 @@ export class Indicators {
  * — the glyph has to carry as a silhouette. Material's set is drawn filled to begin with,
  * one closed path per icon, so there is nothing to stroke and nothing to parse.
  */
-const ICON_PATHS = [mdiHelpCircle, mdiAlert, mdiHammer, mdiCheckBold, mdiPause, mdiSleep, mdiCreation, mdiLogout, mdiEmail, mdiPrinter3d, mdiPlay, mdiDoorOpen, mdiWaterOff, mdiAccountAlert, mdiStar]
+const ICON_PATHS = [mdiHelpCircle, mdiAlert, mdiHammer, mdiCheckBold, mdiPause, mdiSleep, mdiCreation, mdiLogout, mdiEmail, mdiPrinter3d, mdiPlay, mdiDoorOpen, mdiWaterOff, mdiAccountAlert, mdiStar, mdiInformation]
 
 /**
  * The badge atlas. Red channel = the glyph, green channel = the plate's alpha — packing two

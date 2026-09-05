@@ -48,6 +48,7 @@ const STAT_DEFS = [
   { key: 'plant', label: 'thirsty plants', cls: 'waiting' },
   { key: 'visitor', label: 'movement', cls: 'blocked' },
   { key: 'watched', label: 'starred', cls: 'done' },
+  { key: 'info', label: 'fyi', cls: 'done' },
   { key: 'blocked', label: 'blocked', cls: 'blocked' },
   { key: 'celebrating', label: 'shipped', cls: 'done' },
   { key: 'agents', label: 'crew', cls: 'idle' },
@@ -924,7 +925,7 @@ function statusClass(status) {
   if (['waiting', 'mail', 'print', 'door', 'plant'].includes(status)) return 'waiting'
   if (status === 'visitor') return 'blocked'
   if (status === 'blocked') return 'blocked'
-  if (status === 'celebrating' || status === 'watched') return 'done'
+  if (status === 'celebrating' || status === 'watched' || status === 'info') return 'done'
   return 'idle'
 }
 
@@ -1116,6 +1117,7 @@ const TEMPLATE = `
       <div class="legend-row"><i class="badge" style="background:#14301a;color:#8fe0a0">&#128167;</i> a plant whose soil has gone dry</div>
       <div class="legend-row"><i class="badge" style="background:#3a1c14;color:#f0a08a">&#9673;</i> movement at the house right now</div>
       <div class="legend-row"><i class="badge" style="background:#3a3010;color:#f0d46a">&#9733;</i> you starred it to keep an eye on it</div>
+      <div class="legend-row"><i class="badge" style="background:#10283a;color:#7cc4ff">i</i> something to know, nothing to do</div>
       <div class="legend-row"><i class="badge" style="background:#3d1c1c;color:#e88b8b">!</i> something is crashing, unready, or not answering</div>
       <div class="legend-row"><i class="badge" style="background:#16301f;color:#7fd39a">⚒</i> running right now, building</div>
       <div class="legend-row"><i class="badge" style="background:#332b12;color:#e6c67f">✓</i> shipped: good news worth a glance</div>

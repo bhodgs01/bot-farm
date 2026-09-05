@@ -76,7 +76,7 @@ const ZONE_LANDMARK = {
   Frances: 'apartment',
 }
 
-export const STATUS_ORDER = ['blocked', 'visitor', 'door', 'plant', 'mail', 'print', 'waiting', 'working', 'watching', 'printing', 'celebrating', 'watched', 'idle', 'sleeping']
+export const STATUS_ORDER = ['blocked', 'visitor', 'door', 'plant', 'mail', 'print', 'waiting', 'working', 'watching', 'printing', 'celebrating', 'info', 'watched', 'idle', 'sleeping']
 
 export const STATUS_LABEL = {
   working: 'Working',
@@ -89,6 +89,7 @@ export const STATUS_LABEL = {
   plant: 'Needs water',
   visitor: 'Movement',
   watched: 'Starred',
+  info: 'FYI',
   blocked: 'Blocked',
   celebrating: 'Shipped',
   idle: 'Idle',
@@ -113,6 +114,8 @@ export function statusFor(thread, now = Date.now()) {
   if (thread.watched && !thread.unread) return 'watched'
   if (thread.running) return 'working'
   if (thread.prState === 'MERGED') return 'celebrating'
+  // An 'i': the source has something to tell you and nothing to ask of you.
+  if (thread.kind === 'info') return 'info'
   if (thread.unread) return 'waiting'
   if (now - thread.lastActivityAt > STALE_MS) return 'sleeping'
   return 'idle'
@@ -133,6 +136,7 @@ const BADGE_FOR = {
   plant: BADGE.plant,
   visitor: BADGE.visitor,
   watched: BADGE.watched,
+  info: BADGE.info,
   blocked: BADGE.blocked,
   working: BADGE.working,
   celebrating: BADGE.done,
@@ -250,7 +254,7 @@ export class Colony {
     this.activePlots = new Set()
     this._dustTint = new THREE.Color(this.planet.ground.high)
     this._c = new THREE.Color()
-    this.stats = { agents: 0, projects: 0, working: 0, waiting: 0, mail: 0, print: 0, watching: 0, printing: 0, door: 0, plant: 0, visitor: 0, watched: 0, blocked: 0, done: 0 }
+    this.stats = { agents: 0, projects: 0, working: 0, waiting: 0, mail: 0, print: 0, watching: 0, printing: 0, door: 0, plant: 0, visitor: 0, watched: 0, info: 0, blocked: 0, done: 0 }
 
     this._buildTerrain()
   }

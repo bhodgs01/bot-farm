@@ -40,6 +40,7 @@ const AGENT_LOOK = {
   plant: { trim: 0x5f9a4f, eye: [0.7, 2.2, 0.9] },
   visitor: { trim: 0xc95c4f, eye: [2.8, 0.9, 0.7] },
   watched: { trim: 0xc9a24f, eye: [2.4, 2.0, 0.7] },
+  info: { trim: 0x5c8fc9, eye: [0.8, 1.7, 2.6] },
   blocked: { trim: 0xc94f4f, eye: [3.0, 0.5, 0.45] },
   celebrating: { trim: 0xc9a24f, eye: [2.9, 2.1, 0.6] },
   idle: { trim: 0x8b8b85, eye: [1.1, 1.5, 1.7] },
@@ -470,12 +471,16 @@ export class Astronauts {
     const cap = Math.min(this.capacity, this.settings.get('maxAgents'))
     const wanted = entries.slice(0, cap)
     const seen = new Set()
+    // The first roster after a load is not news, it is the state of things: everyone is
+    // already at work. Only arrivals after that walk out of the ship, which is the moment
+    // that means something (a new mail, a print, a feed landing).
+    const settled = this.agents.length === 0
 
     for (const entry of wanted) {
       seen.add(entry.id)
       const existing = this.byId.get(entry.id)
       if (existing) this._updateAgent(existing, entry)
-      else this._spawnAgent(entry)
+      else this._spawnAgent(entry, settled)
     }
 
     for (const agent of this.agents) {
@@ -484,9 +489,13 @@ export class Astronauts {
     return this.agents.length
   }
 
-  _spawnAgent(entry) {
+  _spawnAgent(entry, settled = false) {
     const door = this.world?.shipDoor?.() || new THREE.Vector3(0, 0, 0)
     const jitter = () => (Math.random() - 0.5) * 1.4
+    // Placed at the post rather than at the ship: a whole-map walk on every load is a map
+    // that is wrong for two minutes.
+    const atPost = settled && entry.site
+    const start = atPost ? new THREE.Vector3(entry.site.x + jitter() * 0.5, 0, entry.site.z + jitter() * 0.5) : new THREE.Vector3(door.x + jitter(), 0, door.z + jitter())
 
     const agent = {
       id: entry.id,
@@ -497,14 +506,14 @@ export class Astronauts {
       anchor: entry.anchor ? entry.anchor.clone() : null,
       workSpot: new THREE.Vector3(),
       workAt: 0,
-      pos: new THREE.Vector3(door.x + jitter(), 0, door.z + jitter()),
+      pos: start,
       vel: new THREE.Vector3(),
       yaw: Math.random() * Math.PI * 2,
       targetYaw: 0,
       speed: WALK_SPEED * (0.86 + Math.random() * 0.28),
       phase: Math.random() * Math.PI * 2,
       bob: 0,
-      state: 'spawning',
+      state: atPost ? 'walking' : 'spawning',
       stateAge: 0,
       // Every astronaut runs its own clocks so a crowd never blinks in unison.
       blinkAt: 1 + Math.random() * 4,
@@ -528,12 +537,12 @@ export class Astronauts {
       driftBlocked: false,
       // Animation state: which baked clip, how far into it, and the row of the bone table
       // that lands on. Started at a random offset so a crowd never marches in step.
-      clipKey: 'spawn',
+      clipKey: atPost ? 'idle' : 'spawn',
       clipTime: Math.random() * 0.6,
       frame: 0,
       wander: new THREE.Vector3(),
       wanderAt: 0,
-      scale: 0, // pops up out of the ship
+      scale: atPost ? 1 : 0, // pops up out of the ship, unless already at work
       alive: true,
       path: null,
       pathAt: 0,
