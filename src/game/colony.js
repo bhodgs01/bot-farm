@@ -454,7 +454,9 @@ export class Colony {
     // — never because a different repo gained or lost a thread. `plotCells` carries it
     // between polls, and the colony file carries it between sessions.
     const layout = allocateCells(
-      projects.map(([name, list]) => ({ id: name, size: list.length })),
+      // Workers attached to another worker's building stand around it and take no slot,
+      // so they must not make a zone claim ground it will never use.
+      projects.map(([name, list]) => ({ id: name, size: list.filter((t) => !t.attachTo).length })),
       this.plotCells
     )
     // Remembered, not replaced: a project that has just lost its last thread keeps its
