@@ -471,9 +471,9 @@ export class Astronauts {
     const cap = Math.min(this.capacity, this.settings.get('maxAgents'))
     const wanted = entries.slice(0, cap)
     const seen = new Set()
-    // The first roster after a load is not news, it is the state of things: everyone is
-    // already at work. Only arrivals after that walk out of the ship, which is the moment
-    // that means something (a new mail, a print, a feed landing).
+    // The first roster after a load is the parade: everyone walks out of the ship to their
+    // post. It is the best part of loading, so it stays, but the first wave hustles so the
+    // map is right in under a minute instead of two.
     const settled = this.agents.length === 0
 
     for (const entry of wanted) {
@@ -492,10 +492,8 @@ export class Astronauts {
   _spawnAgent(entry, settled = false) {
     const door = this.world?.shipDoor?.() || new THREE.Vector3(0, 0, 0)
     const jitter = () => (Math.random() - 0.5) * 1.4
-    // Placed at the post rather than at the ship: a whole-map walk on every load is a map
-    // that is wrong for two minutes.
-    const atPost = settled && entry.site
-    const start = atPost ? new THREE.Vector3(entry.site.x + jitter() * 0.5, 0, entry.site.z + jitter() * 0.5) : new THREE.Vector3(door.x + jitter(), 0, door.z + jitter())
+    const atPost = false
+    const start = new THREE.Vector3(door.x + jitter(), 0, door.z + jitter())
 
     const agent = {
       id: entry.id,
@@ -510,7 +508,8 @@ export class Astronauts {
       vel: new THREE.Vector3(),
       yaw: Math.random() * Math.PI * 2,
       targetYaw: 0,
-      speed: WALK_SPEED * (0.86 + Math.random() * 0.28),
+      speed: WALK_SPEED * (0.86 + Math.random() * 0.28) * (settled ? 2.4 : 1),
+      rush: settled, // the opening parade hustles; the pace drops back on arrival
       phase: Math.random() * Math.PI * 2,
       bob: 0,
       state: atPost ? 'walking' : 'spawning',
@@ -726,6 +725,10 @@ export class Astronauts {
         if (dist < ARRIVE_RADIUS || stuck) {
           if (stuck && dist >= ARRIVE_RADIUS) agent.site.copy(agent.pos)
           agent.state = agent.status === 'leaving' ? 'leaving' : 'at-site'
+          if (agent.rush) {
+            agent.rush = false
+            agent.speed = WALK_SPEED * (0.86 + Math.random() * 0.28)
+          }
           agent.stateAge = 0
         }
         break
