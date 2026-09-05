@@ -30,7 +30,6 @@ const ZONE_FOR = [
   [/cybergrade/i, 'CyberGrade'],
   [/ai club/i, 'KC AI Club'],
   [/caregiver|frances/i, 'Frances'],
-  [/franky/i, 'Franky'],
   [/janine/i, 'KC Proto'],
   [/client ops|kc proto|meetings/i, 'KC Proto'],
   [/hive/i, 'Trade Floor'],

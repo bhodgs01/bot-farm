@@ -12,7 +12,7 @@ import {
   setThreadArchived,
 } from './scan.mjs'
 import { ask, chatEnabled } from './ask.mjs'
-import { setProjectStatus, closeTask } from './act.mjs'
+import { setProjectStatus, closeTask, completeChores } from './act.mjs'
 import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
 import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGenerate, topicById, todayKC, newsEnabled } from './news.mjs'
 import { refreshNews } from './harnesses/news.mjs'
@@ -351,6 +351,22 @@ export async function apiMiddleware(req, res, next) {
       try {
         const task = await closeTask({ id: n, who })
         return send(res, 200, { ok: true, done: Boolean(task.done) })
+      } catch (err) {
+        return send(res, 409, { ok: false, error: String(err?.message || err) })
+      }
+    }
+
+    // One of Blake's chores, done. Several ids when reminders were folded into one astronaut.
+    if (url.pathname === '/api/act/chore' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to mark chores done', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      const { ids } = await readJsonBody(req, 16 * 1024)
+      const list = (Array.isArray(ids) ? ids : [ids]).map(String).filter((s) => /^[\w-]{1,40}$/.test(s))
+      if (!list.length) return send(res, 400, { error: 'Bad chore id' })
+      try {
+        const changed = await completeChores({ ids: list, who })
+        return send(res, 200, { ok: true, changed })
       } catch (err) {
         return send(res, 409, { ok: false, error: String(err?.message || err) })
       }

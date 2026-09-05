@@ -10,6 +10,7 @@
  */
 import { refreshProjects } from './harnesses/projects.mjs'
 import { refreshTasks } from './harnesses/tasks.mjs'
+import { refreshChores } from './harnesses/chores.mjs'
 
 const VIKUNJA = (process.env.VIKUNJA_URL || 'http://vikunja.vikunja.svc.cluster.local:3456').replace(/\/$/, '') + '/api/v1'
 const VIKUNJA_TOKEN = process.env.VIKUNJA_TOKEN || ''
@@ -43,6 +44,38 @@ export async function closeTask({ id, who }) {
   console.log(`act: ${who} closed ticket #${id} (${task.title})`)
   refreshTasks()
   return after
+}
+
+const CHORES = (process.env.CHORES_URL || 'http://chore-quest.chore-quest.svc.cluster.local').replace(/\/$/, '')
+
+/**
+ * Mark one or more of Blake's chores done in Chore Quest. The app has one whole-state
+ * PUT, so this reads the state, flips the flags, writes it back, and reads it again to be
+ * sure. Returns how many were newly marked.
+ */
+export async function completeChores({ ids, who }) {
+  const wanted = [...new Set(ids.map((id) => `blake-${String(id)}`))]
+  const get = async () => {
+    const r = await fetch(`${CHORES}/api/state`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) })
+    if (!r.ok) throw new Error(`chores read → ${r.status}`)
+    return r.json()
+  }
+  const state = await get()
+  const known = new Set((state.todayC?.blake || []).map((c) => `blake-${c.id}`))
+  const missing = wanted.filter((k) => !known.has(k))
+  if (missing.length) throw new Error(`Not on today's list: ${missing.join(', ')}`)
+  state.done = state.done || {}
+  let changed = 0
+  for (const k of wanted) if (!state.done[k]) { state.done[k] = true; changed++ }
+  if (changed) {
+    const r = await fetch(`${CHORES}/api/state`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state), signal: AbortSignal.timeout(10000) })
+    if (!r.ok) throw new Error(`chores write → ${r.status}`)
+    const after = await get()
+    for (const k of wanted) if (!after.done?.[k]) throw new Error('Chore Quest did not keep the change')
+  }
+  console.log(`act: ${who} marked ${wanted.length} chore(s) done`)
+  refreshChores()
+  return changed
 }
 
 /** Move one project to a new status. Returns the updated entry. */

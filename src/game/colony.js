@@ -63,6 +63,7 @@ const ZONE_ACCENT = {
   Completed: 0x4f9a63,
   'Embassy Landscape': 0x4f9a63,
   Frances: 0x5c8fc9,
+  Chores: 0xc9a24f,
 }
 
 /**

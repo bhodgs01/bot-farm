@@ -50,7 +50,16 @@ const BUILDING_SCALE = 1.45
  * printer or a workbench standing two astronauts tall reads as a monument, not a tool, and
  * several of them on one hex collide. These bring the furniture back to astronaut scale.
  */
-const KIND_SCALE = { printer: 0.55, bench: 0.5, yard: 0.55, desk: 0.75, newsstand: 0.6 }
+const KIND_SCALE = {
+  printer: 0.55, bench: 0.5, yard: 0.55, desk: 0.75, newsstand: 0.6,
+  // round 2 landmarks
+  hq: 0.75, clubhouse: 0.75, house: 0.75, tradingfloor: 0.7, shield: 0.75, launchpad: 0.75,
+  recruitdesk: 0.65, grill: 0.65, vault: 0.7, controltower: 0.75, garage: 0.75, outpost: 0.75,
+  signpost: 0.6, tvwall: 0.6, keyrack: 0.6, meter: 0.6, countdown: 0.6, mailbox: 0.6,
+  // round 2 rebuilds of the old kit pieces
+  greenhouse: 0.7, habitat: 0.7, solar: 0.7, silo: 0.7, reactor: 0.7, lab: 0.7, tower: 0.7,
+  workshop: 0.7, pad: 0.7, antenna: 0.7,
+}
 
 /** The top face of a base module — where roof modules and masts stack. */
 const DECK = 1.0

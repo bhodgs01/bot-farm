@@ -22,6 +22,7 @@ import {
   askWorker,
   actProject,
   actTask,
+  actChore,
   actAck,
   actStar,
   actNews,
@@ -180,6 +181,13 @@ const actions = {
         Object.assign(thread, { unread: false, count: 0, actions: [], gitBranch: 'read', details: { ...(thread.details || {}), Status: 'read' } })
         applyThreads(threads.slice())
         setTimeout(poll, 1500)
+        return
+      }
+      if (thread.harness === 'chores' && status === 'chore') {
+        await actChore(thread.ref?.ids || [])
+        hud.toast(`Done: ${thread.title}`)
+        colony.beamUp(thread.id)
+        setTimeout(poll, 3200)
         return
       }
       if (thread.harness === 'tasks' && status === 'done') {
