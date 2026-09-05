@@ -73,7 +73,6 @@ const ZONE_ACCENT = {
 const ZONE_LANDMARK = {
   Inbox: 'desk',
   'Embassy Landscape': 'yard',
-  Frances: 'apartment',
 }
 
 export const STATUS_ORDER = ['blocked', 'visitor', 'door', 'plant', 'mail', 'print', 'waiting', 'working', 'watching', 'printing', 'celebrating', 'info', 'watched', 'idle', 'sleeping']
@@ -368,6 +367,15 @@ export class Colony {
       if (!byProject.has(key)) byProject.set(key, [])
       byProject.get(key).push(thread)
     }
+    // A hex is one place. The worker whose source named a landmark owns the building; the
+    // others (a client's mail, the house's doors, the floor's positions) gather round it
+    // rather than each raising a hut of their own. Zones with no landmark keep their props.
+    for (const [key, list] of byProject) {
+      const owns = (t) => Boolean(t.landmark || ZONE_LANDMARK[key])
+      const host = list.filter(owns).sort((a, b) => a.createdAt - b.createdAt)[0]
+      if (!host) continue
+      byProject.set(key, list.map((t) => (t.attachTo || owns(t) || t.id === host.id ? t : { ...t, attachTo: host.id })))
+    }
     const projects = [...byProject.entries()].sort((a, b) => {
       if (b[1].length !== a[1].length) return b[1].length - a[1].length
       return a[0].localeCompare(b[0])
@@ -410,8 +418,11 @@ export class Colony {
           const site = this._workSite(plot, host, k)
           const hx = host.mesh.position.x
           const hz = host.mesh.position.z
-          const a0 = Math.atan2(site.z - hz, site.x - hx) + k * 0.8
-          const r = Math.hypot(site.x - hx, site.z - hz)
+          // Round the host in rings: seven to a ring, each ring a step further out, so a
+          // busy hex's crowd spreads instead of stacking on one spot.
+          const ring = Math.floor(k / 7)
+          const a0 = Math.atan2(site.z - hz, site.x - hx) + (k % 7) * 0.9 + ring * 0.45
+          const r = Math.hypot(site.x - hx, site.z - hz) * (1 + ring * 0.55)
           site.set(hx + Math.cos(a0) * r, 0, hz + Math.sin(a0) * r)
           roster.push({ id: thread.id, thread, status, site, anchor: host.mesh.position.clone() })
           return
