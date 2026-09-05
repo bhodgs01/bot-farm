@@ -26,11 +26,24 @@ function fetchThreads() {
   const sinceHour = (hour - NEWS_HOUR) * 3600000 + minute * 60000
   return Promise.all(
     TOPICS.map(async (topic) => {
-      const doc = await readDay(date)
-      const b = doc?.topics?.[topic.id] || null
+      // Until this morning's edition lands, the desk holds yesterday's: a newsroom with
+      // nothing to read between midnight and six is a newsroom with the lights off.
+      let day = date
+      let doc = await readDay(day)
+      let b = doc?.topics?.[topic.id] || null
+      if (!(Array.isArray(b?.stories) && b.stories.length) && hour < NEWS_HOUR) {
+        const y = new Date(Date.parse(`${date}T12:00:00Z`) - 86400000).toISOString().slice(0, 10)
+        const ydoc = await readDay(y)
+        const yb = ydoc?.topics?.[topic.id] || null
+        if (Array.isArray(yb?.stories) && yb.stories.length) {
+          day = y
+          doc = ydoc
+          b = yb
+        }
+      }
       const stories = Array.isArray(b?.stories) ? b.stories : []
       const has = stories.length > 0
-      const read = has ? await isRead(topic.id, date) : false
+      const read = has ? await isRead(topic.id, day) : false
       const writing = isGenerating(topic.id, date)
       const late = !has && sinceHour > LATE_MS
       const noKey = !newsEnabled()
@@ -58,11 +71,11 @@ function fetchThreads() {
         roof: has ? `${stories.length} stories` : writing ? 'writing' : '',
         count: has && !read ? stories.length : 0,
         topic: topic.id,
-        date,
+        date: day,
         stories: stories.map(({ headline, summary, why, source, url, published }) => ({ headline, summary, why, source, url, published })),
         details: {
           Desk: topic.name,
-          Date: date,
+          Date: day === date ? day : `${day} (yesterday's edition, this morning's lands after ${NEWS_HOUR}:00)`,
           Status: has ? (read ? 'read' : 'unread') : writing ? 'writing' : 'no briefing',
           Headlines: headlines,
           'Written by': b?.model ? `${providerName()}${b.generatedAt ? ` at ${new Date(b.generatedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' })} CT` : ''}` : '',
@@ -72,7 +85,7 @@ function fetchThreads() {
         alertKey: late ? `missing:${date}` : noKey ? 'nokey' : '',
         worktree: '',
         cwd: topic.name,
-        gitBranch: has ? (read ? 'read' : 'unread') : 'no paper',
+        gitBranch: has ? `${day === date ? '' : "yesterday's, "}${read ? 'read' : 'unread'}` : 'no paper',
         model: has ? `${stories.length} stories` : '',
         effort: '',
         createdAt: BORN,
@@ -90,7 +103,7 @@ function fetchThreads() {
         source: 'news-desk',
         canOpen: true,
         canArchive: false,
-        ref: { topic: topic.id, date },
+        ref: { topic: topic.id, date: day },
       }
     })
   )
