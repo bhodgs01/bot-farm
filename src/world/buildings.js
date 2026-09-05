@@ -51,16 +51,17 @@ const BUILDING_SCALE = 1.45
  * several of them on one hex collide. These bring the furniture back to astronaut scale.
  */
 const KIND_SCALE = {
-  printer: 0.55, bench: 0.5, yard: 0.55, desk: 0.75, newsstand: 0.6,
-  // round 2 landmarks
-  hq: 0.75, clubhouse: 0.75, house: 0.75, tradingfloor: 0.7, shield: 0.75, launchpad: 0.75,
-  recruitdesk: 0.65, grill: 0.65, vault: 0.7, controltower: 0.75, garage: 0.75, outpost: 0.75,
-  signpost: 0.6, tvwall: 0.6, keyrack: 0.6, meter: 0.6, countdown: 0.6, mailbox: 0.6,
-  // round 2 rebuilds of the old kit pieces
-  greenhouse: 0.7, habitat: 0.7, solar: 0.7, silo: 0.7, reactor: 0.7, lab: 0.7, tower: 0.7,
-  workshop: 0.7, pad: 0.7, antenna: 0.7,
-  // round 1 landmarks that read as furniture rather than buildings
-  apartment: 0.65, theater: 0.8, kennel: 0.8,
+  // many per hex: furniture-sized, so a row of them reads as a room, not a monument park
+  printer: 0.55, bench: 0.5, yard: 0.55, desk: 0.75, newsstand: 0.6, planter: 0.8, crate: 0.8,
+  // one per hex: the landmark, big enough to name the place from across the map
+  hq: 0.95, clubhouse: 0.95, house: 0.95, tradingfloor: 0.9, shield: 0.95, launchpad: 0.95,
+  recruitdesk: 0.85, grill: 0.85, vault: 0.9, controltower: 0.95, garage: 0.95, outpost: 0.9,
+  apartment: 0.9, theater: 0.9, kennel: 0.9, dish: 1, pumpjack: 1, deck: 0.95, gazebo: 0.95,
+  // small fixtures that stand alone
+  signpost: 0.7, tvwall: 0.7, keyrack: 0.7, meter: 0.7, countdown: 0.7, mailbox: 0.7,
+  // rebuilt kit pieces, used mostly as fillers (fillers are halved again on top of this)
+  greenhouse: 0.8, habitat: 0.8, solar: 0.8, silo: 0.8, reactor: 0.8, lab: 0.8, tower: 0.8,
+  workshop: 0.8, pad: 0.8, antenna: 0.8,
 }
 
 /** The top face of a base module — where roof modules and masts stack. */
