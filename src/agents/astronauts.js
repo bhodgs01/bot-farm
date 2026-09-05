@@ -508,7 +508,7 @@ export class Astronauts {
       vel: new THREE.Vector3(),
       yaw: Math.random() * Math.PI * 2,
       targetYaw: 0,
-      speed: WALK_SPEED * (0.86 + Math.random() * 0.28) * (settled ? 2.4 : 1),
+      speed: WALK_SPEED * (0.86 + Math.random() * 0.28) * (settled ? 3.2 : 1),
       rush: settled, // the opening parade hustles; the pace drops back on arrival
       phase: Math.random() * Math.PI * 2,
       bob: 0,

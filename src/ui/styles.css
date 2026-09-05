@@ -1347,8 +1347,19 @@ kbd {
   .side.shifted {
     transform: translateX(0);
   }
+  /* The rail stays, as a compact strip down the left edge: home, needs-you, orbit, planet,
+     time. Orbit on a phone is a one-thumb thing, and it lives here. */
   .rail {
-    display: none;
+    left: 6px;
+    top: 60px;
+    transform: none;
+    gap: 3px;
+    padding: 4px;
+    opacity: 0.9;
+  }
+  .rail .btn {
+    width: 36px;
+    height: 36px;
   }
   .stats {
     gap: 5px;

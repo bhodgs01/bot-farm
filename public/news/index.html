@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>The Daily Orbit</title>
-<meta name="description" content="Three desks, one morning briefing. Politics, Tech & AI, Self-hosted." />
+<meta name="description" content="A private morning briefing with the wires checked through the day." />
 <meta name="theme-color" content="#0b0c0f" />
 <link rel="icon" href="/icon-192.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -92,15 +92,20 @@
   .ticker .t { display: inline-flex; align-items: center; gap: 10px; }
   .ticker .t i { width: 5px; height: 5px; border-radius: 50%; background: var(--c, var(--ink)); flex: none; }
   .ticker .t span { color: var(--mute); }
+  .ticker .t b { font-weight: 500; color: var(--c, var(--ink)); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; }
   @keyframes slide { from { transform: translateX(0); } to { transform: translateX(-50%); } }
 
   /* ── desks ────────────────────────────────────────────────────────────── */
-  .desks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; margin-top: 8px; }
+  .desks { display: grid; grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr)); gap: 0; margin-top: 8px; }
   .desk { padding: 28px 28px 32px; border-right: 1px solid var(--line); min-width: 0; --c: var(--ink); opacity: 0; transform: translateY(10px); animation: rise .6s ease-out forwards; }
-  .desk:nth-child(1) { padding-left: 0; --c: var(--politics); animation-delay: .05s; }
-  .desk:nth-child(2) { --c: var(--tech); animation-delay: .15s; }
-  .desk:nth-child(3) { border-right: 0; padding-right: 0; --c: var(--selfhosted); animation-delay: .25s; }
+  .desk.first { padding-left: 0; }
+  .desk.last { border-right: 0; padding-right: 0; }
+  .desk.wrap-row { border-top: 1px solid var(--line-2); }
   @keyframes rise { to { opacity: 1; transform: none; } }
+  .new { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--c); }
+  .new i { width: 6px; height: 6px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 22%, transparent); }
+  .new span { color: var(--mute); letter-spacing: 0; text-transform: none; font-size: 12px; }
+  .lead .n, .story .n { display: flex; align-items: center; gap: 12px; }
 
   .desk-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
   .desk-head .name { display: flex; align-items: center; gap: 10px; font-size: 12px; letter-spacing: .2em; text-transform: uppercase; color: var(--ink); }
@@ -153,8 +158,8 @@
 
   @media (max-width: 960px) {
     .desks { grid-template-columns: 1fr; }
-    .desk, .desk:nth-child(1), .desk:nth-child(3) { padding: 26px 0; border-right: 0; border-bottom: 1px solid var(--line-2); }
-    .desk:nth-child(3) { border-bottom: 0; }
+    .desk, .desk.first, .desk.last, .desk.wrap-row { padding: 26px 0; border-right: 0; border-top: 0; border-bottom: 1px solid var(--line-2); }
+    .desk:last-child { border-bottom: 0; }
     .lead h2 { font-size: 30px; }
   }
   @media (max-width: 600px) {
@@ -190,10 +195,11 @@
   <main class="desks" id="desks"></main>
 
   <footer class="foot">
-    <div id="foot-meta">Three desks, one morning briefing.</div>
+    <div id="foot-meta">A morning briefing, and the wires checked through the day.</div>
     <div class="links">
       <button class="btn" id="btn-all">Mark all read</button>
-      <button class="btn" id="btn-refresh" title="Write today’s briefings again">Rewrite today</button>
+      <button class="btn" id="btn-update" title="Every desk looks for what is new since the paper was last written">Check the wires</button>
+      <button class="btn" id="btn-refresh" title="Write today’s briefings again from scratch">Rewrite today</button>
       <a class="link btn" href="/" id="map-link">Open the map ↗</a>
     </div>
   </footer>
@@ -258,10 +264,13 @@
     $('#today').textContent = longDate(selected)
     const stamps = data.topics.map((t) => doc.topics[t.id]?.generatedAt).filter(Boolean)
     const latest = stamps.length ? Math.max(...stamps) : 0
+    const lastStory = Math.max(0, ...data.topics.flatMap((t) => (doc.topics[t.id]?.stories || []).map((s) => s.addedAt || 0)))
     $('#meta').textContent = [
       isToday ? "Today’s edition" : `Edition of ${longDate(selected)}`,
       Number.isFinite(edition) && edition > 0 ? `No. ${edition}` : '',
       latest ? `written ${clock(latest)} CT by ${data.provider || 'the desks'} with web search` : data.provider ? `written by ${data.provider} with web search` : '',
+      lastStory > latest + 60000 ? `last story ${clock(lastStory)}` : '',
+      isToday && data.nextUpdate != null ? `wires checked again at ${data.nextUpdate % 12 || 12}:00 ${data.nextUpdate < 12 ? 'AM' : 'PM'}` : '',
     ].filter(Boolean).join(' · ')
 
     // the day pills: what is on disk, newest first, today always present
@@ -273,37 +282,51 @@
     }).join('')
     for (const b of document.querySelectorAll('.pill')) b.addEventListener('click', () => { selected = b.dataset.d; history.replaceState(null, '', selected === data.today ? location.pathname : `?d=${selected}`); render() })
 
-    // the ticker: every headline of the day, twice over so the loop is seamless
-    const all = data.topics.flatMap((t) => (doc.topics[t.id]?.stories || []).map((s) => ({ ...s, topic: t.id, desk: t.name })))
+    // the ticker: every headline of the day, the newest first, twice over so the loop is seamless
+    const all = data.topics.flatMap((t) => (doc.topics[t.id]?.stories || []).map((s) => ({ ...s, topic: t.id, desk: t.name, color: t.color, fresh: isFresh(s, doc, t.id) })))
     const ticker = $('#ticker')
     if (all.length) {
-      const items = all.map((s) => `<span class="t" style="--c: var(--${esc(s.topic)})"><i></i>${esc(s.headline)} <span>${esc(s.source)}</span></span>`).join('')
+      const ordered = [...all].sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0))
+      const items = ordered.map((s) => `<span class="t" style="--c: ${esc(s.color || 'var(--ink)')}"><i></i>${s.fresh ? '<b>new</b> ' : ''}${esc(s.headline)} <span>${esc(s.source)}</span></span>`).join('')
       $('#track').innerHTML = items + items
       $('#track').style.setProperty('--dur', `${Math.max(40, all.length * 7)}s`)
       ticker.hidden = false
     } else ticker.hidden = true
 
-    $('#desks').innerHTML = data.topics.map((t, i) => deskHtml(t, doc, isToday)).join('')
+    // the desks: up to three across, then another row
+    const n = data.topics.length
+    const cols = n <= 3 ? Math.max(1, n) : n === 4 ? 2 : 3
+    const desks = $('#desks')
+    desks.style.setProperty('--cols', cols)
+    desks.innerHTML = data.topics.map((t, i) => deskHtml(t, doc, isToday, { first: i % cols === 0, last: i % cols === cols - 1 || i === n - 1, wrap: i >= cols, delay: 0.05 + i * 0.1 })).join('')
     for (const b of document.querySelectorAll('[data-read]')) b.addEventListener('click', () => markRead(b.dataset.read, true))
-    for (const b of document.querySelectorAll('[data-write]')) b.addEventListener('click', () => rewrite(b.dataset.write))
+    for (const b of document.querySelectorAll('[data-write]')) b.addEventListener('click', () => rewrite(b.dataset.write, false))
+    for (const b of document.querySelectorAll('[data-update]')) b.addEventListener('click', () => rewrite(b.dataset.update, true))
 
     const unread = data.topics.filter((t) => doc.topics[t.id]?.stories?.length && !doc.read?.[t.id])
+    const freshCount = data.topics.reduce((a, t) => a + (doc.fresh?.[t.id] || 0), 0)
     $('#btn-all').hidden = unread.length === 0
     $('#btn-refresh').hidden = !isToday
-    $('#foot-meta').textContent = all.length ? `${all.length} stories across ${data.topics.length} desks · ${unread.length ? `${unread.length} unread` : 'all read'}` : 'Three desks, one morning briefing.'
+    $('#btn-update').hidden = !isToday || !data.provider || !stamps.length
+    $('#foot-meta').textContent = all.length ? `${all.length} stories across ${data.topics.length} desks · ${freshCount ? `${freshCount} new` : 'all read'}` : 'A morning briefing, and the wires checked through the day.'
     if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView({ block: 'start' })
 
     // while the presses are running, keep looking
     clearTimeout(pollTimer)
-    const busy = isToday && data.topics.some((t) => !doc.topics[t.id]?.stories?.length)
+    const busy = isToday && (data.topics.some((t) => !doc.topics[t.id]?.stories?.length) || (data.generating || []).length > 0)
     if (busy) pollTimer = setTimeout(() => load().catch(() => {}), 45 * 1000)
   }
   let pollTimer
 
-  function deskHtml(t, doc, isToday) {
+  // a story is new until the desk is marked read after it landed; old papers stamp nothing per story
+  const isFresh = (s, doc, topicId) => (s.addedAt || doc.topics[topicId]?.generatedAt || 0) > (doc.readAt?.[topicId] || 0)
+  const newTag = (s, doc, topicId) => (isFresh(s, doc, topicId) && s.addedAt ? `<span class="new"><i></i>new<span>${esc(clock(s.addedAt))}</span></span>` : '')
+
+  function deskHtml(t, doc, isToday, pos = {}) {
     const b = doc.topics[t.id]
     const stories = b?.stories || []
     const read = Boolean(doc.read?.[t.id])
+    const fresh = doc.fresh?.[t.id] || 0
     const writing = (data.generating || []).includes(`${t.id}:${doc.date}`)
     const state = stories.length ? (read ? 'read' : 'unread') : writing ? 'writing' : ''
     let body
@@ -311,7 +334,7 @@
       const [lead, ...rest] = stories
       body = `
         <article class="lead">
-          <div class="n">01</div>
+          <div class="n">01 ${newTag(lead, doc, t.id)}</div>
           <h2><a href="${esc(lead.url)}" target="_blank" rel="noopener">${esc(lead.headline)}</a></h2>
           <p>${esc(lead.summary)}</p>
           ${lead.why ? `<p class="why"><b>Why it matters.</b> ${esc(lead.why)}</p>` : ''}
@@ -320,7 +343,7 @@
         <ol class="rest">
           ${rest.map((s, i) => `
             <li class="story">
-              <div class="n">${String(i + 2).padStart(2, '0')}</div>
+              <div class="n">${String(i + 2).padStart(2, '0')} ${newTag(s, doc, t.id)}</div>
               <h3><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.headline)}</a></h3>
               <p>${esc(s.summary)}</p>
               ${s.why ? `<p class="why"><b>Why it matters.</b> ${esc(s.why)}</p>` : ''}
@@ -329,6 +352,7 @@
         </ol>
         <div class="desk-foot">
           ${read ? `<button class="btn done" disabled>Read ✓</button>` : `<button class="btn primary" data-read="${t.id}">Mark read</button>`}
+          ${isToday && data.provider ? (writing ? `<button class="btn" disabled>Checking…</button>` : `<button class="btn" data-update="${t.id}" title="Look for what is new on this desk">Check the wires</button>`) : ''}
           <a class="btn" href="${MAP_URL}" title="The ${esc(t.desk)} correspondent takes questions on the map">Ask the desk ↗</a>
         </div>`
     } else if (writing) {
@@ -340,11 +364,14 @@
     } else {
       body = `<div class="empty"><div class="big">No paper that day</div></div>`
     }
+    const stateText = stories.length
+      ? `${fresh ? `${fresh} new · ` : ''}${stories.length} stories${fresh ? '' : ' · read'}${writing ? ' · checking' : ''}`
+      : state === 'writing' ? 'writing' : ''
     return `
-      <section class="desk" id="${t.id}">
+      <section class="desk ${pos.first ? 'first' : ''} ${pos.last ? 'last' : ''} ${pos.wrap ? 'wrap-row' : ''}" id="${esc(t.id)}" style="--c: ${esc(t.color || 'var(--ink)')}; animation-delay: ${pos.delay || 0}s">
         <div class="desk-head">
           <div class="name"><i></i>${esc(t.name)}</div>
-          <div class="state ${state}">${stories.length ? `${stories.length} stories · ${read ? 'read' : 'unread'}` : state === 'writing' ? 'writing' : ''}</div>
+          <div class="state ${state}">${stateText}</div>
         </div>
         ${body}
       </section>`
@@ -355,15 +382,18 @@
       await post('/api/act/news', { topic, date: selected, on })
       const doc = dayDoc()
       doc.read = { ...(doc.read || {}), [topic]: on }
+      doc.readAt = { ...(doc.readAt || {}), [topic]: on ? Date.now() : 0 }
+      doc.fresh = { ...(doc.fresh || {}), [topic]: on ? 0 : (doc.topics[topic]?.stories || []).length }
       render()
       toast(on ? 'Marked read' : 'Marked unread')
     } catch (err) { toast(String(err.message || err)) }
   }
 
-  async function rewrite(topic) {
+  async function rewrite(topic, update = false) {
     try {
-      await post('/api/act/news/refresh', topic ? { topic } : {})
-      toast(topic ? 'Rewriting that desk' : 'Rewriting all three desks')
+      await post('/api/act/news/refresh', { ...(topic ? { topic } : {}), ...(update ? { update: true } : {}) })
+      const which = topic ? 'that desk' : 'every desk'
+      toast(update ? `Checking the wires on ${which}` : `Rewriting ${which}`)
       data.generating = (topic ? [topic] : data.topics.map((t) => t.id)).map((id) => `${id}:${data.today}`)
       render()
       setTimeout(() => load().catch(() => {}), 20 * 1000)
@@ -374,7 +404,8 @@
     const doc = dayDoc()
     for (const t of data.topics) if (doc.topics[t.id]?.stories?.length && !doc.read?.[t.id]) await markRead(t.id, true)
   })
-  $('#btn-refresh').addEventListener('click', () => rewrite(''))
+  $('#btn-refresh').addEventListener('click', () => rewrite('', false))
+  $('#btn-update').addEventListener('click', () => rewrite('', true))
 
   load().catch((err) => {
     $('#today').textContent = 'The paper did not arrive'

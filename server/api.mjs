@@ -14,7 +14,7 @@ import {
 import { ask, chatEnabled } from './ask.mjs'
 import { setProjectStatus, closeTask, completeChores } from './act.mjs'
 import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
-import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGenerate, topicById, todayKC, newsEnabled } from './news.mjs'
+import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGenerate, update as newsUpdate, topicById, todayKC, newsEnabled } from './news.mjs'
 import { refreshNews } from './harnesses/news.mjs'
 import { napMode, fetchNap } from './harnesses/home.mjs'
 
@@ -484,22 +484,27 @@ export async function apiMiddleware(req, res, next) {
       }
     }
 
-    // Write today's briefing again, on request. One topic, or all three when none is named.
+    // Write today's briefing again, on request. One topic, or every desk when none is named.
+    // `update: true` checks the wires instead: adds what is new, keeps what is there.
     if (url.pathname === '/api/act/news/refresh' && req.method === 'POST') {
       const who = chatIdentity(req)
       if (!who) return send(res, 401, { error: 'Sign in to refresh the paper', signIn: '/api/act/auth' })
       if (!chatAllowed(`news:${who}`)) return send(res, 429, { error: 'Slow down' })
       if (!newsEnabled()) return send(res, 503, { error: 'No news key on this server' })
-      const { topic } = await readJsonBody(req, 16 * 1024)
+      const { topic, update } = await readJsonBody(req, 16 * 1024)
       const ids = topic ? [String(topic)] : (await newsSnapshot(1)).topics.map((t) => t.id)
       if (ids.some((id) => !topicById(id))) return send(res, 400, { error: 'Bad topic' })
-      console.log(`news: ${who} asked for a rewrite of ${ids.join(', ')}`)
+      const updating = update === true
+      console.log(`news: ${who} asked for ${updating ? 'a check of the wires on' : 'a rewrite of'} ${ids.join(', ')}`)
       // Fire and return: a briefing takes a minute or two, longer than the tunnel will wait.
       ;(async () => {
-        for (const id of ids) await newsGenerate(id, todayKC(), { force: true })
-        refreshNews()
+        for (const id of ids) {
+          if (updating) await newsUpdate(id, todayKC(), { slot: 'manual' })
+          else await newsGenerate(id, todayKC(), { force: true })
+          refreshNews()
+        }
       })().catch((err) => console.warn('news refresh:', err.message))
-      return send(res, 202, { ok: true, writing: ids })
+      return send(res, 202, { ok: true, writing: ids, update: updating })
     }
 
     if (url.pathname === '/api/harnesses' && req.method === 'GET') {

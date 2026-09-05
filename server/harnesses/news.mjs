@@ -1,29 +1,32 @@
 /**
  * Harness adapter: the Newsroom — one correspondent per topic.
  *
- * Each desk writes one briefing a day (server/news.mjs). A fresh briefing Blake has not read
- * yet is a correspondent with a hand up; once he marks it read (on the card, or on the news
- * page) the correspondent goes back to idle. A desk with no paper after the morning hour has
- * come and gone is flagged. The card carries the headlines, the chat answers out of the
- * stories, and "Open" is the news page.
+ * Each desk writes one paper a day and adds to it through the day (server/news.mjs). A story
+ * Blake has not seen is a correspondent with a hand up; once he marks the desk read (on the
+ * card, or on the news page) the correspondent goes back to idle until the next story lands.
+ * A desk with no paper after the morning hour has come and gone is flagged. The card carries
+ * the stories newest first, the chat answers out of them, and "Open" is the news page.
  *
- * Read-only against the store; the read flag is the one write, behind /api/act/news.
+ * Read-only against the store; the read stamp is the one write, behind /api/act/news.
  */
-import { TOPICS, NEWS_HOUR, kcNow, readDay, isRead, isGenerating, newsEnabled, providerName } from '../news.mjs'
+import { TOPICS, NEWS_HOUR, UPDATE_HOURS, kcNow, readDay, readAt, unreadOf, storyAt, isGenerating, newsEnabled, providerName } from '../news.mjs'
 
 const ZONE = 'Newsroom'
 const NEWS_URL = (process.env.NEWS_URL || '/news/').replace(/\/?$/, '/')
 const TTL_MS = 20 * 1000
 /** How long after the morning hour an empty desk is a problem, not just early. */
 const LATE_MS = 90 * 60 * 1000
-/** Fixed creation stamp so the three keep their stand slots from day to day. */
+/** Fixed creation stamp so the correspondents keep their stand slots from day to day. */
 const BORN = Date.parse('2026-09-04T12:00:00Z')
 
-const ICON = { politics: '🏛️', tech: '🤖', selfhosted: '🧰' }
+const ICON = { politics: '🏛️', tech: '🤖', selfhosted: '🧰', maker: '🔧', kc: '🌽', markets: '📈', security: '🛡️' }
+
+const clock = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' })
 
 function fetchThreads() {
   const { date, hour, minute } = kcNow()
   const sinceHour = (hour - NEWS_HOUR) * 3600000 + minute * 60000
+  const nextCheck = UPDATE_HOURS.find((h) => h > hour)
   return Promise.all(
     TOPICS.map(async (topic) => {
       // Until this morning's edition lands, the desk holds yesterday's: a newsroom with
@@ -43,14 +46,19 @@ function fetchThreads() {
       }
       const stories = Array.isArray(b?.stories) ? b.stories : []
       const has = stories.length > 0
-      const read = has ? await isRead(topic.id, day) : false
+      const at = has ? await readAt(topic.id, day) : 0
+      const fresh = has ? unreadOf(b, at) : []
+      const read = has && fresh.length === 0
       const writing = isGenerating(topic.id, date)
       const late = !has && sinceHour > LATE_MS
       const noKey = !newsEnabled()
-      const lead = stories[0]
+      const lead = fresh[0] || stories[0]
       const headlines = stories.map((s, i) => `${i + 1}. ${s.headline} (${s.source})`).join('\n')
+      const lastAt = Number(b?.updatedAt) || Number(b?.generatedAt) || 0
       const preview = has
-        ? `${stories.length} stories · ${lead.headline}`
+        ? fresh.length
+          ? `${fresh.length} new · ${lead.headline}`
+          : `${stories.length} stories, all read · ${lead.headline}`
         : writing
           ? 'Writing this morning’s briefing…'
           : noKey
@@ -68,31 +76,33 @@ function fetchThreads() {
         project: ZONE,
         projectPath: 'news://desk',
         landmark: 'newsstand',
-        roof: has ? `${stories.length} stories` : writing ? 'writing' : '',
-        count: has && !read ? stories.length : 0,
+        roof: has ? (fresh.length ? `${fresh.length} new` : `${stories.length} stories`) : writing ? 'writing' : '',
+        count: fresh.length,
         topic: topic.id,
         date: day,
-        stories: stories.map(({ headline, summary, why, source, url, published }) => ({ headline, summary, why, source, url, published })),
+        stories: stories.map(({ headline, summary, why, source, url, published, addedAt }) => ({ headline, summary, why, source, url, published, fresh: storyAt({ addedAt }, b) > at })),
         details: {
           Desk: topic.name,
           Date: day === date ? day : `${day} (yesterday's edition, this morning's lands after ${NEWS_HOUR}:00)`,
-          Status: has ? (read ? 'read' : 'unread') : writing ? 'writing' : 'no briefing',
+          Status: has ? (fresh.length ? `${fresh.length} new of ${stories.length}` : `${stories.length} stories, read`) : writing ? 'writing' : 'no briefing',
           Headlines: headlines,
-          'Written by': b?.model ? `${providerName()}${b.generatedAt ? ` at ${new Date(b.generatedAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' })} CT` : ''}` : '',
+          'Written by': b?.model ? `${providerName()}${b.generatedAt ? ` at ${clock(b.generatedAt)} CT` : ''}` : '',
+          'Last story': lastAt && has ? `${clock(lastAt)} CT` : '',
+          'Next check': day === date && has && nextCheck != null ? `${nextCheck}:00 CT` : '',
           Error: !has && b?.error ? b.error : '',
         },
-        actions: has && !read ? ['read'] : [],
+        actions: fresh.length ? ['read'] : [],
         alertKey: late ? `missing:${date}` : noKey ? 'nokey' : '',
         worktree: '',
         cwd: topic.name,
-        gitBranch: has ? `${day === date ? '' : "yesterday's, "}${read ? 'read' : 'unread'}` : 'no paper',
+        gitBranch: has ? `${day === date ? '' : "yesterday's, "}${fresh.length ? `${fresh.length} new` : 'read'}` : 'no paper',
         model: has ? `${stories.length} stories` : '',
         effort: '',
         createdAt: BORN,
-        lastActivityAt: b?.generatedAt || b?.failedAt || Date.now(),
+        lastActivityAt: lastAt || b?.failedAt || Date.now(),
         lastFocusedAt: 0,
         running: writing,
-        unread: has && !read,
+        unread: fresh.length > 0,
         hasError: (late && !writing) || noKey,
         starred: false,
         routine: '',

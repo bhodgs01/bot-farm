@@ -527,7 +527,7 @@ export class Hud {
     const when = s.published ? ` · ${escapeHtml(String(s.published))}` : ''
     const src = s.source ? `${escapeHtml(String(s.source))}${when}` : ''
     box.innerHTML = `
-      <div class="n">Story ${i + 1} of ${n}${unread ? '' : ' · read'}</div>
+      <div class="n">Story ${i + 1} of ${n}${s.fresh ? ' · new' : unread ? '' : ' · read'}</div>
       <div class="body">
         <div class="hl">${escapeHtml(String(s.headline || ''))}</div>
         ${s.summary ? `<div class="sum">${escapeHtml(String(s.summary))}</div>` : ''}
