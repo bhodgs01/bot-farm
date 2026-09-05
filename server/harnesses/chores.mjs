@@ -6,9 +6,8 @@
  * wears the count on its roof; when the last one is done the keeper celebrates. The kids'
  * lists stay in Chore Quest.
  *
- * Chore Quest repeats generated chores (the battery reminders arrive once per device
- * reading), so chores with the same first line fold into one astronaut that remembers
- * every id it stands for. Marking him done marks all of them.
+ * One astronaut per chore on the list, exactly as Chore Quest has it. Duplicates are
+ * Chore Quest's to fix, not the map's to hide.
  *
  * Reads /api/state; the one write (done) goes through server/act.mjs.
  */
@@ -38,10 +37,10 @@ async function fetchThreads() {
   if (!mine.length) return out
 
   const left = mine.filter((c) => !done[`blake-${c.id}`])
-  // Fold repeats: same headline, one astronaut, every id remembered.
+  // One astronaut per chore, exactly as Chore Quest lists them (Blake de-duplicates there).
   const groups = new Map()
   for (const c of left) {
-    const key = headline(c).toLowerCase()
+    const key = String(c.id)
     if (!groups.has(key)) groups.set(key, { first: c, ids: [], notes: [] })
     const g = groups.get(key)
     g.ids.push(c.id)
