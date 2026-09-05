@@ -134,7 +134,11 @@ async function buildSnapshot() {
     kubeGet('/api/v1/nodes').catch(() => ({ items: [] })),
     kubeGet('/apis/metrics.k8s.io/v1beta1/nodes').catch(() => ({ items: [] })),
   ])
-  const nodePods = await podsPerNode((nodes.items || []).map((n) => n.metadata.name))
+  // Pods in the roster's namespaces are somebody's already: their failures show on that
+  // agent's hex, so the node does not raise the same flag a second time.
+  const podList = pods instanceof Map ? [...pods.values()].flat() : Array.isArray(pods) ? pods : pods?.items || []
+  const ownedPods = new Set(podList.map((p) => p?.metadata?.name).filter(Boolean))
+  const nodePods = await podsPerNode((nodes.items || []).map((n) => n.metadata.name), ownedPods)
   // Namespace creation times never change; refresh them rarely.
   if (Date.now() - nsCreatedCache.at > 10 * 60 * 1000) {
     try {
@@ -202,7 +206,7 @@ function parseMem(q) {
  */
 const EMPTY_STATS = () => ({ total: 0, running: 0, starting: 0, bad: 0, badNames: [] })
 let nodePodsCache = { at: 0, map: new Map() }
-async function podsPerNode(names) {
+async function podsPerNode(names, owned = new Set()) {
   if (Date.now() - nodePodsCache.at < 60 * 1000) return nodePodsCache.map
   const map = new Map()
   const token = await serviceAccountToken()
@@ -226,6 +230,7 @@ async function podsPerNode(names) {
             stats.total++
             if (st === 'Running') stats.running++
             else if (/ContainerCreating|Pending|PodInitializing|^Init:|Terminating/.test(st)) stats.starting++
+            else if (owned.has(String(podName))) continue // flagged on its owner's hex
             else if (/CrashLoopBackOff|Error|ImagePullBackOff|ErrImagePull|OOMKilled|CreateContainerConfigError|Evicted|Unknown/.test(st)) {
               stats.bad++
               if (stats.badNames.length < 6) stats.badNames.push(`${podName} (${st})`)

@@ -1938,7 +1938,14 @@ const KINDS = {
   },
 }
 
-const KIND_IDS = Object.keys(KINDS).filter((k) => !['dish', 'printer', 'rack', 'planter', 'theater', 'pumpjack', 'bench', 'crate', 'deck', 'gazebo', 'kennel', 'desk', 'yard', 'apartment', 'newsstand', 'hq', 'clubhouse', 'house', 'tradingfloor', 'shield', 'launchpad', 'recruitdesk', 'grill', 'vault', 'controltower', 'garage', 'signpost', 'tvwall', 'keyrack', 'meter', 'countdown', 'mailbox', 'outpost'].includes(k))
+/**
+ * What a worker gets when its source names no landmark: a small prop from this list,
+ * at FILLER_SCALE, so a hex reads as one place with a few fixtures rather than a row of
+ * monuments. Landmarks are chosen by name and are never dealt at random.
+ */
+const FILLER_KINDS = ['pad', 'antenna', 'solar', 'silo', 'habitat', 'greenhouse', 'reactor']
+const FILLER_SCALE = 0.5
+const KIND_IDS = FILLER_KINDS.filter((k) => KINDS[k])
 
 // ── the reveal shader ─────────────────────────────────────────────────────────────────
 
@@ -2125,14 +2132,15 @@ function depthMaterial(uniforms) {
  */
 export function createBuilding({ seed = 1, accent = 0xc96442, kind = null } = {}) {
   const rand = mulberry(seed)
-  const chosen = kind && KINDS[kind] ? kind : KIND_IDS[Math.floor(rand() * KIND_IDS.length)]
+  const requested = Boolean(kind && KINDS[kind])
+  const chosen = requested ? kind : KIND_IDS[Math.floor(rand() * KIND_IDS.length)]
 
   const c = new Composer()
   const label = KINDS[chosen](c, rand, accent)
   const geo = c.finish()
   // Trimmed to fit a slot: the catalogue is authored on the pack's module grid and scaled
   // once here, so tuning the plot lattice never means re-tuning ten recipes.
-  const k = BUILDING_SCALE * (KIND_SCALE[chosen] || 1)
+  const k = BUILDING_SCALE * (KIND_SCALE[chosen] || 1) * (requested ? 1 : FILLER_SCALE)
   geo.scale(k, k, k)
   // `scale()` transforms position and normal and nothing else, so a custom attribute that
   // holds a *position* has to be taken along by hand. Miss this and a rotor turns about a

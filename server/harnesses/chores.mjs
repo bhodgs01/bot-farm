@@ -109,6 +109,7 @@ async function fetchThreads() {
         Photo: link(c),
       },
       actions: ['chore'],
+      attachTo: 'chore:blake:list',
       exit: 'beam',
       cwd: 'blake',
       gitBranch: 'to do',
