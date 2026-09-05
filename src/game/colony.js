@@ -899,15 +899,15 @@ export class Colony {
   }
 
   /**
-   * Names fade in for the plots that have something going on, and for whichever one you are
-   * pointing at. Everywhere else the colony stays unlabelled.
+   * Every hex wears its name. Blake tried the fade-in-when-busy version and preferred the
+   * map he can read; the label toggle still hides them all at once.
    */
   _updateLabels(dt) {
     const show = this.uiVisible && this.settings.get('showLabels')
     for (const plot of this.plotOrder) {
       const label = plot.label
       if (!label) continue
-      const wanted = show && (this.activePlots.has(plot.id) || this.hoveredPlot === plot) ? 1 : 0
+      const wanted = show ? 1 : 0
       const next = THREE.MathUtils.damp(label.material.opacity, wanted, 9, dt)
       label.material.opacity = next
       label.visible = next > 0.01
