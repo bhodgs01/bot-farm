@@ -531,8 +531,19 @@ export const isGenerating = (topicId, date = todayKC()) => inflight.has(`${topic
  * the hour has come, then the one trickle slot that is due. Only the latest due slot counts: a
  * pod that comes back at four does not owe the morning three.
  */
+let ticking = false
 export async function tick() {
-  if (!newsEnabled()) return
+  if (!newsEnabled() || ticking) return
+  ticking = true
+  try {
+    await sweep()
+  } finally {
+    ticking = false
+  }
+}
+
+/** One pass over the desks. Runs alone: a tick that starts while the last one is still writing would put two desks on the wire at once. */
+async function sweep() {
   const { date, hour } = kcNow()
   if (hour < NEWS_HOUR) return
   const due = UPDATE_HOURS.filter((h) => h <= hour).pop()
