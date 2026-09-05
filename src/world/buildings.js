@@ -59,6 +59,8 @@ const KIND_SCALE = {
   // round 2 rebuilds of the old kit pieces
   greenhouse: 0.7, habitat: 0.7, solar: 0.7, silo: 0.7, reactor: 0.7, lab: 0.7, tower: 0.7,
   workshop: 0.7, pad: 0.7, antenna: 0.7,
+  // round 1 landmarks that read as furniture rather than buildings
+  apartment: 0.65, theater: 0.8, kennel: 0.8,
 }
 
 /** The top face of a base module — where roof modules and masts stack. */
