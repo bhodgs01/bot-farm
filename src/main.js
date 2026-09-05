@@ -920,27 +920,54 @@ function applyNap(on) {
     settings.set('timeOfDay', 0.02)
     hud.toast('Nap time: lights down')
   } else {
-    // Daylight, whichever way the sky is driven: the real hour when the clock is on, the
-    // hand-set hour otherwise. A hand-set hour that was itself night falls back to the clock,
-    // because waking into darkness is the one thing this must never do.
-    if (settings.get('clockTime')) {
-      applyClock(true)
-    } else if (timeBeforeNap != null && timeBeforeNap > 0.24 && timeBeforeNap < 0.8) {
-      settings.set('timeOfDay', timeBeforeNap)
-    } else {
-      settings.set('clockTime', true)
-      applyClock(true)
-    }
+    wake()
     hud.toast('Awake: lights up')
   }
   clockSetting = false
 }
+
+/** Kansas City's hour as a 0..1 fraction of the day. */
+function kcHour() {
+  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: 'numeric', hour12: false }).formatToParts(new Date())
+  const h = Number(parts.find((p) => p.type === 'hour')?.value) % 24
+  const m = Number(parts.find((p) => p.type === 'minute')?.value) || 0
+  return (h + m / 60) / 24
+}
+
+/**
+ * Waking means daylight, full stop. The real clock when it is daytime out; the hand-set
+ * hour if it was a daytime one; otherwise a fixed mid-morning, because waking into darkness
+ * is the one thing this must never do, even at three in the morning.
+ */
+function wake() {
+  const real = kcHour()
+  const daytime = real > 0.27 && real < 0.8
+  if (daytime) {
+    settings.set('clockTime', true)
+    applyClock(true)
+  } else if (timeBeforeNap != null && timeBeforeNap > 0.27 && timeBeforeNap < 0.8) {
+    settings.set('clockTime', false)
+    settings.set('timeOfDay', timeBeforeNap)
+  } else {
+    settings.set('clockTime', false)
+    settings.set('timeOfDay', 0.42)
+  }
+}
 let napPolling = false
+let napChecked = false
 async function pollNap() {
   if (napPolling || document.hidden) return
   napPolling = true
   try {
     const res = await fetchNap()
+    // A page that loads after a nap ended still carries the nap's midnight in its saved
+    // settings. Nothing else sets a hand-set midnight, so treat it as a nap to wake from.
+    if (!napChecked && !res.nap && !settings.get('clockTime') && settings.get('timeOfDay') <= 0.05) {
+      clockSetting = true
+      wake()
+      clockSetting = false
+    }
+    napChecked = true
     applyNap(Boolean(res.nap))
   } catch {
     /* the slow path in poll() still carries the flag */
