@@ -128,6 +128,27 @@ function zoneFor(meta, isPrint) {
 // Scan — stale-while-revalidate, like the cluster adapter.
 // ------------------------------------------------------------------------------------------
 
+// ── aging: a message that has sat three days with no reply from Blake raises a hand ──────
+const AGING_MS = Number(process.env.MAIL_AGING_DAYS || 3) * 86400000
+const replyCache = new Map() // threadId → { at, replied }
+async function repliedByMe(threadId, since) {
+  const hit = replyCache.get(threadId)
+  if (hit && Date.now() - hit.at < 60 * 60 * 1000) return hit.replied
+  let replied = false
+  try {
+    const t = await gmail(`threads/${threadId}?format=metadata&metadataHeaders=From`)
+    const me = String(MAILBOX || '').toLowerCase()
+    replied = (t.messages || []).some((m) => {
+      const from = ((m.payload?.headers || []).find((h) => h.name.toLowerCase() === 'from')?.value || '').toLowerCase()
+      return from.includes(me) && (Number(m.internalDate) || 0) > since
+    })
+  } catch {
+    replied = hit ? hit.replied : true // unknown: do not raise a hand on a guess
+  }
+  replyCache.set(threadId, { at: Date.now(), replied })
+  return replied
+}
+
 async function fetchThreads() {
   const [unread, printy] = await Promise.all([
     gmail(`messages?q=${encodeURIComponent(QUERY)}&maxResults=${MAX_MESSAGES}`),
@@ -144,24 +165,31 @@ async function fetchThreads() {
     const isPrint = printIds.has(meta.id) || PRINT_FILES.test(meta.subject) || (PRINT_WORDS.test(meta.subject) && PRINT_WORDS.test(meta.snippet))
     const zone = zoneFor(meta, isPrint)
     const unread = meta.labels.includes('UNREAD')
+    // Unread is loud already; ignored is the quiet failure. Three days in the inbox with no
+    // reply from Blake is a hand up, whether or not it was opened.
+    const ageMs = Date.now() - meta.at
+    const mine = address === String(MAILBOX || '').toLowerCase()
+    const stale = !isPrint && !mine && ageMs >= AGING_MS && !(await repliedByMe(meta.threadId, meta.at))
+    const ageDays = Math.floor(ageMs / 86400000)
     out.push({
       id: `mail:${meta.id}`,
-      kind: isPrint ? 'print' : unread ? 'mail' : 'inbox',
+      kind: isPrint ? 'print' : unread || stale ? 'mail' : 'inbox',
       title: meta.subject.slice(0, 120),
       preview: `${name} · ${meta.snippet}`.slice(0, 240),
       project: zone,
       projectPath: `mail://${zone.toLowerCase().replace(/\s+/g, '-')}`,
       worktree: '',
       cwd: address,
-      gitBranch: isPrint ? 'print request' : unread ? 'unread' : 'read',
+      gitBranch: isPrint ? 'print request' : stale ? `no reply for ${ageDays}d` : unread ? 'unread' : 'read',
       model: name,
       effort: '',
       createdAt: meta.at,
       lastActivityAt: meta.at,
       lastFocusedAt: 0,
       running: false,
-      unread,
+      unread: unread || stale,
       hasError: false,
+      details: stale ? { From: meta.from, Waiting: `${ageDays} days without a reply from you`, Subject: meta.subject } : undefined,
       starred: meta.labels.includes('STARRED'),
       routine: '',
       prState: '',
