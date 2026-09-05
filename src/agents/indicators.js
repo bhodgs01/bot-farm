@@ -95,6 +95,7 @@ const FADE_BY_BADGE = {
   [BADGE.plant]: 0,
   [BADGE.visitor]: 0,
   [BADGE.watched]: 0,
+  [BADGE.info]: 0.15,
   [BADGE.paused]: 0.6,
   [BADGE.sleeping]: 1,
 }
