@@ -299,6 +299,7 @@ async function fetchThreads() {
   // You. Garmin through Home Assistant: body battery over your head, the night on the card.
   // A rough night or a flat battery by midday is a hand up: it is your report, and you are
   // the one thing on it that everything else depends on.
+  const now = Date.now()
   const num = (k) => (Number.isFinite(Number(garmin[k])) ? Number(garmin[k]) : null)
   const sleep = num('sleep_score')
   const battery = num('body_battery_most_recent')

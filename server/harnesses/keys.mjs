@@ -147,11 +147,14 @@ function kcMidnightUtc() {
 async function spendToday() {
   if (!ADMIN_KEY) throw new Error('no admin key')
   const start = kcMidnightUtc()
+  // Hour buckets from Kansas City midnight: a day bucket has to start at UTC midnight, which
+  // is 7 pm here, and would count last evening as today.
+  start.setUTCMinutes(0, 0, 0)
   const buckets = await adminGet('/usage_report/messages', {
     starting_at: start.toISOString().replace(/\.\d{3}Z$/, 'Z'),
-    bucket_width: '1d',
+    bucket_width: '1h',
     'group_by[]': ['api_key_id', 'model'],
-    limit: 7,
+    limit: 48,
   })
   const names = await namesForKeys()
   const byKey = new Map()
