@@ -16,9 +16,10 @@ import trades from './trades.mjs'
 import projects from './projects.mjs'
 import calendar from './calendar.mjs'
 import news from './news.mjs'
+import weather from './weather.mjs'
 
-const ALL = { 'jarvis-cluster': jarvisCluster, mailroom, plex, 'print-farm': printFarm, home, chores, tasks, trades, projects, calendar, news, 'claude-code': claudeCode }
-const wanted = (process.env.COLONY_HARNESSES || 'jarvis-cluster,mailroom,plex,print-farm,home,chores,tasks,trades,projects,calendar,news').split(',').map((s) => s.trim()).filter(Boolean)
+const ALL = { 'jarvis-cluster': jarvisCluster, mailroom, plex, 'print-farm': printFarm, home, chores, tasks, trades, projects, calendar, news, weather, 'claude-code': claudeCode }
+const wanted = (process.env.COLONY_HARNESSES || 'jarvis-cluster,mailroom,plex,print-farm,home,chores,tasks,trades,projects,calendar,news,weather').split(',').map((s) => s.trim()).filter(Boolean)
 
 export const HARNESSES = wanted.map((id) => ALL[id]).filter(Boolean)
 

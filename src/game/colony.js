@@ -894,9 +894,10 @@ export class Colony {
     for (const agent of this.astronauts.agents) {
       const t = agent.thread
       const n = Number(t?.count)
-      if (!t || !Number.isFinite(n) || n <= 0 || agent.state === 'gone' || agent.scale < 0.4) continue
+      const text = t?.plate ? String(t.plate) : Number.isFinite(n) && n > 0 ? String(n) : ''
+      if (!t || !text || agent.state === 'gone' || agent.scale < 0.4) continue
       const plot = this.plots.get(t.project)
-      const plate = want(`count:${agent.id}`, String(n), plot?.accent ?? 0xffffff, 'count')
+      const plate = want(`count:${agent.id}`, text, plot?.accent ?? 0xffffff, 'count')
       plate.mesh.position.set(agent.pos.x + 0.42, agent.pos.y + 2.12, agent.pos.z)
     }
     for (const [id, entry] of this.buildings) {
