@@ -64,6 +64,9 @@ const ZONE_ACCENT = {
   'Embassy Landscape': 0x4f9a63,
   Frances: 0x5c8fc9,
   Chores: 0xc9a24f,
+  Countdown: 0xc95c5c,
+  Garage: 0x8a6a4f,
+  'Hetzner DR': 0x6a7fa6,
 }
 
 /**

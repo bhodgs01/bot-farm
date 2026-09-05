@@ -90,6 +90,7 @@ async function messageMeta(id) {
     id: m.id,
     threadId: m.threadId,
     from: header('from'),
+    to: header('to'),
     subject: header('subject') || '(no subject)',
     snippet: decodeEntities(m.snippet || ''),
     at: Number(m.internalDate) || Date.parse(header('date')) || Date.now(),

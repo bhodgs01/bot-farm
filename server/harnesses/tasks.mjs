@@ -26,6 +26,7 @@ const ZONE_FOR = [
   [/corrosion/i, 'CorrosionDC'],
   [/ngv|recruit/i, 'NGV Talent'],
   [/embassy|marc coaching/i, 'Embassy Landscape'],
+  [/fj40|land ?cruiser|garage/i, 'Garage'],
   [/nedbuilds|ned builds/i, 'NED Builds'],
   [/cybergrade/i, 'CyberGrade'],
   [/ai club/i, 'KC AI Club'],

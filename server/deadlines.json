@@ -1,0 +1,7 @@
+[
+  { "id": "brainjuice", "title": "Hive demo at BrainJuice", "date": "2026-09-07", "note": "hive.kcproto.com forecasting demo. The sim is the spec; never collect broker keys.", "url": "https://hive.kcproto.com" },
+  { "id": "dmarc", "title": "DMARC flip to quarantine", "date": "2026-09-08", "note": "kcproto.com p=none -> p=quarantine. The unexplained AWS sender 35.174.145.124 must be resolved first." },
+  { "id": "accel-ks", "title": "ACCEL-KS closes (Frances)", "date": "2026-09-18", "note": "$25k application. Blake is not the lead; make sure the lead has what they need from Caregiver AI." },
+  { "id": "cybergrade-funding", "title": "CyberGrade funding meeting, Collinsville", "date": "2026-09-23", "note": "NDA before depth. Demo on RMF, not CSF." },
+  { "id": "ku-talk", "title": "KU talk: Falling into AI", "date": "2026-09-24", "time": "12:00", "note": "Thursday noon. Over 400,000 lines. No live demo." }
+]

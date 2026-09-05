@@ -1,0 +1,12 @@
+{
+  "vehicle": "1984 Toyota Land Cruiser FJ40 · 4.2L 2F inline-six · 4-speed · built in Nagoya",
+  "status": "Head out for machining (valve job). Engine apart in the garage.",
+  "items": [
+    { "id": "head", "title": "Head at the machine shop", "note": "4 of 6 exhaust valves burned before 500 km on the advertised rebuild. Casting salvageable; valve job rather than a replacement head. Ask the shop: valve lash as found, new vs old valves and seats, cracks or warp.", "flag": true },
+    { "id": "carb", "title": "Carburetor runs lean", "note": "Root cause of the burnt valves. Re-jet or replace before the head goes back on; check the intake manifold gasket for a vacuum leak (known 2F failure).", "flag": true },
+    { "id": "thermostat", "title": "No thermostat installed", "note": "Another corner cut in the rebuild. Fit one on reassembly.", "flag": false },
+    { "id": "gearbox", "title": "GL-4 only", "note": "Never GL-5 in the 4-speed: it eats the brass synchros.", "flag": false },
+    { "id": "dispute", "title": "GR Auto Gallery dispute", "note": "Evidence complete in Documents/fj40-dispute. Next: written demand, then MI Dept of State complaint against broker license D001231. eBay recourse is dead.", "flag": true },
+    { "id": "electrical", "title": "Electrical gremlin hunt", "note": "Ballast resistor was a red herring (original ~1.6 ohm Toyota unit is correct). Keep the fuel pump swap in mind as the last known change.", "flag": false }
+  ]
+}

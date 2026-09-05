@@ -136,6 +136,7 @@ async function fetchThreads() {
   const out = []
   const seenPlants = new Set()
   const doors = [] // { name, open, changed }
+  const garmin = {} // entity suffix → state
   const leaks = [] // { name, wet, offline, changed }
   const laundry = [] // { name, since }
 
@@ -148,6 +149,10 @@ async function fetchThreads() {
 
     if (id === NAP_ENTITY) {
       napState = s.state === 'on'
+      continue
+    }
+    if (id.startsWith('sensor.garmin_connect_')) {
+      garmin[id.slice('sensor.garmin_connect_'.length)] = s.state
       continue
     }
 
@@ -289,6 +294,66 @@ async function fetchThreads() {
     g.createdAt = 0
     g.lastActivityAt = Date.now()
     out.push(g)
+  }
+
+  // You. Garmin through Home Assistant: body battery over your head, the night on the card.
+  // A rough night or a flat battery by midday is a hand up: it is your report, and you are
+  // the one thing on it that everything else depends on.
+  const num = (k) => (Number.isFinite(Number(garmin[k])) ? Number(garmin[k]) : null)
+  const sleep = num('sleep_score')
+  const battery = num('body_battery_most_recent')
+  if (sleep != null || battery != null) {
+    const hourKC = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Chicago' }).format(new Date()))
+    const rough = (sleep != null && sleep < 50) || (battery != null && battery < 25 && hourKC >= 12)
+    const hrv = num('hrv_last_night_average')
+    const rhr = num('resting_heart_rate')
+    const steps = num('total_steps')
+    const mins = (k) => (num(k) != null ? `${Math.floor(num(k) / 60)}h ${num(k) % 60}m` : '')
+    out.push({
+      id: 'home:you',
+      kind: 'you',
+      title: '🫀 You',
+      plate: battery != null ? `${battery}⚡` : sleep != null ? `${sleep}` : '',
+      preview: [
+        sleep != null ? `Sleep score ${sleep}${mins('sleep_duration') ? ` · ${mins('sleep_duration')}` : ''}` : '',
+        battery != null ? `Body battery ${battery}${num('body_battery_lowest') != null ? ` (low ${num('body_battery_lowest')})` : ''}` : '',
+        hrv != null ? `HRV ${hrv}` : '',
+        steps != null ? `${steps.toLocaleString('en-US')} steps` : '',
+      ].filter(Boolean).join(' · '),
+      details: {
+        'Sleep score': sleep != null ? String(sleep) : '',
+        Slept: mins('sleep_duration') || mins('total_sleep_duration'),
+        'Deep / light / REM': [mins('deep_sleep'), mins('light_sleep'), mins('rem_sleep')].filter(Boolean).join(' / '),
+        'Body battery': battery != null ? `${battery} now · high ${num('body_battery_highest') ?? '—'} · low ${num('body_battery_lowest') ?? '—'}` : '',
+        HRV: hrv != null ? `${hrv} ms (last night average)` : '',
+        'Resting HR': rhr != null ? `${rhr} bpm` : '',
+        Steps: steps != null ? steps.toLocaleString('en-US') : '',
+        Read: rough ? 'Rough night or running on empty. Plan the day around it.' : 'Good to go.',
+      },
+      project: 'Home',
+      projectPath: 'home://you',
+      worktree: '',
+      cwd: 'blake',
+      gitBranch: rough ? 'running low' : 'good to go',
+      model: 'Garmin',
+      effort: '',
+      createdAt: Date.parse('2026-09-05T12:00:00Z'),
+      lastActivityAt: now,
+      lastFocusedAt: 0,
+      running: false,
+      unread: rough,
+      hasError: false,
+      starred: false,
+      routine: '',
+      prState: '',
+      archived: false,
+      hasTranscript: false,
+      sizeBytes: 2500,
+      source: 'garmin',
+      canOpen: true,
+      canArchive: false,
+      ref: { url: `${OPEN_URL}` },
+    })
   }
   return out
 }
