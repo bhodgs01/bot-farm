@@ -67,7 +67,17 @@ async function fluxThread(now) {
   }
   const items = list?.items || []
   const ready = (k) => (k.status?.conditions || []).find((c) => c.type === 'Ready')
-  const bad = items.filter((k) => ready(k)?.status !== 'True' && !k.spec?.suspend)
+  // A reconcile in progress is not a failure until it has been in progress a while: every
+  // release nudges the source and the whole tree re-reconciles for a few minutes.
+  const GRACE_MS = Number(process.env.FLUX_GRACE_MIN || 15) * 60000
+  const stuck = (k) => {
+    const c = ready(k)
+    if (!c || c.status === 'True') return false
+    const since = Date.parse(c.lastTransitionTime || '') || 0
+    const inProgress = /progress/i.test(`${c.reason || ''} ${c.message || ''}`)
+    return !inProgress || Date.now() - since > GRACE_MS
+  }
+  const bad = items.filter((k) => stuck(k) && !k.spec?.suspend)
   const suspended = items.filter((k) => k.spec?.suspend)
   return {
     ...base,
