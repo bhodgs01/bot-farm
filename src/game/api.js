@@ -14,6 +14,7 @@ const post = (url, payload) =>
 
 export const fetchThreads = () => req('/api/threads')
 export const fetchState = () => req('/api/state')
+export const fetchNap = () => req('/api/nap')
 
 /** The hash in this page's own bundle name; 'dev' under the Vite dev server. */
 export const BUILD = (() => {

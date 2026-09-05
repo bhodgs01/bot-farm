@@ -107,6 +107,24 @@ function plantName(attrs, entityId) {
 const NAP_ENTITY = process.env.HA_NAP_ENTITY || 'input_boolean.nap_time_toggle'
 let napState = false
 export const napMode = () => napState
+let napCache = { at: 0, inflight: null }
+/** The toggle alone, fresh within three seconds: the nap should land on the map in one poll. */
+export async function fetchNap() {
+  if (Date.now() - napCache.at < 3000) return napState
+  if (!napCache.inflight) {
+    napCache.inflight = fetch(`${HA_URL}/api/states/${NAP_ENTITY}`, { headers: { Authorization: `Bearer ${TOKEN}`, Accept: 'application/json' }, signal: AbortSignal.timeout(4000) })
+      .then(async (r) => {
+        if (r.ok) napState = (await r.json()).state === 'on'
+        napCache = { at: Date.now(), inflight: null }
+        return napState
+      })
+      .catch(() => {
+        napCache = { at: Date.now(), inflight: null }
+        return napState
+      })
+  }
+  return napCache.inflight
+}
 
 async function fetchThreads() {
   const res = await fetch(`${HA_URL}/api/states`, {

@@ -12,6 +12,7 @@ import { TIMES } from './world/sky.js'
 import {
   fetchThreads,
   fetchState,
+  fetchNap,
   saveState,
   BUILD,
   reloadForBuild,
@@ -909,28 +910,54 @@ function queueItems() {
  * sky comes back to the real hour (or to whatever the clock setting was before the nap).
  */
 let napping = false
-let clockBeforeNap = null
+let timeBeforeNap = null
 function applyNap(on) {
   if (on === napping) return
   napping = on
+  clockSetting = true
   if (on) {
-    clockBeforeNap = settings.get('clockTime')
-    settings.set('clockTime', false)
-    clockSetting = true
+    timeBeforeNap = settings.get('timeOfDay')
     settings.set('timeOfDay', 0.02)
-    clockSetting = false
     hud.toast('Nap time: lights down')
   } else {
-    if (clockBeforeNap !== false) settings.set('clockTime', true)
-    applyClock()
+    // Daylight, whichever way the sky is driven: the real hour when the clock is on, the
+    // hand-set hour otherwise. A hand-set hour that was itself night falls back to the clock,
+    // because waking into darkness is the one thing this must never do.
+    if (settings.get('clockTime')) {
+      applyClock(true)
+    } else if (timeBeforeNap != null && timeBeforeNap > 0.24 && timeBeforeNap < 0.8) {
+      settings.set('timeOfDay', timeBeforeNap)
+    } else {
+      settings.set('clockTime', true)
+      applyClock(true)
+    }
     hud.toast('Awake: lights up')
   }
+  clockSetting = false
 }
+let napPolling = false
+async function pollNap() {
+  if (napPolling || document.hidden) return
+  napPolling = true
+  try {
+    const res = await fetchNap()
+    applyNap(Boolean(res.nap))
+  } catch {
+    /* the slow path in poll() still carries the flag */
+  } finally {
+    napPolling = false
+  }
+}
+setInterval(pollNap, 5000)
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) pollNap()
+})
 
 /** The sky follows the actual hour in Kansas City until the time is set by hand. */
 let clockSetting = false
-function applyClock() {
+function applyClock(force = false) {
   if (!settings.get('clockTime')) return
+  if (napping && !force) return // the sky stays dark for the nap; the toggle brings it back
   const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: 'numeric', hour12: false }).formatToParts(new Date())
   const h = Number(parts.find((p) => p.type === 'hour')?.value) % 24
   const m = Number(parts.find((p) => p.type === 'minute')?.value) || 0
@@ -965,7 +992,7 @@ engine.add({
 
 engine.start()
 // Debug handle for headless checks and the console; nothing in the app reads it.
-window.__botfarm = { actions, colony, settings }
+window.__botfarm = { actions, colony, settings, nap: applyNap }
 
 boot()
 

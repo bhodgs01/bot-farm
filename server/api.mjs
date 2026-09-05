@@ -16,7 +16,7 @@ import { setProjectStatus, closeTask, completeChores } from './act.mjs'
 import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
 import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGenerate, topicById, todayKC, newsEnabled } from './news.mjs'
 import { refreshNews } from './harnesses/news.mjs'
-import { napMode } from './harnesses/home.mjs'
+import { napMode, fetchNap } from './harnesses/home.mjs'
 
 /**
  * The id of the build being served: the hash Vite put in the main bundle's file name.
@@ -441,6 +441,11 @@ export async function apiMiddleware(req, res, next) {
 
     if (url.pathname === '/api/harnesses' && req.method === 'GET') {
       return send(res, 200, { harnesses: await harnessStatus() })
+    }
+
+    // Nap time, on its own so the page can ask every few seconds without a full scan.
+    if (url.pathname === '/api/nap' && req.method === 'GET') {
+      return send(res, 200, { nap: await fetchNap() })
     }
 
     if (url.pathname === '/api/state' && req.method === 'GET') {
