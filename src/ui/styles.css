@@ -1362,6 +1362,45 @@ kbd {
 }
 
 @media (max-width: 600px) {
+  /* Phone: the panels become a bottom sheet, the card a full-width sheet above it. */
+  .stack {
+    top: auto;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+    max-height: 46dvh;
+  }
+  .side {
+    width: auto !important;
+  }
+  .side.collapsed,
+  .queue-card.collapsed {
+    flex: 0 0 auto;
+  }
+  .thread-pop {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    top: auto;
+    width: auto;
+    max-height: 70dvh;
+    transform: none !important;
+    z-index: 30;
+  }
+  .thread-pop .nib {
+    display: none;
+  }
+  .thread-pop .details {
+    max-height: 120px;
+  }
+  .thread-pop .reader .body {
+    max-height: 30dvh;
+  }
+  .unhide {
+    bottom: max(8px, env(safe-area-inset-bottom));
+  }
   .topbar {
     height: 46px;
     padding: 0 6px 0 12px;

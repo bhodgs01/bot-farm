@@ -32,19 +32,52 @@ function total(p) {
 
 const money = (n) => `$${Math.round(n).toLocaleString('en-US')}`
 
+// Prospect silence: when did Blake last email this prospect? One Gmail search per address,
+// cached an hour. Nothing found in 30 days reads as "never", which is its own answer.
+const SILENT_DAYS = Number(process.env.PROSPECT_SILENT_DAYS || 7)
+const RECEIVABLE_DAYS = Number(process.env.RECEIVABLE_DAYS || 14)
+const contactCache = new Map() // email → { at, lastSent }
+let gmailSearch = null
+async function lastSentTo(email) {
+  const key = String(email || '').toLowerCase()
+  if (!key) return null
+  const hit = contactCache.get(key)
+  if (hit && Date.now() - hit.at < 60 * 60 * 1000) return hit.lastSent
+  let lastSent = null
+  try {
+    if (!gmailSearch) gmailSearch = (await import('./mailroom.mjs')).gmail
+    const res = await gmailSearch(`messages?q=${encodeURIComponent(`in:sent to:${key} newer_than:30d`)}&maxResults=1`)
+    const id = res?.messages?.[0]?.id
+    if (id) {
+      const m = await gmailSearch(`messages/${id}?format=minimal`)
+      lastSent = Number(m?.internalDate) || null
+    } else lastSent = 0
+  } catch {
+    lastSent = hit ? hit.lastSent : null // unknown: no hand on a guess
+  }
+  contactCache.set(key, { at: Date.now(), lastSent })
+  return lastSent
+}
+
 async function fetchThreads() {
   const res = await fetch(`${API}/api/projects`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) })
   if (!res.ok) throw new Error(`projects → ${res.status}`)
   const json = await res.json()
   const list = Array.isArray(json) ? json : json.projects || []
   const now = Date.now()
-  return list
-    .filter((p) => SHOW.has(p.status))
+  const shown = list.filter((p) => SHOW.has(p.status))
+  const sent = new Map(await Promise.all(shown.filter((p) => p.status === 'prospect' && p.email).map(async (p) => [p.id, await lastSentTo(p.email)])))
+  return shown
     .map((p) => {
       const amount = total(p)
       const created = Date.parse(p.created || '') || now
       const started = Date.parse(p.processStarted || '') || created
       const age = Math.max(1, Math.round((now - created) / 86400000))
+      const completedAt = Date.parse(p.completed || '') || 0
+      const owedDays = p.status === 'completed' && completedAt ? Math.max(0, Math.round((now - completedAt) / 86400000)) : null
+      const lastSent = p.status === 'prospect' ? sent.get(p.id) : undefined
+      const quietDays = lastSent === 0 ? Math.max(1, age) : lastSent ? Math.round((now - lastSent) / 86400000) : null
+      const quiet = quietDays != null && quietDays >= SILENT_DAYS
       const who = p.client || p.name || 'Someone'
       const what = p.name && p.name !== p.client ? p.name : ''
       return {
@@ -59,6 +92,10 @@ async function fetchThreads() {
         status: p.status,
         landmark: p.status === 'completed' ? 'crate' : 'bench',
         actions: NEXT[p.status] || [],
+        // Over the head: days owed on a finished job, days of silence on a prospect.
+        plate: owedDays != null ? `${owedDays}d` : quietDays != null ? `${quietDays}d` : '',
+        roof: p.status === 'completed' && amount ? money(amount) : undefined,
+        alertKey: owedDays != null && owedDays >= RECEIVABLE_DAYS ? `owed:${p.id}:${owedDays}` : quiet ? `quiet:${p.id}` : '',
         details: {
           Client: p.client || '',
           Project: p.name || '',
@@ -77,11 +114,13 @@ async function fetchThreads() {
           Created: p.created ? new Date(created).toLocaleDateString('en-US') : '',
           Started: p.processStarted ? new Date(started).toLocaleDateString('en-US') : '',
           Completed: p.completed ? new Date(Date.parse(p.completed)).toLocaleDateString('en-US') : '',
+          Owed: owedDays != null ? `${amount ? money(amount) : 'unpriced'} for ${owedDays} day${owedDays === 1 ? '' : 's'}${owedDays >= RECEIVABLE_DAYS ? ' · time to nudge' : ''}` : '',
+          'Last emailed': lastSent === undefined ? '' : lastSent === 0 ? 'nothing sent in 30 days' : lastSent ? `${new Date(lastSent).toLocaleDateString('en-US')} (${quietDays}d ago)${quiet ? ' · gone quiet' : ''}` : 'unknown',
           Notes: p.notes || '',
         },
         worktree: '',
         cwd: p.email || '',
-        gitBranch: LABEL[p.status],
+        gitBranch: owedDays != null && owedDays >= RECEIVABLE_DAYS ? `owed ${owedDays}d` : quiet ? `quiet ${quietDays}d` : LABEL[p.status],
         model: amount ? money(amount) : '',
         effort: '',
         createdAt: created,
@@ -89,7 +128,7 @@ async function fetchThreads() {
         lastFocusedAt: 0,
         running: p.status === 'in_process',
         unread: p.status === 'prospect' || p.status === 'completed',
-        hasError: false,
+        hasError: (owedDays != null && owedDays >= RECEIVABLE_DAYS) || quiet,
         starred: p.priority === 'hot',
         routine: '',
         prState: '',

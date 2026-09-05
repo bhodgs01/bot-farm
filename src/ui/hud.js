@@ -351,8 +351,12 @@ export class Hud {
     // Keys typed into the chat box are for the worker, not the map.
     this.$('.thread-pop form.ask input').addEventListener('keydown', (e) => e.stopPropagation())
     try {
-      if (localStorage.getItem('botfarm.side.collapsed') === '1') this.toggleCollapse(true)
-      if (localStorage.getItem('botfarm.queue.collapsed') === '1') this.toggleQueue(true)
+      // Phones start with both panels folded to their bars: the map is the point.
+      const phone = window.innerWidth <= 600
+      const sideSaved = localStorage.getItem('botfarm.side.collapsed')
+      const queueSaved = localStorage.getItem('botfarm.queue.collapsed')
+      if (sideSaved === '1' || (sideSaved === null && phone)) this.toggleCollapse(true)
+      if (queueSaved === '1' || (queueSaved === null && phone)) this.toggleQueue(true)
     } catch {}
     on('#btn-archive', 'click', () => this.actions.archiveThread?.())
     on('#btn-deselect', 'click', () => this.actions.select?.(null))

@@ -70,7 +70,7 @@ async function accessToken() {
   return access.token
 }
 
-async function gmail(path) {
+export async function gmail(path) {
   const token = await accessToken()
   const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/${path}`, {
     headers: { Authorization: `Bearer ${token}` },

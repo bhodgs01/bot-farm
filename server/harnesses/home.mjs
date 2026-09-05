@@ -137,6 +137,7 @@ async function fetchThreads() {
   const seenPlants = new Set()
   const doors = [] // { name, open, changed }
   const garmin = {} // entity suffix → state
+  const fp2 = [] // presence sensor entities: { id, state, updated }
   const leaks = [] // { name, wet, offline, changed }
   const laundry = [] // { name, since }
 
@@ -153,6 +154,10 @@ async function fetchThreads() {
     }
     if (id.startsWith('sensor.garmin_connect_')) {
       garmin[id.slice('sensor.garmin_connect_'.length)] = s.state
+      continue
+    }
+    if (/presence_sensor_fp2/.test(id)) {
+      fp2.push({ id, state: s.state, updated: Date.parse(s.last_updated || s.last_changed || '') || 0 })
       continue
     }
 
@@ -294,6 +299,57 @@ async function fetchThreads() {
     g.createdAt = 0
     g.lastActivityAt = Date.now()
     out.push(g)
+  }
+
+  // Frances's room sensor: the Aqara FP2 that stands in for Alice's room. Its light channel
+  // reports continuously, so the newest update across the device is "last seen". Silent for
+  // SENSOR_SILENT_H hours is a hand up: the caregiver system's one real signal has gone quiet.
+  if (fp2.length) {
+    const seen = Math.max(...fp2.map((e) => e.updated))
+    const ageMin = seen ? Math.round((Date.now() - seen) / 60000) : Infinity
+    const silentH = Number(process.env.SENSOR_SILENT_H || 6)
+    const silent = ageMin > silentH * 60
+    const present = fp2.filter((e) => /binary_sensor\..*presence_sensor_\d+$/.test(e.id) && e.state === 'on').length
+    const light = fp2.find((e) => /light_level/.test(e.id))
+    out.push({
+      id: 'frances:sensor',
+      kind: 'device',
+      title: '📡 Room sensor',
+      plate: ageMin < 60 ? `${ageMin}m` : ageMin < 1440 ? `${Math.round(ageMin / 60)}h` : '',
+      preview: silent ? `The FP2 room sensor has been silent for ${Math.round(ageMin / 60)} h. Frances is blind until it reports.` : `Last seen ${ageMin} min ago · ${present} zone${present === 1 ? '' : 's'} occupied${light ? ` · light ${light.state}` : ''}`,
+      details: {
+        Device: 'Aqara FP2 presence sensor (presence_sensor_fp2_8797) through Home Assistant',
+        'Last seen': seen ? new Date(seen).toLocaleString('en-US', { timeZone: 'America/Chicago' }) : 'never',
+        Zones: fp2.filter((e) => /binary_sensor\..*presence_sensor_\d+$/.test(e.id)).map((e) => `${e.id.split('_').pop()}: ${e.state}`).join(', '),
+        Light: light ? `${light.state} lx` : '',
+        'Text line': '+1 913-565-4158 (Twilio) is built but DISARMED behind OUTBOUND_MODE',
+        Note: 'fall_detected is synthetic; this sensor is the only live signal.',
+      },
+      project: 'Frances',
+      projectPath: 'home://frances',
+      worktree: '',
+      cwd: 'fp2',
+      gitBranch: silent ? 'silent' : 'reporting',
+      model: 'Aqara FP2',
+      effort: '',
+      createdAt: Date.parse('2026-09-05T12:00:00Z') + 5,
+      lastActivityAt: seen || Date.now(),
+      lastFocusedAt: 0,
+      running: false,
+      unread: false,
+      hasError: silent,
+      alertKey: silent ? `silent:${Math.round(ageMin / 60)}h` : '',
+      starred: false,
+      routine: '',
+      prState: '',
+      archived: false,
+      hasTranscript: false,
+      sizeBytes: 2000,
+      source: 'home-assistant',
+      canOpen: true,
+      canArchive: false,
+      ref: { url: `${OPEN_URL}` },
+    })
   }
 
   // You. Garmin through Home Assistant: body battery over your head, the night on the card.

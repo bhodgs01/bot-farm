@@ -56,9 +56,49 @@ async function showing(id) {
   }
 }
 
+const BOX = { host: process.env.EMBASSY_BOX_HOST || '100.68.178.23', portal: Number(process.env.EMBASSY_BOX_PORT || 30965) }
+
+async function boxThread(now) {
+  const [ssh, portal] = await Promise.all([probe(BOX.host, 22), probe(BOX.host, BOX.portal)])
+  const up = ssh === 'open' && portal === 'open'
+  const state = up ? 'online, portal serving' : ssh === 'open' ? `online, portal ${portal}` : `offline (${ssh})`
+  return {
+    id: 'tv:box',
+    kind: 'device',
+    title: '🖥️ Embassy box',
+    preview: up ? 'The on-site EliteDesk is up and serving the portal as primary.' : `The on-site box is ${state}. The portal fails over to home; check power and the tailnet, then run /embassy_box_check.`,
+    details: { Status: state, Tailscale: BOX.host, Portal: `NodePort ${BOX.portal}`, SSH: `ssh jarvisembassy@${BOX.host}`, Role: 'PRIMARY for inspire.kcproto.com; home is the failover. app_settings do not dr-sync.', Check: '/embassy_box_check' },
+    project: ZONE,
+    projectPath: 'tvs://embassy',
+    worktree: '',
+    cwd: 'jarvisembassy',
+    gitBranch: up ? 'primary' : state,
+    model: 'HP EliteDesk',
+    effort: '',
+    createdAt: BORN - 1,
+    lastActivityAt: now,
+    lastFocusedAt: 0,
+    running: false,
+    unread: false,
+    hasError: !up,
+    alertKey: up ? '' : `box:${ssh}:${portal}`,
+    starred: false,
+    routine: '',
+    prState: '',
+    archived: false,
+    hasTranscript: false,
+    sizeBytes: 2000,
+    source: 'embassy-box',
+    canOpen: true,
+    canArchive: false,
+    ref: { tv: 'box', url: 'https://inspire.kcproto.com/' },
+  }
+}
+
 async function fetchThreads() {
   const now = Date.now()
-  return Promise.all(
+  const box = await boxThread(now)
+  const tvs = await Promise.all(
     TVS.map(async (tv, i) => {
       const [ssh, url] = await Promise.all([probe(tv.host, 22), showing(tv.id)])
       const up = ssh === 'open'
@@ -98,6 +138,7 @@ async function fetchThreads() {
       }
     })
   )
+  return [box, ...tvs]
 }
 
 let cache = { at: 0, data: null, inflight: null }

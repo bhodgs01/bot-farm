@@ -19,6 +19,69 @@ import { refreshNews } from './harnesses/news.mjs'
 import { napMode, fetchNap } from './harnesses/home.mjs'
 
 /**
+ * The chief of staff: a synthetic worker who carries the whole map's facts, so Blake can
+ * ask one astronaut "what's my day" and get the needs-you list, the next deadline, the
+ * weather, his sleep and today's spend in one answer. Stands at the countdown post.
+ */
+function withChief(threads) {
+  const by = new Map(threads.map((t) => [t.id, t]))
+  const wants = threads.filter((t) => !t.archived && (t.unread || t.hasError) && !t.id.startsWith('chief:'))
+  const blocked = wants.filter((t) => t.hasError)
+  const waiting = wants.filter((t) => !t.hasError)
+  const deadlines = threads.filter((t) => t.id.startsWith('deadline:') && t.id !== 'deadline:post').sort((a, b) => Number(String(a.plate).replace(/\D/g, '') || 999) - Number(String(b.plate).replace(/\D/g, '') || 999))
+  const weather = by.get('weather:now')
+  const you = by.get('home:you')
+  const spend = by.get('keys:spend')
+  const nl = String.fromCharCode(10)
+  const line = (t) => `${t.title} (${t.project})`
+  const details = {
+    'Needs you': `${wants.length}: ${blocked.length} blocked, ${waiting.length} waiting`,
+    Blocked: blocked.slice(0, 12).map(line).join(nl) || 'nothing',
+    Waiting: waiting.slice(0, 15).map(line).join(nl) || 'nothing',
+    'Next deadline': deadlines[0] ? `${deadlines[0].title.replace(/^⏳ /, '')} in ${deadlines[0].plate}` : 'none',
+    Deadlines: deadlines.map((d) => `${d.plate}: ${d.title.replace(/^⏳ /, '')}`).join(nl),
+    Weather: weather ? `${weather.details?.Now || weather.preview}${weather.details?.Alerts && weather.details.Alerts !== 'none' ? ` · alerts: ${weather.details.Alerts}` : ''}` : '',
+    You: you ? you.preview : '',
+    Spend: spend ? spend.details?.Today || '' : '',
+    Crew: `${threads.length} on the map`,
+  }
+  const chief = {
+    id: 'chief:day',
+    kind: 'chief',
+    title: '🎖️ Chief of staff',
+    plate: wants.length ? `${wants.length}` : '',
+    preview: `${wants.length} need you${deadlines[0] ? ` · next: ${deadlines[0].title.replace(/^⏳ /, '')} in ${deadlines[0].plate}` : ''}${weather ? ` · ${weather.details?.Now || ''}` : ''}`,
+    details,
+    project: 'Countdown',
+    projectPath: 'chief://day',
+    worktree: '',
+    cwd: 'chief',
+    gitBranch: wants.length ? `${wants.length} need you` : 'clear',
+    model: '',
+    effort: '',
+    createdAt: Date.parse('2026-09-05T12:00:00Z') - 1,
+    lastActivityAt: Date.now(),
+    lastFocusedAt: 0,
+    running: false,
+    unread: false,
+    hasError: false,
+    starred: false,
+    routine: '',
+    prState: '',
+    archived: false,
+    hasTranscript: false,
+    sizeBytes: 4000,
+    source: 'bot-farm',
+    harness: 'deadlines',
+    harnessName: 'Countdown',
+    canOpen: false,
+    canArchive: false,
+    ref: {},
+  }
+  return [...threads, chief]
+}
+
+/**
  * The id of the build being served: the hash Vite put in the main bundle's file name.
  * The page reads the same hash off its own script tag, so the two agree exactly when the
  * page is running what the server is serving.
@@ -295,7 +358,7 @@ export async function apiMiddleware(req, res, next) {
 
   try {
     if (url.pathname === '/api/threads' && req.method === 'GET') {
-      const threads = await applyStars(await applyAcks(await reconcileArchived(await scanThreads())))
+      const threads = withChief(await applyStars(await applyAcks(await reconcileArchived(await scanThreads()))))
       return send(res, 200, { nap: napMode(), threads, scannedAt: Date.now() })
     }
 
