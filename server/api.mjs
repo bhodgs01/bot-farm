@@ -16,6 +16,7 @@ import { setProjectStatus, closeTask, completeChores } from './act.mjs'
 import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
 import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGenerate, topicById, todayKC, newsEnabled } from './news.mjs'
 import { refreshNews } from './harnesses/news.mjs'
+import { napMode } from './harnesses/home.mjs'
 
 /**
  * The id of the build being served: the hash Vite put in the main bundle's file name.
@@ -295,7 +296,7 @@ export async function apiMiddleware(req, res, next) {
   try {
     if (url.pathname === '/api/threads' && req.method === 'GET') {
       const threads = await applyStars(await applyAcks(await reconcileArchived(await scanThreads())))
-      return send(res, 200, { threads, scannedAt: Date.now() })
+      return send(res, 200, { nap: napMode(), threads, scannedAt: Date.now() })
     }
 
     // A GET here exists only so the browser can complete the Access login in a tab.

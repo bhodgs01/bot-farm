@@ -787,6 +787,7 @@ async function poll() {
   polling = true
   try {
     const res = await fetchThreads()
+    applyNap(Boolean(res.nap))
     await adoptRemoteState()
     applyThreads(res.threads || [])
     hud.removeBoot()
@@ -902,6 +903,29 @@ function queueItems() {
 }
 
 // ── real time ─────────────────────────────────────────────────────────────────────────
+
+/**
+ * Nap time. When the Home Assistant toggle is on the colony goes dark; when it goes off the
+ * sky comes back to the real hour (or to whatever the clock setting was before the nap).
+ */
+let napping = false
+let clockBeforeNap = null
+function applyNap(on) {
+  if (on === napping) return
+  napping = on
+  if (on) {
+    clockBeforeNap = settings.get('clockTime')
+    settings.set('clockTime', false)
+    clockSetting = true
+    settings.set('timeOfDay', 0.02)
+    clockSetting = false
+    hud.toast('Nap time: lights down')
+  } else {
+    if (clockBeforeNap !== false) settings.set('clockTime', true)
+    applyClock()
+    hud.toast('Awake: lights up')
+  }
+}
 
 /** The sky follows the actual hour in Kansas City until the time is set by hand. */
 let clockSetting = false

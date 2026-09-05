@@ -308,7 +308,10 @@ export class Indicators {
  * — the glyph has to carry as a silhouette. Material's set is drawn filled to begin with,
  * one closed path per icon, so there is nothing to stroke and nothing to parse.
  */
-const ICON_PATHS = [mdiHelpCircle, mdiAlert, mdiHammer, mdiCheckBold, mdiPause, mdiSleep, mdiCreation, mdiLogout, mdiEmail, mdiPrinter3d, mdiPlay, mdiDoorOpen, mdiWaterOff, mdiAccountAlert, mdiStar, mdiInformation]
+// One entry per BADGE cell, in order. `printing` (11) is a ring the shader draws and has no
+// glyph, so it holds a null: without the placeholder every glyph after it landed one cell
+// early (the door badge wore the water drop, the star never drew).
+const ICON_PATHS = [mdiHelpCircle, mdiAlert, mdiHammer, mdiCheckBold, mdiPause, mdiSleep, mdiCreation, mdiLogout, mdiEmail, mdiPrinter3d, mdiPlay, null, mdiDoorOpen, mdiWaterOff, mdiAccountAlert, mdiStar, mdiInformation]
 
 /**
  * The badge atlas. Red channel = the glyph, green channel = the plate's alpha — packing two
@@ -337,7 +340,7 @@ function buildBadgeAtlas(cellSize = 512) {
   const ctx = canvas.getContext('2d')
   ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-  const icons = ICON_PATHS.map((d) => new Path2D(d))
+  const icons = ICON_PATHS.map((d) => (d ? new Path2D(d) : null))
 
   icons.forEach((icon, index) => {
     const x = (index % COLS) * cellSize
@@ -365,7 +368,7 @@ function buildBadgeAtlas(cellSize = 512) {
 
     // Red channel: the glyph. Additive so it lights up inside the plate the shader draws.
     ctx.fillStyle = 'rgb(255,0,0)'
-    drawIcon(ctx, icon)
+    if (icon) drawIcon(ctx, icon)
     ctx.restore()
     ctx.restore()
   })

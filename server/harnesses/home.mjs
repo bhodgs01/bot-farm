@@ -103,6 +103,11 @@ function plantName(attrs, entityId) {
     .trim()
 }
 
+/** Blake's nap-time toggle, read on every scan. The page darkens the sky while it is on. */
+const NAP_ENTITY = process.env.HA_NAP_ENTITY || 'input_boolean.nap_time_toggle'
+let napState = false
+export const napMode = () => napState
+
 async function fetchThreads() {
   const res = await fetch(`${HA_URL}/api/states`, {
     headers: { Authorization: `Bearer ${TOKEN}`, Accept: 'application/json' },
@@ -122,6 +127,11 @@ async function fetchThreads() {
     const a = s.attributes || {}
     const cls = String(a.device_class || '')
     const changed = s.last_changed
+
+    if (id === NAP_ENTITY) {
+      napState = s.state === 'on'
+      continue
+    }
 
     if (domain === 'person') {
       if (s.state !== 'home') continue
