@@ -19,7 +19,7 @@ const LATE_MS = 90 * 60 * 1000
 /** Fixed creation stamp so the correspondents keep their stand slots from day to day. */
 const BORN = Date.parse('2026-09-04T12:00:00Z')
 
-const ICON = { politics: '🏛️', tech: '🤖', selfhosted: '🧰', maker: '🔧', kc: '🌽', markets: '📈', security: '🛡️' }
+const ICON = { politics: '🏛️', tech: '🤖', selfhosted: '🧰', events: '🎟️', maker: '🔧', kc: '🌽', markets: '📈', security: '🛡️' }
 
 const clock = (ms) => new Date(ms).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' })
 

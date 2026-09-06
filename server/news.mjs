@@ -79,6 +79,16 @@ const DEFAULT_TOPICS = [
     brief:
       'Noteworthy self-hosted and open-source applications: new projects gaining traction (GitHub trending, r/selfhosted, Hacker News), major releases of established ones, and homelab tooling such as Kubernetes, Docker, Home Assistant, media servers, backup, networking and dashboards. Prefer things a homelab operator could actually install this week, and say what each one does.',
   },
+  {
+    id: 'events',
+    name: 'Kansas City',
+    desk: 'Events desk',
+    color: '#d98b7a',
+    // A forward-looking desk: the sweep covers the week ahead, not the last two days.
+    ahead: 7,
+    brief:
+      'Things to do in the Kansas City metro (both sides of the state line): concerts and shows, festivals, markets and fairs, Chiefs, Royals, Sporting KC and KC Current games, family and kids activities, museum and gallery openings, food and drink events, maker and tech meetups. Blake goes with his wife and young son when he can, so weekend and evening things a family could actually attend rank high, and anything that sells out or needs tickets bought ahead should say so. Every event needs its date, time, venue and price in the summary, and the source should be the organizer, venue or ticket page.',
+  },
 ]
 
 const PALETTE = ['#d3a94e', '#6fb1e8', '#7cc48a', '#d98b7a', '#b48ee8', '#e8c46f', '#7fd0c9']
@@ -97,6 +107,8 @@ export const TOPICS = (() => {
       desk: String(t.desk || `${t.name || t.id} desk`),
       color: /^#[0-9a-f]{6}$/i.test(String(t.color || '')) ? String(t.color) : PALETTE[i % PALETTE.length],
       brief: String(t.brief || t.name || t.id),
+      /** Days ahead a desk looks (events, deadlines); 0 = the usual news desk, looking back. */
+      ahead: Number.isInteger(t.ahead) && t.ahead > 0 ? t.ahead : 0,
     }))
 })()
 
@@ -280,10 +292,13 @@ const REPLY_SHAPE = 'When you are done, reply with the briefing as one JSON obje
 const HOUSE_STYLE = 'Write plainly. No hype words, no em dashes, American spelling. Every story needs a real source URL you actually saw in the search results.'
 
 function systemFor(topic, date) {
+  const sweep = topic.ahead
+    ? `Use web search to find what is on in the next ${topic.ahead} days, today included. Pick the ${STORIES_MIN} to ${STORIES_MAX} events most worth his time, soonest first, and drop anything you could not confirm on the organizer's, venue's or ticket page. One event per story, no roundups of roundups, nothing that has already happened. Put the event's date and time in the "published" field.`
+    : `Use web search to find what actually happened in the last 24 to 48 hours. Pick the ${STORIES_MIN} to ${STORIES_MAX} stories that matter most, lead with the biggest, and drop anything you could not confirm from a real source. No duplicates, no listicles, no stories older than three days unless they broke today.`
   return [
     `You are the ${topic.desk} of a small private daily news briefing written for one reader, Blake, a software developer and homelab operator in Kansas City. Today is ${longDate(date)}.`,
     `Your beat: ${topic.brief}`,
-    `Use web search to find what actually happened in the last 24 to 48 hours. Pick the ${STORIES_MIN} to ${STORIES_MAX} stories that matter most, lead with the biggest, and drop anything you could not confirm from a real source. No duplicates, no listicles, no stories older than three days unless they broke today.`,
+    sweep,
     HOUSE_STYLE,
     REPLY_SHAPE,
   ].join('\n')
@@ -296,14 +311,16 @@ function updateSystemFor(topic, date, existing, since) {
     `You are the ${topic.desk} of a small private daily news briefing written for one reader, Blake, a software developer and homelab operator in Kansas City. Today is ${longDate(date)}; it is now ${clockKC(Date.now())} in Kansas City.`,
     `Your beat: ${topic.brief}`,
     `Today's paper already carries these stories (last written ${clockKC(since)}):\n${covered || '(nothing yet)'}`,
-    `Use web search to find what has happened on your beat in the last few hours that the paper does not have. Return only genuinely new developments, at most ${UPDATE_MAX}, biggest first. A story already on the list does not count, and neither does a fresh angle on one; a real new development in a covered story counts only if it changes what Blake would think. If nothing new and worth his time has happened, return an empty stories array. That is a fine answer and the usual one.`,
+    topic.ahead
+      ? `Use web search to find events in the next ${topic.ahead} days that the paper does not have: newly announced, newly on sale, or happening tonight and easy to miss. Return at most ${UPDATE_MAX}, soonest first, with the event's date and time in the "published" field. An event already on the list does not count. If nothing new and worth his time has turned up, return an empty stories array. That is a fine answer and the usual one.`
+      : `Use web search to find what has happened on your beat in the last few hours that the paper does not have. Return only genuinely new developments, at most ${UPDATE_MAX}, biggest first. A story already on the list does not count, and neither does a fresh angle on one; a real new development in a covered story counts only if it changes what Blake would think. If nothing new and worth his time has happened, return an empty stories array. That is a fine answer and the usual one.`,
     HOUSE_STYLE,
     REPLY_SHAPE,
   ].join('\n')
 }
 
-const userPrompt = (topic) => `Write today's ${topic.name} briefing.`
-const updatePrompt = (topic) => `What is new on the ${topic.name} desk since the paper was written? New stories only.`
+const userPrompt = (topic) => (topic.ahead ? `Write today's ${topic.desk} briefing: what is on in ${topic.name} this week.` : `Write today's ${topic.name} briefing.`)
+const updatePrompt = (topic) => (topic.ahead ? `What has turned up on the ${topic.desk} since the paper was written? New events only.` : `What is new on the ${topic.name} desk since the paper was written? New stories only.`)
 
 /** The JSON object out of the model's text: the last fenced block, else the outermost braces. */
 function parseStories(text) {
