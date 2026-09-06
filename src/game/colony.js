@@ -525,7 +525,7 @@ export class Colony {
       plot.group.add(sign)
       plot.sign = sign
       const label = createLabel(name, accent)
-      label.position.set(plot.center.x + SIGN_AT.x, DECK_TOP + 1.55, plot.center.z + SIGN_AT.z)
+      label.position.set(plot.center.x + SIGN_AT.x, DECK_TOP + 2.9, plot.center.z + SIGN_AT.z)
       plot.label = label
       this.labelGroup.add(label)
     })
