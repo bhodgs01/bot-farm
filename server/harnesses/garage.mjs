@@ -43,7 +43,7 @@ async function fetchThreads() {
       ...base,
       id: 'garage:fj40',
       kind: 'keeper',
-      landmark: 'garage',
+      landmark: 'fj40',
       title: '🚙 FJ40',
       roof: flagged.length ? `${flagged.length} open` : 'running',
       preview: [doc.status || '', ...items.map((i) => `• ${i.title}`)].filter(Boolean).join(NL),

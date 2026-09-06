@@ -58,11 +58,8 @@ def main():
             kinds = kinds.replace(anchor, code + '\n' + anchor, 1)
             added.append(name)
     s = s[:start] + kinds + s[end:]
-    if added:
-        m = re.search(r"const KIND_IDS = Object\.keys\(KINDS\)\.filter\(\(k\) => !\[(.*?)\]\.includes\(k\)\)", s)
-        assert m, 'KIND_IDS exclusion list not found'
-        lst = m.group(1) + ''.join(", '%s'" % n for n in added)
-        s = s[:m.start(1)] + lst + s[m.end(1):]
+    # Random fillers come from FILLER_KINDS, so a new kind is never dealt at random; nothing
+    # to exclude any more.
     print('replaced:', ', '.join(replaced) or '-')
     print('added:   ', ', '.join(added) or '-')
     if rejected:
