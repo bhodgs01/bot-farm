@@ -810,7 +810,11 @@ engine.canvas.addEventListener(
         hexHold = null
         if (!hold || !colony.plots.has(hold.name)) return
         rig.release()
-        engine.canvas.setPointerCapture?.(hold.pointerId)
+        try {
+          engine.canvas.setPointerCapture?.(hold.pointerId)
+        } catch {
+          /* a pointer the browser no longer tracks; the window listeners still see the release */
+        }
         const live = colony.plots.get(hold.name)
         hexDrag = { name: hold.name, plot: live, pointerId: hold.pointerId }
         liftHex(live, true)
