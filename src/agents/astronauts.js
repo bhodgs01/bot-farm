@@ -95,6 +95,27 @@ const PATH_BUDGET = 6
 const CREW_SCALE = 0.56
 
 /**
+ * Hats, as lathe profiles in helmet radii: [radius, height] pairs from the crown down to
+ * the brim. Worn on top of the helmet by the workers whose post suggests one.
+ */
+const HATS = {
+  rain: { profile: [[0, 0.62], [0.3, 0.36], [0.5, 0.16], [0.78, 0.05], [0.78, 0]], color: 0xe8c23a }, // sou'wester for the weather desk
+  fedora: { profile: [[0, 0.44], [0.4, 0.44], [0.46, 0.06], [0.82, 0.06], [0.82, 0]], color: 0x3b3a45 }, // press hat for the correspondents
+  cap: { profile: [[0, 0.38], [0.26, 0.36], [0.44, 0.2], [0.5, 0.04], [0.5, 0]], color: 0xc9402f }, // ball cap for the garage and the scoreboard
+  hard: { profile: [[0, 0.4], [0.34, 0.36], [0.5, 0.16], [0.7, 0.05], [0.7, 0]], color: 0xf0a020 }, // hard hat for nodes, the fleet and the printers
+}
+/** Which hat a worker wears, from what it is; null for most. */
+function hatFor(t) {
+  if (!t) return null
+  const id = String(t.id || '')
+  if (id.startsWith('weather:')) return 'rain'
+  if (id.startsWith('news:') || id.startsWith('chief:')) return 'fedora'
+  if (id.startsWith('garage:') || id.startsWith('games:')) return 'cap'
+  if (id.startsWith('node:') || id.startsWith('fleet:') || t.source === 'print-farm' || t.source === 'nodes') return 'hard'
+  return null
+}
+
+/**
  * Where the worn parts sit relative to the bone they hang off, in the mannequin's own
  * units — the root transform carries CREW_SCALE, so everything downstream of a bone is
  * measured in the rig's space and stays put if that scale is ever retuned.
@@ -198,6 +219,14 @@ export class Astronauts {
     // The hammer, held in the right hand while a thread is running. Wood and steel rather
     // than suit white, so it reads as a tool at the distance the colony is watched from.
     parts.hammer = this._mesh(hammerGeometry(R), suit(0.62, { vertexColors: true }), capacity, true)
+
+    // Hats: a lathe profile each, worn on the crown of the helmet by the workers whose job
+    // suggests one. Their own instance counters, like the hammer, so empty slots never draw.
+    for (const [name, { profile, color }] of Object.entries(HATS)) {
+      const pts = profile.map(([x, y]) => new THREE.Vector2(x * R, y * R))
+      const geo = new THREE.LatheGeometry(pts, 14)
+      parts[`hat_${name}`] = this._mesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: 0.05 }), capacity, true)
+    }
 
     // Face: the features only, drawn straight onto the visor beneath. Built as a sphere cap
     // a hair larger than the visor, so it lies exactly on the curved surface instead of
@@ -1171,6 +1200,8 @@ export class Astronauts {
     let i = 0
     let hands = 0
     let staticDirty = false
+    const hats = {}
+    for (const name of Object.keys(HATS)) hats[name] = 0
     for (const agent of this.agents) {
       if (agent.state === 'gone') continue
       const s = agent.scale
@@ -1199,6 +1230,8 @@ export class Astronauts {
         setPart(child, worn, face, i, 0, P.headUp, 0, 0, 0, 0)
         setPart(child, worn, antenna, i, P.antX, P.antY, P.antZ, 0.06, 0, -0.12)
         setPart(child, worn, tip, i, P.tipX, P.tipY, P.antZ, 0, 0, 0)
+        const hat = hatFor(agent.thread)
+        if (hat) setPart(child, worn, this.parts[`hat_${hat}`], hats[hat]++, 0, P.headUp + P.helmetR * 0.82, 0, 0, 0, 0)
 
         attachMatrixAt(rig, agent.frame, this.chestSlot, bone)
         worn.multiplyMatrices(root, bone)
@@ -1247,7 +1280,7 @@ export class Astronauts {
     // The glowing parts pulse every frame; the rest only re-upload when something moved slot.
     const animated = new Set(['tip', 'lamp'])
     for (const [name, mesh] of Object.entries(this.parts)) {
-      mesh.count = name === 'hammer' ? hands : n
+      mesh.count = name === 'hammer' ? hands : name.startsWith('hat_') ? hats[name.slice(4)] : n
       mesh.instanceMatrix.needsUpdate = true
       if (mesh.instanceColor && (staticDirty || animated.has(name))) mesh.instanceColor.needsUpdate = true
     }
