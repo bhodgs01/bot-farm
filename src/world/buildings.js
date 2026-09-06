@@ -1281,9 +1281,9 @@ const KINDS = {
     // Oversized pentagonal shield and center stripe.
     const badge = new THREE.CylinderGeometry(0.37, 0.37, 0.12, 5)
     badge.rotateX(Math.PI / 2)
+    // The badge face carries the CyberGrade owl, hung on as a decal by the colony (see
+    // `_syncBuilding`), so the crest is the real logo rather than a modelled plus.
     c.geom(badge, CELL.TRIM, { x: 0.56, y: 0.92, z: 1.18 })
-    box(0.1, 0.4, 0.08, CELL.WHITE, { x: 0.56, y: 0.94, z: 1.29 })
-    box(0.3, 0.1, 0.08, CELL.WHITE, { x: 0.56, y: 1.03, z: 1.29 })
 
     // Single rotating radar bar.
     c.geom(new THREE.CylinderGeometry(0.13, 0.21, 0.55, 8), CELL.WHITE, {

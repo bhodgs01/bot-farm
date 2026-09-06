@@ -589,6 +589,7 @@ export class Colony {
       mesh.rotation.y = ((hashString(thread.id) >>> 8) % 360) * (Math.PI / 180)
       // The cinema faces the default view, screen toward the camera.
       if (mesh.userData.kind === 'theater') mesh.rotation.y += Math.PI
+      if (mesh.userData.kind === 'shield') this._hangDecal(mesh, '/owl-cybergrade.png', { x: 0.56, y: 0.92, z: 1.25, w: 0.5, h: 0.5 * (715 / 500) })
       // New buildings rise from nothing rather than appearing whole.
       mesh.userData.setProgress(0)
       this.worldGroup.add(mesh)
@@ -1004,6 +1005,34 @@ export class Colony {
     }
     if (img.complete && img.naturalWidth) paint()
     else img.addEventListener('load', paint, { once: true })
+  }
+
+  /**
+   * A flat picture stuck to one face of a set piece, in the recipe's own units: the
+   * CyberGrade owl on the shield's badge. Textures are shared across pieces of one kind.
+   */
+  _hangDecal(mesh, url, { x, y, z, w, h }) {
+    const k = mesh.userData.scale || 1
+    this._decals ||= new Map()
+    let texture = this._decals.get(url)
+    if (!texture) {
+      texture = new THREE.TextureLoader().load(url)
+      texture.colorSpace = THREE.SRGBColorSpace
+      texture.anisotropy = 4
+      this._decals.set(url, texture)
+    }
+    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, toneMapped: false, alphaTest: 0.05 })
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(w * k, h * k), material)
+    plane.position.set(x * k, y * k, z * k)
+    plane.renderOrder = 2
+    mesh.add(plane)
+    const before = mesh.userData.disposeExtras
+    mesh.userData.disposeExtras = () => {
+      before?.()
+      mesh.remove(plane)
+      plane.geometry.dispose()
+      material.dispose()
+    }
   }
 
   _hangScreen(id, mesh) {
