@@ -346,7 +346,36 @@ export class Hud {
     on('#btn-hide', 'click', () => this.toggleUi())
     on('#btn-help', 'click', () => this.toggleHelp())
     on('#btn-shot', 'click', () => this.actions.screenshot?.())
-    on('#btn-home', 'click', () => this.actions.resetView?.())
+    // Tap Home to go home; hold it to make the view on screen the new home.
+    {
+      const home = this.$('#btn-home')
+      let timer = null
+      let held = false
+      const arm = (e) => {
+        if (e.button !== undefined && e.button !== 0) return
+        held = false
+        clearTimeout(timer)
+        timer = setTimeout(() => {
+          held = true
+          home.classList.add('held')
+          this.actions.setHome?.()
+          try {
+            navigator.vibrate?.(18)
+          } catch {}
+        }, 650)
+      }
+      const disarm = () => {
+        clearTimeout(timer)
+        setTimeout(() => home.classList.remove('held'), 350)
+      }
+      home.addEventListener('pointerdown', arm)
+      for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) home.addEventListener(ev, disarm)
+      home.addEventListener('click', () => {
+        if (held) return // that press was a save, not a trip home
+        this.actions.resetView?.()
+      })
+      home.title = 'Home (0) · hold to save this view as home'
+    }
     on('#btn-next', 'click', () => this.actions.focusStatus?.('waiting'))
     on('#btn-orbit', 'click', () => this.setOrbit(this.actions.toggleOrbit?.()))
     on('#btn-tour', 'click', () => this.setTour(this.actions.toggleTour?.()))

@@ -60,8 +60,30 @@ const engine = new Engine(settings).mount(app)
 const rig = new CameraRig(engine.camera, engine.canvas, settings)
 const colony = new Colony(engine.scene, settings, engine.camera, engine.renderer)
 
-let state = { archived: [], archivedAt: {}, opened: [], plots: {}, seen: {}, home: null }
+let state = { archived: [], archivedAt: {}, opened: [], plots: {}, seen: {}, home: null, homes: {} }
 let homeApplied = false
+
+/**
+ * Which screen this is. A home view only makes sense per device: the phone wants the map
+ * tall and close, the ultrawide wants all of it. The screen's pixel size tells the three
+ * apart without asking; the kind is the fallback when a screen has no home of its own.
+ */
+function deviceKey() {
+  const w = Number(screen?.width) || window.innerWidth
+  const h = Number(screen?.height) || window.innerHeight
+  const coarse = window.matchMedia?.('(pointer: coarse)').matches
+  const kind = coarse && Math.min(w, h) <= 900 ? 'phone' : Math.max(w, h) >= 2200 ? 'desktop' : 'laptop'
+  return { key: `${w}x${h}`, kind }
+}
+/** The saved home for this device: its own screen first, then any screen of the same kind, then the old single home. */
+function homeFor(remote) {
+  const { key, kind } = deviceKey()
+  const homes = remote?.homes && typeof remote.homes === 'object' ? remote.homes : {}
+  if (homes[key]) return homes[key]
+  const same = Object.values(homes).filter((h) => h?.kind === kind).sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0))
+  if (same[0]) return same[0]
+  return remote?.home && typeof remote.home === 'object' ? remote.home : null
+}
 // Set once the saved state has actually arrived. A page that booted while the server was
 // restarting has an empty layout in hand, and saving that would re-lay the whole colony.
 let stateLoaded = false
@@ -106,11 +128,13 @@ const actions = {
 
   /** The view on screen right now becomes home: the Home button and every page load return to it. */
   setHome: () => {
-    state.home = rig.pose()
-    rig.setHome(state.home)
+    const { key, kind } = deviceKey()
+    const pose = { ...rig.pose(), kind, savedAt: Date.now() }
+    state.homes = { ...(state.homes || {}), [key]: pose }
+    rig.setHome(pose)
     homeApplied = true
     queueSave()
-    hud.toast('This view is home now')
+    hud.toast(`Saved as home for this ${kind}`)
   },
 
   screenshot: () => {
@@ -1082,9 +1106,10 @@ async function adoptRemoteState() {
   state.archivedAt = remote.archivedAt || {}
   // The saved home view: a fresh page jumps straight to it; a change from another device
   // is remembered for the next Home press.
-  const home = remote.home && typeof remote.home === 'object' ? remote.home : null
-  if (JSON.stringify(home) !== JSON.stringify(state.home) || (home && !homeApplied)) {
-    state.home = home
+  state.home = remote.home && typeof remote.home === 'object' ? remote.home : null
+  state.homes = remote.homes && typeof remote.homes === 'object' ? remote.homes : {}
+  const home = homeFor(remote)
+  if (JSON.stringify(home) !== JSON.stringify(rig.home) || (home && !homeApplied)) {
     rig.setHome(home, { jump: !homeApplied })
     homeApplied = true
   }

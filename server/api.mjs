@@ -246,6 +246,19 @@ function asPose(v) {
   return Object.values(pose).every(Number.isFinite) ? pose : null
 }
 
+/** Homes keyed by screen (`WxH`): each carries a pose and the kind of device that saved it. */
+function asHomes(v) {
+  if (!v || typeof v !== 'object') return {}
+  const out = {}
+  for (const [key, h] of Object.entries(v)) {
+    if (!/^\d{2,5}x\d{2,5}$/.test(key)) continue
+    const pose = asPose(h)
+    if (!pose) continue
+    out[key] = { ...pose, kind: ['phone', 'laptop', 'desktop'].includes(h.kind) ? h.kind : 'desktop', savedAt: Number(h.savedAt) || 0 }
+  }
+  return out
+}
+
 async function readState() {
   try {
     const raw = JSON.parse(await fsp.readFile(STATE_FILE, 'utf8'))
@@ -258,6 +271,7 @@ async function readState() {
       seen: asObject(raw.seen),
       settings: raw.settings && typeof raw.settings === 'object' ? raw.settings : null,
       home: asPose(raw.home),
+      homes: asHomes(raw.homes),
       updatedAt: Number(raw.updatedAt) || 0,
     }
   } catch {
@@ -280,6 +294,7 @@ async function writeState(next) {
     seen: asObject(next.seen),
     settings: next.settings && typeof next.settings === 'object' ? next.settings : null,
     home: asPose(next.home),
+    homes: asHomes(next.homes),
     updatedAt: Date.now(),
   }
   await fsp.mkdir(DATA_DIR, { recursive: true })
