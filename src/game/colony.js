@@ -8,6 +8,7 @@ import {
   createLabel,
   hashString,
   worldToHex,
+  SHIP_CELL,
   DECK_TOP,
   PLOT_PALETTE,
   PLOT_CELL,
