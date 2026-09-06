@@ -1249,7 +1249,9 @@ async function boot() {
 
   // The pre-rename key counts as seen, so the rename does not pop the help sheet at
   // somebody who dismissed it long ago.
-  if (!localStorage.getItem('botcrossing.seen-help') && !localStorage.getItem('cosmo.seen-help')) {
+  // A headset browser gets the VR onboarding card instead; the sheet is hard to dismiss in there.
+  const headset = /OculusBrowser|Quest|Pico|VR/i.test(navigator.userAgent)
+  if (!headset && !localStorage.getItem('botcrossing.seen-help') && !localStorage.getItem('cosmo.seen-help')) {
     hud.toggleHelp(true)
     localStorage.setItem('botcrossing.seen-help', '1')
   } else {

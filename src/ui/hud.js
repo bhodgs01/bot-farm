@@ -468,6 +468,7 @@ export class Hud {
     })
     this.$('.help .sheet').addEventListener('click', (e) => e.stopPropagation())
     on('#btn-help-close', 'click', () => this.toggleHelp(false))
+    on('#btn-help-x', 'click', () => this.toggleHelp(false))
 
     this.settings.onChange(() => this.syncSettings())
   }
@@ -1228,6 +1229,7 @@ const TEMPLATE = `
 
 <div class="help">
   <div class="sheet panel">
+    <button class="btn icon ghost help-x" id="btn-help-x" title="Close (Esc)">${ICON.close}</button>
     <h2>Bot Farm</h2>
     <p class="sub">Every AI agent in the JARVIS Armada is an astronaut, and every client is a hex zone. Nothing here is simulated: an astronaut hammers when its pods are busy or a job is mid-run, slumps when something is crashing or a dashboard stops answering, and holds a ? when a queue needs a human. Click one for its live status and to open its dashboard. Navigation works like Google Earth — drag the ground itself, right-drag to tilt, scroll to zoom in on whatever is under the cursor.</p>
     <div class="cols">
@@ -1270,7 +1272,7 @@ const TEMPLATE = `
       <div class="legend-row"><i class="badge" style="background:#332b12;color:#e6c67f">✓</i> shipped: good news worth a glance</div>
       <div class="legend-row"><i class="badge" style="background:#1d1f2e;color:#a9a8c0">z</i> nothing for three days</div>
     </div>
-    <div style="margin-top:18px;display:flex;justify-content:flex-end">
+    <div class="help-foot">
       <button class="btn primary" id="btn-help-close">Got it</button>
     </div>
   </div>
