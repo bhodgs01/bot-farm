@@ -1108,12 +1108,17 @@ async function adoptRemoteState() {
   // is remembered for the next Home press.
   state.home = remote.home && typeof remote.home === 'object' ? remote.home : null
   state.homes = remote.homes && typeof remote.homes === 'object' ? remote.homes : {}
+  applyHome(remote)
+  colony.restoreLayout(state.plots)
+}
+
+/** Point the rig at this device's saved home: a fresh page jumps there, a later change is kept for the next Home press. */
+function applyHome(remote) {
   const home = homeFor(remote)
   if (JSON.stringify(home) !== JSON.stringify(rig.home) || (home && !homeApplied)) {
     rig.setHome(home, { jump: !homeApplied })
     homeApplied = true
   }
-  colony.restoreLayout(state.plots)
 }
 
 async function poll() {
@@ -1160,6 +1165,9 @@ async function boot() {
       .then((s) => {
         state = s
         stateLoaded = true
+        // The boot fetch is the one the first poll then skips as already seen, so the
+        // saved home has to be applied here or a fresh page never lands on it.
+        applyHome(state)
         // Before the first roster: zones come back to the ground they were on last time.
         colony.restoreLayout(state.plots)
         // And the settings, but only for a browser that has none of its own — an explicit
