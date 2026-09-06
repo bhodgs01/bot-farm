@@ -79,7 +79,6 @@ async function fetchThreads() {
     const red = today <= -0.02
     out.push({
       id: `trade:${p.symbol}`,
-      kind: 'position',
       title: `${p.side === 'short' ? '📉' : '📈'} ${NAMES[p.symbol] ? `${NAMES[p.symbol]} (${p.symbol})` : p.symbol} · ${p.qty} sh`,
       preview: `${money(p.unrealized_pl)} (${pct(plpc)}) · today ${pct(today)} · ${Number(p.avg_entry_price).toFixed(2)} → ${Number(p.current_price).toFixed(2)} · $${Math.round(value).toLocaleString('en-US')}`,
       project: ZONE,

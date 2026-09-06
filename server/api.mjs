@@ -19,11 +19,12 @@ import { refreshNews } from './harnesses/news.mjs'
 import { napMode, fetchNap } from './harnesses/home.mjs'
 
 // ── history: who had a hand up, hour by hour ─────────────────────────────────────────────
-const HISTORY_DIR = path.join(DATA_DIR, 'history')
+// Resolved on use: DATA_DIR is declared further down and this block loads with the module.
+const historyDir = () => path.join(DATA_DIR, 'history')
 let lastHistoryAt = 0
 async function readHistory(day) {
   try {
-    return JSON.parse(await fsp.readFile(path.join(HISTORY_DIR, `${day}.json`), 'utf8'))
+    return JSON.parse(await fsp.readFile(path.join(historyDir(), `${day}.json`), 'utf8'))
   } catch {
     return []
   }
@@ -37,12 +38,12 @@ async function recordHistory(threads) {
     .map((t) => ({ id: t.id, title: t.title, project: t.project, kind: t.hasError ? 'blocked' : 'waiting' }))
   const list = await readHistory(day)
   list.push({ at: Date.now(), hands })
-  await fsp.mkdir(HISTORY_DIR, { recursive: true })
-  await fsp.writeFile(path.join(HISTORY_DIR, `${day}.json`), JSON.stringify(list))
+  await fsp.mkdir(historyDir(), { recursive: true })
+  await fsp.writeFile(path.join(historyDir(), `${day}.json`), JSON.stringify(list))
   // thirty days is plenty
   try {
-    const files = (await fsp.readdir(HISTORY_DIR)).filter((f) => f.endsWith('.json')).sort()
-    for (const f of files.slice(0, Math.max(0, files.length - 30))) await fsp.unlink(path.join(HISTORY_DIR, f))
+    const files = (await fsp.readdir(historyDir())).filter((f) => f.endsWith('.json')).sort()
+    for (const f of files.slice(0, Math.max(0, files.length - 30))) await fsp.unlink(path.join(historyDir(), f))
   } catch {
     /* fine */
   }
@@ -129,7 +130,9 @@ function withLedger(threads) {
  * weather, his sleep and today's spend in one answer. Stands at the countdown post.
  */
 let chiefTimeline = []
-setInterval(() => timelineToday().then((l) => (chiefTimeline = l)).catch(() => {}), 5 * 60 * 1000)
+// unref: this module is also loaded by the Vite config at build time, and a live timer there
+// would keep the build process from ever exiting.
+setInterval(() => timelineToday().then((l) => (chiefTimeline = l)).catch(() => {}), 5 * 60 * 1000).unref?.()
 timelineToday().then((l) => (chiefTimeline = l)).catch(() => {})
 function withChief(threads) {
   const by = new Map(threads.map((t) => [t.id, t]))
