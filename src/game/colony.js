@@ -75,6 +75,9 @@ const ZONE_ACCENT = {
  * What a zone's buildings are when the source did not say: the whole hex dressed as one
  * place, so every email on the Inbox gets a desk and every Embassy task a patch of yard.
  */
+/** Where a zone's signpost stands, in the root cell's frame: the front-right vertex, pulled in a touch. */
+const SIGN_AT = { x: 3.1, z: 5.4 }
+
 const ZONE_LANDMARK = {
   Inbox: 'desk',
   'Embassy Landscape': 'yard',
@@ -514,8 +517,15 @@ export class Colony {
       this.plots.set(name, plot)
       this.plotGroup.add(plot.group)
 
+      // A signpost at the front-right vertex of the root cell (between two stand slots, so
+      // nothing is built on top of it), with the zone's name riding on the board.
+      const sign = createBuilding({ seed: hashString(name), accent, kind: 'signpost' })
+      sign.position.set(SIGN_AT.x, DECK_TOP, SIGN_AT.z)
+      sign.rotation.y = -0.3
+      plot.group.add(sign)
+      plot.sign = sign
       const label = createLabel(name, accent)
-      label.position.set(plot.labelAnchor.x, 3.2, plot.labelAnchor.z)
+      label.position.set(plot.center.x + SIGN_AT.x, DECK_TOP + 1.55, plot.center.z + SIGN_AT.z)
       plot.label = label
       this.labelGroup.add(label)
     })
