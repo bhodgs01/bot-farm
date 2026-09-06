@@ -957,7 +957,7 @@ export class Colony {
    * screen. More than one stream and it cycles, ten seconds each. Nobody watching and the
    * plane hides, leaving the theater's own lit screen.
    */
-  _syncScreen(elapsed) {
+  _syncScreen() {
     let sc = this._screen
     let entry = sc ? this.buildings.get(sc.id) : null
     if (!entry || entry.mesh !== sc.mesh || entry.retiring) {
@@ -978,7 +978,8 @@ export class Colony {
       return
     }
     watching.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-    const t = watching[Math.floor(elapsed / 10) % watching.length]
+    // Wall clock, not the frame clock: a throttled tab still turns the page every ten seconds.
+    const t = watching[Math.floor(Date.now() / 10000) % watching.length]
     const sig = `${t.id}|${t.title}|${t.preview}|${t.art}|${t.pct}`
     if (sig === sc.shown) return
     sc.shown = sig
@@ -1126,7 +1127,7 @@ export class Colony {
 
   update(dt, elapsed, focus) {
     this._syncPlates()
-    this._syncScreen(elapsed)
+    this._syncScreen()
     this._syncBeams(dt)
     this._syncSignals(dt)
     this._syncStarMarks(dt, elapsed)
