@@ -1499,6 +1499,10 @@ kbd {
 .thread-pop .details { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 12px; max-height: 190px; overflow: auto; }
 .thread-pop .details[hidden], .thread-pop .stage[hidden], .thread-pop .intro[hidden] { display: none; }
 .thread-pop .intro { display: grid; gap: 8px; }
+#btn-rename { align-self: flex-start; opacity: 0.55; }
+#btn-rename:hover { opacity: 1; }
+#btn-mic.listening { color: #ff6b6b; animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: 0.4; } }
 #btn-home.held { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55) inset; }
 .thread-pop .intro p { margin: 0; font-size: 13px; line-height: 1.45; opacity: 0.92; }
 .thread-pop .intro .btn { justify-self: start; }

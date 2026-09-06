@@ -396,6 +396,54 @@ export class Hud {
       input.value = ''
       this.actions.askWorker?.(text)
     })
+    // Rename: a small pencil beside the title. An empty answer gives the source's name back.
+    this.$('#btn-rename').addEventListener('click', () => {
+      const t = this.selected?.thread
+      if (!t) return
+      const current = String(t.title || '').replace(/^\p{Extended_Pictographic}\uFE0F?\s*/u, '')
+      const name = window.prompt('What do you call this one? (empty = the given name)', current)
+      if (name === null) return
+      this.actions.renameWorker?.(t.id, name)
+    })
+    // Voice: the browser's own recognition fills the box and asks; the answer is read aloud.
+    {
+      const SR = window.SpeechRecognition || window.webkitSpeechRecognition
+      const mic = this.$('#btn-mic')
+      if (SR && 'speechSynthesis' in window) {
+        mic.hidden = false
+        let rec = null
+        mic.addEventListener('click', () => {
+          if (rec) {
+            rec.stop()
+            return
+          }
+          rec = new SR()
+          rec.lang = 'en-US'
+          rec.interimResults = true
+          rec.maxAlternatives = 1
+          const input = this.$('.thread-pop form.ask input')
+          mic.classList.add('listening')
+          rec.onresult = (e) => {
+            const text = [...e.results].map((r) => r[0].transcript).join(' ').trim()
+            input.value = text
+            if (e.results[e.results.length - 1].isFinal && text) {
+              this._speakNext = true
+              this.$('.thread-pop form.ask').requestSubmit()
+            }
+          }
+          rec.onend = () => {
+            rec = null
+            mic.classList.remove('listening')
+          }
+          rec.onerror = rec.onend
+          try {
+            rec.start()
+          } catch {
+            rec.onend()
+          }
+        })
+      }
+    }
     // Keys typed into the chat box are for the worker, not the map.
     this.$('.thread-pop form.ask input').addEventListener('keydown', (e) => e.stopPropagation())
     try {
@@ -658,13 +706,15 @@ export class Hud {
     if (intro) introBox.querySelector('p').textContent = thread.intro
     // Stage buttons: what this thread can be moved to next.
     const stage = this.$('.thread-pop .stage')
-    const STAGE_LABEL = { active: 'Make active', in_process: 'Start work', completed: 'Mark complete', paid: 'Paid ✓', done: 'Close ticket ✓', chore: 'Done ✓', read: 'Read ✓', ticket: '🎫 Make it a ticket', approve: 'Send it ✓', skip: 'Skip', ack: 'Remove flag', unack: 'Flag again', star: '★ Star', unstar: 'Unstar' }
+    const STAGE_LABEL = { active: 'Make active', in_process: 'Start work', completed: 'Mark complete', paid: 'Paid ✓', done: 'Close ticket ✓', chore: 'Done ✓', read: 'Read ✓', ticket: '🎫 Make it a ticket', join: '📹 Join', record: '🎙️ Record', nudge: '💌 Nudge (draft)', approve: 'Send it ✓', skip: 'Skip', ack: 'Remove flag', unack: 'Flag again', star: '★ Star', unstar: 'Unstar' }
     // A flagged worker offers to have the flag removed; an acknowledged one offers it back.
     this.renderReader(thread)
     if (intro) this.$('.thread-pop .reader').hidden = true
     // Any raised hand can become a ticket, unless it already is one.
     const ticketable = (thread.unread || thread.hasError) && !['tasks', 'janine'].includes(thread.harness) && !/^(chief|ledger|deadline):/.test(thread.id)
-    const acts = (Array.isArray(thread.actions) ? thread.actions : []).filter((a) => !(hasStories && a === 'read')).concat(ticketable ? ['ticket'] : []).concat(thread.hasError ? ['ack'] : thread.acked ? ['unack'] : []).concat(thread.watched ? ['unstar'] : ['star'])
+    // A finished job with a client address can be nudged: a reminder drafted into Gmail, never sent from here.
+    const nudgeable = thread.project === 'Completed' && thread.details?.Email
+    const acts = (Array.isArray(thread.actions) ? thread.actions : []).filter((a) => !(hasStories && a === 'read')).concat(nudgeable ? ['nudge'] : []).concat(ticketable ? ['ticket'] : []).concat(thread.hasError ? ['ack'] : thread.acked ? ['unack'] : []).concat(thread.watched ? ['unstar'] : ['star'])
     stage.innerHTML = acts.map((a) => `<button class="btn ${a === 'paid' || a === 'done' || a === 'chore' || a === 'approve' ? 'primary' : ''}" data-stage="${escapeHtml(a)}">${escapeHtml(STAGE_LABEL[a] || a)}</button>`).join('')
     stage.hidden = intro || acts.length === 0
     for (const b of stage.querySelectorAll('button')) b.addEventListener('click', () => this.actions.stageThread?.(b.dataset.stage))
@@ -742,6 +792,13 @@ export class Hud {
     this.chatLogs ||= new Map()
     const turns = this.chatLogs.get(id) || []
     if (role === 'worker' && turns.length && turns[turns.length - 1].role === 'pending') turns.pop()
+    if (role === 'worker' && this._speakNext && 'speechSynthesis' in window) {
+      this._speakNext = false
+      try {
+        window.speechSynthesis.cancel()
+        window.speechSynthesis.speak(new SpeechSynthesisUtterance(String(text).slice(0, 600)))
+      } catch {}
+    }
     turns.push({ role, text })
     this.chatLogs.set(id, turns.slice(-20))
     if (this._chatFor === id) this.renderChat(id)
@@ -1129,6 +1186,7 @@ const TEMPLATE = `
     <div class="info">
       <div class="title"></div>
       <div class="meta"></div>
+      <button class="btn icon ghost rename" id="btn-rename" title="Give this worker a name of your own">✎</button>
     </div>
     <button class="btn icon ghost" id="btn-deselect" title="Deselect (Esc)">${ICON.close}</button>
   </div>
@@ -1145,6 +1203,7 @@ const TEMPLATE = `
     <div class="log"></div>
     <form class="ask" autocomplete="off">
       <input name="q" placeholder="Ask what it needs…" maxlength="400">
+      <button class="btn icon ghost mic" type="button" id="btn-mic" title="Ask by voice, hear the answer" hidden>🎤</button>
       <button class="btn primary" type="submit" title="Ask this worker">Ask</button>
     </form>
   </div>

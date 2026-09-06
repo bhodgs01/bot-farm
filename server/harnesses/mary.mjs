@@ -32,8 +32,15 @@ const fmt = (s) => {
 }
 
 async function fetchThreads() {
-  const [board, agent] = await Promise.all([getJson('/api/vitals'), getJson('/api/subagent?slug=vitals').catch(() => null)])
+  const [board, agent, floor] = await Promise.all([getJson('/api/vitals'), getJson('/api/subagent?slug=vitals').catch(() => null), getJson('/api/floor').catch(() => null)])
   const now = Date.now()
+  // Up yet? The first live motion event of the Kansas City day says so; until then she sleeps.
+  const kcDay = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' })
+  const today = kcDay.format(new Date(now))
+  const recent = Array.isArray(floor?.recent) ? floor.recent : []
+  const motion = recent.filter((e) => e.kind === 'event' && e.live && /motion|movement|door|presence/i.test(`${e.type || ''} ${e.text || ''}`) && e.ts && kcDay.format(new Date(e.ts)) === today)
+  const upSince = motion.length ? Math.min(...motion.map((e) => e.ts)) : 0
+  const asleep = !upSince
   const hr = sign(board, 'Resting HR')
   const hrv = sign(board, 'HRV')
   const battery = sign(board, 'Body Battery')
@@ -56,6 +63,7 @@ async function fetchThreads() {
     Stress: stress ? `${fmt(stress)}${bands ? ` · ${bands}` : ''}` : '',
     Recovery: fmt(recovery),
     'Fitness age': fitness ? `${fmt(fitness)}${fitness.vs != null ? ` (actual ${fitness.vs})` : ''}` : '',
+    'Up today': upSince ? `since ${fmtTime.format(new Date(upSince))} CT (first movement)` : 'no movement seen yet today',
     Sleep: sleepLine || 'not reported',
     Source: board.live ? 'Garmin via Home Assistant, live' : 'caregiver app',
     Updated: board.updated ? `${fmtTime.format(new Date(board.updated))} CT` : '',
@@ -64,9 +72,10 @@ async function fetchThreads() {
     {
       id: 'mary:vitals',
       kind: worrying ? 'task' : 'vitals',
+      asleep: asleep && !worrying,
       title: '❤️ Mary',
       plate: hr && hr.value != null ? `♥ ${hr.value}` : '',
-      preview: [agent?.headline || 'Vitals live from the Garmin', hr ? `Resting HR ${fmt(hr)}` : '', battery ? `Body battery ${fmt(battery)}` : ''].filter(Boolean).join(NL),
+      preview: [asleep ? 'Not up yet today (no movement seen)' : `Up since ${fmtTime.format(new Date(upSince))}`, agent?.headline || 'Vitals live from the Garmin', hr ? `Resting HR ${fmt(hr)}` : '', battery ? `Body battery ${fmt(battery)}` : ''].filter(Boolean).join(NL),
       project: ZONE,
       projectPath: 'caregiver://mary',
       worktree: '',

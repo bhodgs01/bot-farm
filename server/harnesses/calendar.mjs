@@ -152,7 +152,9 @@ async function fetchThreads() {
       source: 'calendar',
       canOpen: Boolean(e.link),
       canArchive: false,
-      ref: { link: e.link },
+      ref: { link: e.link, meet: e.meet },
+      // Join inside the last ten minutes before a Meet; Record any time the day of.
+      actions: [...(e.meet && e.start - now < 10 * 60000 && e.end > now ? ['join'] : []), ...(e.start - now < 12 * 3600000 && e.end > now ? ['record'] : [])],
     })
   }
   return out

@@ -145,3 +145,50 @@ export async function janineDraftAction({ draftKey, action, who }) {
   refreshJanine()
   return j
 }
+
+// ── Nudge: a payment reminder drafted into Gmail, never sent from here ────────────────
+const GMAIL = { id: process.env.GMAIL_CLIENT_ID || '', secret: process.env.GMAIL_CLIENT_SECRET || '', refresh: process.env.GMAIL_REFRESH_TOKEN || '' }
+let gmailAccess = { token: '', expiresAt: 0 }
+async function gmailToken() {
+  if (gmailAccess.token && Date.now() < gmailAccess.expiresAt - 60000) return gmailAccess.token
+  if (!GMAIL.id || !GMAIL.secret || !GMAIL.refresh) throw new Error('No Gmail credentials on this server')
+  const body = new URLSearchParams({ client_id: GMAIL.id, client_secret: GMAIL.secret, refresh_token: GMAIL.refresh, grant_type: 'refresh_token' })
+  const res = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body, signal: AbortSignal.timeout(15000) })
+  if (!res.ok) throw new Error(`gmail token → ${res.status}`)
+  const json = await res.json()
+  gmailAccess = { token: json.access_token, expiresAt: Date.now() + (Number(json.expires_in) || 3600) * 1000 }
+  return gmailAccess.token
+}
+
+/**
+ * Draft a short, polite reminder to the client behind a receivable. It lands in Gmail's
+ * Drafts for Blake to read and send; nothing goes out from the map.
+ */
+export async function nudgeClient({ thread, who }) {
+  const d = thread.details || {}
+  const to = String(d.Email || thread.cwd || '').trim()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw new Error('No email address on this job')
+  const client = String(d.Client || '').trim()
+  const job = String(thread.title || '').replace(/^[^\w$]+/, '').trim()
+  const amount = String(d.Total || d.Owed || thread.plate || '').trim()
+  const first = client.split(/\s+/)[0] || 'there'
+  const subject = `Invoice reminder: ${job}`
+  const text = [
+    `Hi ${first},`,
+    '',
+    `Quick note on the invoice for ${job}${amount ? ` (${amount})` : ''}. When you get a chance, could you let me know where it stands on your end?`,
+    '',
+    'Happy to resend it or answer any questions.',
+    '',
+    'Thanks,',
+    'Blake',
+  ].join('\r\n')
+  const raw = [`To: ${to}`, `Subject: ${subject}`, 'Content-Type: text/plain; charset=utf-8', 'MIME-Version: 1.0', '', text].join('\r\n')
+  const encoded = Buffer.from(raw, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  const token = await gmailToken()
+  const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/drafts', { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ message: { raw: encoded } }), signal: AbortSignal.timeout(15000) })
+  if (!res.ok) throw new Error(`gmail draft → ${res.status}`)
+  const draft = await res.json()
+  console.log(`act: ${who} drafted a reminder to ${to} for ${job} (draft ${draft.id})`)
+  return { id: draft.id, to, subject }
+}

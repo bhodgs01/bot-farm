@@ -114,6 +114,8 @@ export function statusFor(thread, now = Date.now()) {
   if (thread.kind === 'plant') return 'plant'
   if (thread.kind === 'visitor') return 'visitor'
   if (thread.kind === 'person') return thread.running ? 'working' : 'idle'
+  // A source can put a worker to sleep on purpose (Mary before her first movement, the scoreboard between games).
+  if (thread.asleep && !thread.hasError) return 'sleeping'
   if (thread.hasError) return 'blocked'
   // A star is a note to self: it shows over anything that is not asking for Blake.
   if (thread.watched && !thread.unread) return 'watched'

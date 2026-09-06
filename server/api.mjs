@@ -12,7 +12,7 @@ import {
   setThreadArchived,
 } from './scan.mjs'
 import { ask, chatEnabled } from './ask.mjs'
-import { setProjectStatus, closeTask, completeChores, createTicket, janineDraftAction } from './act.mjs'
+import { setProjectStatus, closeTask, completeChores, createTicket, janineDraftAction, nudgeClient } from './act.mjs'
 import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
 import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGenerate, update as newsUpdate, topicById, todayKC, newsEnabled } from './news.mjs'
 import { refreshNews } from './harnesses/news.mjs'
@@ -238,6 +238,14 @@ const emptyState = () => ({
 const asObject = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {})
 const asArray = (v) => (Array.isArray(v) ? v : [])
 
+/** Blake's own names for workers, by thread id. */
+function asNames(v) {
+  if (!v || typeof v !== 'object') return {}
+  const out = {}
+  for (const [id, name] of Object.entries(v)) if (typeof name === 'string' && name.trim() && id.length < 200) out[id] = name.trim().slice(0, 40)
+  return out
+}
+
 /** The saved home view: angle, tilt, zoom and the ground point it looks at. Null when unset. */
 function asPose(v) {
   if (!v || typeof v !== 'object') return null
@@ -269,6 +277,7 @@ async function readState() {
       opened: asArray(raw.opened),
       plots: asObject(raw.plots),
       seen: asObject(raw.seen),
+      names: asNames(raw.names),
       settings: raw.settings && typeof raw.settings === 'object' ? raw.settings : null,
       home: asPose(raw.home),
       homes: asHomes(raw.homes),
@@ -292,6 +301,7 @@ async function writeState(next) {
     opened: asArray(next.opened),
     plots: asObject(next.plots),
     seen: asObject(next.seen),
+    names: asNames(next.names),
     settings: next.settings && typeof next.settings === 'object' ? next.settings : null,
     home: asPose(next.home),
     homes: asHomes(next.homes),
@@ -588,6 +598,22 @@ export async function apiMiddleware(req, res, next) {
       try {
         const task = await createTicket({ thread, who })
         return send(res, 200, { ok: true, task: { id: task.id, title: task.title, project: task.project_id } })
+      } catch (err) {
+        return send(res, 409, { ok: false, error: String(err?.message || err) })
+      }
+    }
+
+    // A polite payment reminder, drafted into Gmail for Blake to send (never sent from here).
+    if (url.pathname === '/api/act/nudge' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to draft reminders', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      const { id } = await readJsonBody(req, 16 * 1024)
+      const thread = (await scanThreads()).find((t) => t.id === id)
+      if (!thread) return send(res, 404, { error: 'That worker has walked off the map' })
+      try {
+        const draft = await nudgeClient({ thread, who })
+        return send(res, 200, { ok: true, draft })
       } catch (err) {
         return send(res, 409, { ok: false, error: String(err?.message || err) })
       }

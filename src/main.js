@@ -26,6 +26,7 @@ import {
   actChore,
   actTicket,
   actJanine,
+  actNudge,
   actAck,
   actStar,
   actNews,
@@ -60,7 +61,19 @@ const engine = new Engine(settings).mount(app)
 const rig = new CameraRig(engine.camera, engine.canvas, settings)
 const colony = new Colony(engine.scene, settings, engine.camera, engine.renderer)
 
-let state = { archived: [], archivedAt: {}, opened: [], plots: {}, seen: {}, home: null, homes: {} }
+let state = { archived: [], archivedAt: {}, opened: [], plots: {}, seen: {}, home: null, homes: {}, names: {} }
+
+/** Blake's own names for workers, laid over the titles their sources gave them. The emoji stays. */
+function withNames(list) {
+  const names = state.names || {}
+  if (!Object.keys(names).length) return list
+  return list.map((t) => {
+    const name = names[t.id]
+    if (!name) return t
+    const emoji = (String(t.title || '').match(/^(\p{Extended_Pictographic}\uFE0F?\s*)/u) || ['', ''])[1]
+    return { ...t, title: `${emoji}${name}`, givenTitle: t.title }
+  })
+}
 let homeApplied = false
 
 /**
@@ -125,6 +138,20 @@ const hoverGround = new THREE.Vector3()
 
 const actions = {
   resetView: () => rig.resetView(),
+
+  /** Give a worker a name of Blake's own; an empty name gives the source's back. */
+  renameWorker: (id, name) => {
+    const names = { ...(state.names || {}) }
+    const clean = String(name || '').trim().slice(0, 40)
+    if (clean) names[id] = clean
+    else delete names[id]
+    state.names = names
+    queueSave()
+    const base = threads.map((t) => (t.givenTitle ? { ...t, title: t.givenTitle, givenTitle: undefined } : t))
+    applyThreads(base)
+    if (selectedId === id) select(id, {})
+    hud.toast(clean ? `Meet ${clean}` : 'Back to the given name')
+  },
 
   /** The view on screen right now becomes home: the Home button and every page load return to it. */
   setHome: () => {
@@ -218,6 +245,21 @@ const actions = {
         Object.assign(thread, { unread: false, count: 0, actions: [], gitBranch: 'read', details: { ...(thread.details || {}), Status: 'read' } })
         applyThreads(threads.slice())
         setTimeout(poll, 1500)
+        return
+      }
+      if (status === 'join') {
+        const url = thread.ref?.meet || thread.details?.Meet
+        if (url) window.open(url, '_blank', 'noopener')
+        return
+      }
+      if (status === 'record') {
+        window.open('https://meetings.kcproto.com/', '_blank', 'noopener')
+        hud.toast('Meetings hub opened. Press Record on the meeting there.')
+        return
+      }
+      if (status === 'nudge') {
+        const r = await actNudge(thread.id)
+        hud.toast(`Reminder drafted in Gmail for ${r.draft?.to || 'the client'}. Send it from Drafts.`)
         return
       }
       if (status === 'ticket') {
@@ -1047,7 +1089,7 @@ window.addEventListener('keydown', (e) => {
 // ── data ──────────────────────────────────────────────────────────────────────────────
 
 function applyThreads(list) {
-  threads = list
+  threads = list = withNames(list)
   const archivedSet = new Set(state.archived)
   const stats = colony.setThreads(list, archivedSet)
   hud.setStats(stats)
@@ -1106,6 +1148,7 @@ async function adoptRemoteState() {
   state.archivedAt = remote.archivedAt || {}
   // The saved home view: a fresh page jumps straight to it; a change from another device
   // is remembered for the next Home press.
+  state.names = remote.names && typeof remote.names === 'object' ? remote.names : {}
   state.home = remote.home && typeof remote.home === 'object' ? remote.home : null
   state.homes = remote.homes && typeof remote.homes === 'object' ? remote.homes : {}
   applyHome(remote)

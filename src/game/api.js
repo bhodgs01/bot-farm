@@ -89,6 +89,9 @@ export const actChore = (ids) => post('/api/act/chore', { ids })
 /** File the worker's situation as a Vikunja ticket in its client's project. */
 export const actTicket = (threadId) => post('/api/act/ticket', { id: threadId })
 
+/** Draft a payment reminder into Gmail for the client behind a receivable. */
+export const actNudge = (threadId) => post('/api/act/nudge', { id: threadId })
+
 /** Tell Janine to send or skip a held draft. */
 export const actJanine = (threadId, action) => post('/api/act/janine', { id: threadId, action })
 
