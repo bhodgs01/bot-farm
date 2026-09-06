@@ -135,10 +135,10 @@ export async function createTicket({ thread, who }) {
 }
 
 // ── Janine's held drafts: send it, or skip it ────────────────────────────────────────────
-const JANINE = (process.env.JANINE_URL || 'http://janine.janine.svc.cluster.local:3120').replace(/\/$/, '')
+const JANINE_BASE = (process.env.JANINE_URL || 'http://janine.janine.svc.cluster.local:3120').replace(/\/$/, '')
 export async function janineDraftAction({ draftKey, action, who }) {
   if (!['approve', 'skip', 'handled'].includes(action)) throw new Error('Bad action')
-  const r = await fetch(`${JANINE}/api/draft/action`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draftKey, action }), signal: AbortSignal.timeout(20000) })
+  const r = await fetch(`${JANINE_BASE}/api/draft/action`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draftKey, action }), signal: AbortSignal.timeout(20000) })
   const j = await r.json().catch(() => ({}))
   if (!r.ok || j.success === false) throw new Error(j.error || `janine → ${r.status}`)
   console.log(`act: ${who} told Janine to ${action} ${draftKey}`)
