@@ -225,6 +225,16 @@ export class CameraRig {
     this._sync()
   }
 
+  /** Forget every pointer: the page has taken this press for itself (a hex being dragged). */
+  release() {
+    this._pointers.clear()
+    this._mode = null
+    this.interacting = false
+    this.suppressed = false
+    this._hasAnchor = false
+    this._twist = null
+  }
+
   _pointerUp(e) {
     this._pointers.delete(e.pointerId)
     if (this._pointers.size === 0) {

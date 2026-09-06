@@ -339,6 +339,9 @@ export class Hud {
     on('#btn-orbit', 'click', () => this.setOrbit(this.actions.toggleOrbit?.()))
     on('#btn-tour', 'click', () => this.setTour(this.actions.toggleTour?.()))
     on('#btn-move-zone', 'click', () => this.actions.moveZone?.(this.project?.name))
+    on('#btn-intro-card', 'click', () => {
+      if (this.selected) this.setSelection(this.selected.agent, this.selected.thread, { mode: 'card' })
+    })
     on('#btn-planet', 'click', () => this.actions.cyclePlanet?.())
     on('#btn-time', 'click', () => this.actions.cycleTime?.())
     on('#btn-open', 'click', () => this.actions.openThread?.())
@@ -561,8 +564,13 @@ export class Hud {
    * one thread and its repo are the same context, and splitting them across the screen made
    * you look in two places to act on one astronaut.
    */
-  setSelection(agent, thread) {
+  setSelection(agent, thread, { mode } = {}) {
     const card = this.$('.thread-pop')
+    // Which face of the card: the intro (who I am) or the card proper (what I know and
+    // what you can do about it). A refresh of the same thread keeps the face it had.
+    if (mode) this._cardMode = mode
+    else if (thread?.id !== this.selected?.thread?.id) this._cardMode = 'card'
+    const intro = this._cardMode === 'intro' && Boolean(thread?.intro)
     if (thread && this._chatFor !== thread.id) {
       this._chatFor = thread.id
       this.renderChat(thread.id)
@@ -603,17 +611,21 @@ export class Hud {
         ? `<img class="cam" src="${escapeHtml(thread.art)}" alt="now playing" loading="lazy">`
         : ''
     details.innerHTML = picture + entries.map(([k, v]) => `<div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(String(v))}</div>`).join('')
-    details.hidden = entries.length === 0 && !picture
+    details.hidden = intro || (entries.length === 0 && !picture)
+    const introBox = this.$('.thread-pop .intro')
+    introBox.hidden = !intro
+    if (intro) introBox.querySelector('p').textContent = thread.intro
     // Stage buttons: what this thread can be moved to next.
     const stage = this.$('.thread-pop .stage')
     const STAGE_LABEL = { active: 'Make active', in_process: 'Start work', completed: 'Mark complete', paid: 'Paid ✓', done: 'Close ticket ✓', chore: 'Done ✓', read: 'Read ✓', ticket: '🎫 Make it a ticket', approve: 'Send it ✓', skip: 'Skip', ack: 'Remove flag', unack: 'Flag again', star: '★ Star', unstar: 'Unstar' }
     // A flagged worker offers to have the flag removed; an acknowledged one offers it back.
     this.renderReader(thread)
+    if (intro) this.$('.thread-pop .reader').hidden = true
     // Any raised hand can become a ticket, unless it already is one.
     const ticketable = (thread.unread || thread.hasError) && !['tasks', 'janine'].includes(thread.harness) && !/^(chief|ledger|deadline):/.test(thread.id)
     const acts = (Array.isArray(thread.actions) ? thread.actions : []).filter((a) => !(hasStories && a === 'read')).concat(ticketable ? ['ticket'] : []).concat(thread.hasError ? ['ack'] : thread.acked ? ['unack'] : []).concat(thread.watched ? ['unstar'] : ['star'])
     stage.innerHTML = acts.map((a) => `<button class="btn ${a === 'paid' || a === 'done' || a === 'chore' || a === 'approve' ? 'primary' : ''}" data-stage="${escapeHtml(a)}">${escapeHtml(STAGE_LABEL[a] || a)}</button>`).join('')
-    stage.hidden = acts.length === 0
+    stage.hidden = intro || acts.length === 0
     for (const b of stage.querySelectorAll('button')) b.addEventListener('click', () => this.actions.stageThread?.(b.dataset.stage))
 
     const pct = Math.round((this.actions.progressFor?.(thread.id) ?? 0) * 100)
@@ -1080,6 +1092,7 @@ const TEMPLATE = `
     <button class="btn icon ghost" id="btn-deselect" title="Deselect (Esc)">${ICON.close}</button>
   </div>
   <div class="progress"><i></i></div>
+  <div class="intro" hidden><p></p><button class="btn" id="btn-intro-card" title="Everything this worker knows">Show the card ›</button></div>
   <div class="details"></div>
   <div class="reader" hidden></div>
   <div class="stage"></div>

@@ -1271,6 +1271,8 @@ export class Astronauts {
   pick(camera, ndcX, ndcY, aspect, maxDist = 0.075) {
     let best = null
     let bestScore = Infinity
+    let bestPart = 'body'
+    this.pickPart = 'body'
     const v = this._v
     const b = this._pickBadge
 
@@ -1282,6 +1284,7 @@ export class Astronauts {
       const dx = (v.x - ndcX) * aspect
       const dy = v.y - ndcY
       let d = Math.hypot(dx, dy)
+      let part = 'body'
 
       // The badge over an astronaut's head is what you actually aim at when one wants you —
       // it is bigger than the astronaut, it is the thing that caught your eye, and it sits
@@ -1289,7 +1292,10 @@ export class Astronauts {
       b.set(agent.pos.x, agent.pos.y + BADGE_HEIGHT, agent.pos.z).project(camera)
       if (b.z <= 1) {
         const bd = Math.hypot((b.x - ndcX) * aspect, b.y - ndcY)
-        if (bd < d) d = bd
+        if (bd < d) {
+          d = bd
+          part = 'badge'
+        }
       }
       if (d > maxDist) continue
       // Break ties by depth so the nearer of two overlapping agents wins.
@@ -1297,8 +1303,11 @@ export class Astronauts {
       if (score < bestScore) {
         bestScore = score
         best = agent
+        bestPart = part
       }
     }
+    // Which part of the winner was aimed at: the bubble opens the alert, the body the intro.
+    this.pickPart = bestPart
     return best
   }
 

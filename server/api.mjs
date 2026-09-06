@@ -18,6 +18,7 @@ import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGen
 import { refreshNews } from './harnesses/news.mjs'
 import { napMode, fetchNap } from './harnesses/home.mjs'
 import { plexArt } from './harnesses/plex.mjs'
+import { withIntros } from './intro.mjs'
 
 // ── history: who had a hand up, hour by hour ─────────────────────────────────────────────
 // Resolved on use: DATA_DIR is declared further down and this block loads with the module.
@@ -84,9 +85,9 @@ function withLedger(threads) {
     kind: 'keeper',
     landmark: 'signpost',
     title: '📒 Ledger',
-    plate: money(owedTotal),
-    roof: monthly ? `${money(monthly)}/mo` : '',
-    preview: `${money(owedTotal)} owed on ${owed.length} finished job${owed.length === 1 ? '' : 's'} · ${money(inProcess)} in process · ${money(pipeline)} in the pipeline${monthly ? ` · ${money(monthly)}/mo retainers` : ''} · ${money(spend)} API today`,
+    // No figures over the keeper's head: the map gets shown around. The numbers are on
+    // the card, one click away.
+    preview: `The books: ${owed.length} finished job${owed.length === 1 ? '' : 's'} owed, ${retainers.length} retainer${retainers.length === 1 ? '' : 's'} on the board. Click me for the figures.`,
     details: {
       Owed: owed.length ? owed.map((o) => `${o.t.title.replace(/^[^\w]+/, '')}: ${money(o.amount)} (${o.t.plate || ''})`).join(nl) : 'nothing outstanding',
       'In process': money(inProcess),
@@ -473,7 +474,7 @@ export async function apiMiddleware(req, res, next) {
     if (url.pathname === '/api/threads' && req.method === 'GET') {
       const scanned = await applyStars(await applyAcks(await reconcileArchived(await scanThreads())))
       recordHistory(scanned).catch(() => {})
-      const threads = withChief(withLedger(scanned))
+      const threads = withIntros(withChief(withLedger(scanned)))
       return send(res, 200, { nap: napMode(), threads, scannedAt: Date.now() })
     }
 

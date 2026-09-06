@@ -25,8 +25,9 @@ import orders from './orders.mjs'
 import dr from './dr.mjs'
 import garage from './garage.mjs'
 import fleet from './fleet.mjs'
+import mary from './mary.mjs'
 
-const ALL = { 'jarvis-cluster': jarvisCluster, mailroom, plex, 'print-farm': printFarm, home, chores, tasks, trades, projects, calendar, news, weather, keys, deadlines, tvs, janine, orders, dr, garage, fleet, 'claude-code': claudeCode }
+const ALL = { 'jarvis-cluster': jarvisCluster, mailroom, plex, 'print-farm': printFarm, home, chores, tasks, trades, projects, calendar, news, weather, keys, deadlines, tvs, janine, orders, dr, garage, fleet, mary, 'claude-code': claudeCode }
 const wanted = (process.env.COLONY_HARNESSES || 'jarvis-cluster,mailroom,plex,print-farm,home,chores,tasks,trades,projects,calendar,news,weather,keys,deadlines,tvs,janine,orders,dr,garage,fleet').split(',').map((s) => s.trim()).filter(Boolean)
 
 export const HARNESSES = wanted.map((id) => ALL[id]).filter(Boolean)

@@ -369,7 +369,7 @@ window.addEventListener('resize', () => hud.setSideWidth(sideWidth()))
 
 // ── selection ─────────────────────────────────────────────────────────────────────────
 
-function select(id, { fly = false } = {}) {
+function select(id, { fly = false, mode } = {}) {
   selectedId = id
   const agent = id ? colony.agentFor(id) : null
   if (!agent) {
@@ -381,7 +381,7 @@ function select(id, { fly = false } = {}) {
   }
   colony.astronauts.setSelected(agent)
   const thread = threads.find((t) => t.id === id) || agent.thread
-  hud.setSelection(agent, thread)
+  hud.setSelection(agent, thread, { mode })
   // Picking somebody is also picking the zone they are standing on: the sidebar follows.
   if (thread?.project && colony.plots.has(thread.project)) selectedProject = thread.project
   syncProject()
@@ -618,7 +618,8 @@ engine.canvas.addEventListener('pointerup', (e) => {
   const p = ndc(e)
   const agent = colony.pick(p.x, p.y, p.aspect)
   if (agent) {
-    select(agent.id, {})
+    // The bubble is the alert; the astronaut itself introduces who it is.
+    select(agent.id, { mode: colony.astronauts.pickPart === 'badge' ? 'card' : 'intro' })
     return
   }
   // Nobody there: a zone's deck or its name plate opens that repo's sidebar instead, and
@@ -776,6 +777,115 @@ window.addEventListener('pointerup', (e) => {
   }
   applyThreads(threads.slice())
   hud.toast(r.swapped ? `Swapped ${name} with ${r.swapped}` : `Moved ${name}`)
+})
+
+// ── drag a hex: press and hold on its deck, then carry it to a cell ───────────────────
+// A plain press is a pan, so the hex only lifts after a short hold without movement. Once
+// lifted the camera lets go of the press, the deck rises, and wherever the pointer is on
+// release is where the hex lands (on another hex: the two swap).
+const HOLD_MS = 420
+let hexHold = null // { name, x, y, pointerId, timer }
+let hexDrag = null // { name, plot, pointerId }
+function liftHex(plot, up) {
+  if (!plot?.group) return
+  plot.group.position.y = up ? 0.55 : 0
+  if (plot.label) plot.label.position.y += up ? 0.55 : -0.55
+}
+engine.canvas.addEventListener(
+  'pointerdown',
+  (e) => {
+    if (e.button !== 0 || moveZone || drag || hexDrag) return
+    const p = ndc(e)
+    if (colony.pick(p.x, p.y, p.aspect)) return
+    const plot = plotUnder(e, p)
+    if (!plot) return
+    if (hexHold) clearTimeout(hexHold.timer)
+    hexHold = {
+      name: plot.name,
+      x: e.clientX,
+      y: e.clientY,
+      pointerId: e.pointerId,
+      timer: setTimeout(() => {
+        const hold = hexHold
+        hexHold = null
+        if (!hold || !colony.plots.has(hold.name)) return
+        rig.release()
+        engine.canvas.setPointerCapture?.(hold.pointerId)
+        const live = colony.plots.get(hold.name)
+        hexDrag = { name: hold.name, plot: live, pointerId: hold.pointerId }
+        liftHex(live, true)
+        hoverTip.hidden = true
+        engine.canvas.style.cursor = 'grabbing'
+        dragTip.textContent = `Carry ${hold.name} to a cell`
+        dragTip.hidden = false
+        dragTip.style.left = `${hold.x + 14}px`
+        dragTip.style.top = `${hold.y + 16}px`
+        try {
+          navigator.vibrate?.(18)
+        } catch {}
+      }, HOLD_MS),
+    }
+  },
+  { capture: true }
+)
+window.addEventListener(
+  'pointermove',
+  (e) => {
+    if (hexHold && Math.hypot(e.clientX - hexHold.x, e.clientY - hexHold.y) > 8) {
+      clearTimeout(hexHold.timer)
+      hexHold = null // moved: that was a pan after all
+    }
+    if (!hexDrag) return
+    e.stopImmediatePropagation()
+    const ground = rig.groundPoint(e.clientX, e.clientY, hoverGround)
+    const cell = ground ? colony.cellAt(ground.x, ground.z) : null
+    const over = ground ? colony.plotAt(ground.x, ground.z) : null
+    colony.setHoveredPlot(over && over.name !== hexDrag.name ? over : null)
+    dragTip.textContent = !cell ? `Carry ${hexDrag.name} to a cell` : over && over.name !== hexDrag.name ? `Swap ${hexDrag.name} with ${over.name}` : `Drop ${hexDrag.name} here`
+    dragTip.style.left = `${e.clientX + 14}px`
+    dragTip.style.top = `${e.clientY + 16}px`
+  },
+  { capture: true }
+)
+window.addEventListener(
+  'pointerup',
+  (e) => {
+    if (hexHold) {
+      clearTimeout(hexHold.timer)
+      hexHold = null
+    }
+    if (!hexDrag) return
+    const d = hexDrag
+    hexDrag = null
+    e.stopImmediatePropagation()
+    dragTip.hidden = true
+    engine.canvas.style.cursor = 'grab'
+    colony.setHoveredPlot(null)
+    liftHex(d.plot, false)
+    const ground = rig.groundPoint(e.clientX, e.clientY, hoverGround)
+    if (!ground) return
+    const cell = colony.cellAt(ground.x, ground.z)
+    const here = colony.plotAt(ground.x, ground.z)
+    if (here && here.name === d.name) return // put back where it was
+    const r = colony.moveZoneTo(d.name, cell)
+    if (!r.ok) {
+      hud.toast(r.why, 'err')
+      return
+    }
+    applyThreads(threads.slice())
+    hud.toast(r.swapped ? `Swapped ${d.name} with ${r.swapped}` : `Moved ${d.name}`)
+  },
+  { capture: true }
+)
+window.addEventListener('pointercancel', () => {
+  if (hexHold) clearTimeout(hexHold.timer)
+  hexHold = null
+  if (hexDrag) {
+    liftHex(hexDrag.plot, false)
+    hexDrag = null
+    dragTip.hidden = true
+    colony.setHoveredPlot(null)
+  }
 })
 
 window.addEventListener('keydown', (e) => {
