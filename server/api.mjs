@@ -17,6 +17,7 @@ import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
 import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGenerate, update as newsUpdate, topicById, todayKC, newsEnabled } from './news.mjs'
 import { refreshNews } from './harnesses/news.mjs'
 import { napMode, fetchNap } from './harnesses/home.mjs'
+import { plexArt } from './harnesses/plex.mjs'
 
 // ── history: who had a hand up, hour by hour ─────────────────────────────────────────────
 // Resolved on use: DATA_DIR is declared further down and this block loads with the module.
@@ -665,6 +666,19 @@ export async function apiMiddleware(req, res, next) {
     }
 
     // Nap time, on its own so the page can ask every few seconds without a full scan.
+    // Artwork for the theater screen. The Plex token stays here; the page only ever sees
+    // a library path, and only library art paths are fetched.
+    if (url.pathname === '/api/plex/art' && req.method === 'GET') {
+      try {
+        const a = await plexArt(url.searchParams.get('key'))
+        if (!a) return send(res, 400, { error: 'Not a library art path' })
+        res.writeHead(200, { 'Content-Type': a.type, 'Content-Length': a.body.length, 'Cache-Control': 'public, max-age=600' })
+        return res.end(a.body)
+      } catch (err) {
+        return send(res, 502, { error: err.message })
+      }
+    }
+
     if (url.pathname === '/api/nap' && req.method === 'GET') {
       return send(res, 200, { nap: await fetchNap() })
     }

@@ -33,7 +33,16 @@ async function fetchSessions() {
     const pct = m.duration ? Math.round((100 * (m.viewOffset || 0)) / m.duration) : 0
     const player = [m.Player?.device, m.Player?.product].filter(Boolean).join(' ')
     const key = m.Session?.id || m.sessionKey || `${user}:${m.ratingKey}`
+    // Backdrop first (it is landscape, like the screen), poster as the fallback. The page
+    // fetches these through /api/plex/art so the token never leaves the server.
+    const artPath = [m.art, m.grandparentArt, m.thumb, m.grandparentThumb, m.parentThumb].find((v) => typeof v === 'string' && v.startsWith('/library/'))
+    const posterPath = [m.thumb, m.grandparentThumb, m.parentThumb].find((v) => typeof v === 'string' && v.startsWith('/library/'))
+    const artUrl = (v) => (v ? `/api/plex/art?key=${encodeURIComponent(v)}` : '')
     return {
+      art: artUrl(artPath),
+      poster: artUrl(posterPath),
+      watcher: user,
+      pct,
       id: `plex:${key}`,
       kind: 'watching',
       title: show.slice(0, 120),
@@ -82,6 +91,28 @@ async function scanThreads() {
       })
   }
   return cache.data || cache.inflight
+}
+
+/**
+ * One piece of artwork from the Plex server, for the theater screen and the card. Only
+ * library art paths are allowed through, and each one is held for ten minutes so a screen
+ * cycling every ten seconds never re-asks Plex for the same frame.
+ */
+const art = new Map()
+const ART_TTL_MS = 10 * 60 * 1000
+export async function plexArt(key) {
+  const path = String(key || '')
+  if (!/^\/library\/metadata\/\d+\/(art|thumb|banner)\/\d+$/.test(path)) return null
+  const hit = art.get(path)
+  if (hit && Date.now() - hit.at < ART_TTL_MS) return hit
+  // Ask Plex for a modest transcode: the screen is a few hundred pixels across.
+  const url = `${PLEX_URL}/photo/:/transcode?width=640&height=360&minSize=1&upscale=1&url=${encodeURIComponent(path)}`
+  const res = await fetch(url, { headers: { 'X-Plex-Token': TOKEN }, signal: AbortSignal.timeout(10000) })
+  if (!res.ok) throw new Error(`plex art → ${res.status}`)
+  const entry = { at: Date.now(), type: res.headers.get('content-type') || 'image/jpeg', body: Buffer.from(await res.arrayBuffer()) }
+  if (art.size > 64) art.delete(art.keys().next().value)
+  art.set(path, entry)
+  return entry
 }
 
 function openThread(ref) {

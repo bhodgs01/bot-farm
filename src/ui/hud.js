@@ -597,8 +597,13 @@ export class Hud {
     const hasStories = Array.isArray(thread.stories) && thread.stories.length > 0
     // The reader shows the stories one at a time, so the headline list would say it twice.
     const entries = Object.entries(thread.details || {}).filter(([k, v]) => v !== '' && v != null && !(hasStories && k === 'Headlines'))
-    details.innerHTML = (thread.camera ? `<img class="cam" src="${escapeHtml(thread.camera)}" alt="printer camera" loading="lazy">` : '') + entries.map(([k, v]) => `<div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(String(v))}</div>`).join('')
-    details.hidden = entries.length === 0 && !thread.camera
+    const picture = thread.camera
+      ? `<img class="cam" src="${escapeHtml(thread.camera)}" alt="printer camera" loading="lazy">`
+      : thread.art
+        ? `<img class="cam" src="${escapeHtml(thread.art)}" alt="now playing" loading="lazy">`
+        : ''
+    details.innerHTML = picture + entries.map(([k, v]) => `<div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(String(v))}</div>`).join('')
+    details.hidden = entries.length === 0 && !picture
     // Stage buttons: what this thread can be moved to next.
     const stage = this.$('.thread-pop .stage')
     const STAGE_LABEL = { active: 'Make active', in_process: 'Start work', completed: 'Mark complete', paid: 'Paid ✓', done: 'Close ticket ✓', chore: 'Done ✓', read: 'Read ✓', ticket: '🎫 Make it a ticket', approve: 'Send it ✓', skip: 'Skip', ack: 'Remove flag', unack: 'Flag again', star: '★ Star', unstar: 'Unstar' }

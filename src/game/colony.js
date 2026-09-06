@@ -615,6 +615,7 @@ export class Colony {
     entry.target = 0
     if (entry.progress <= 0.02) {
       this.worldGroup.remove(entry.mesh)
+      entry.mesh.userData.disposeExtras?.()
       entry.mesh.geometry.dispose()
       entry.mesh.material.dispose()
       entry.mesh.customDepthMaterial?.dispose()
@@ -951,6 +952,122 @@ export class Colony {
   }
 
   /**
+   * The cinema screen shows what is playing on Plex: the stream's backdrop with the title,
+   * who is watching and how far in, drawn on a plane just in front of the kit's white
+   * screen. More than one stream and it cycles, ten seconds each. Nobody watching and the
+   * plane hides, leaving the theater's own lit screen.
+   */
+  _syncScreen(elapsed) {
+    let sc = this._screen
+    let entry = sc ? this.buildings.get(sc.id) : null
+    if (!entry || entry.mesh !== sc.mesh || entry.retiring) {
+      sc = null
+      for (const [id, e] of this.buildings) {
+        if (e.mesh.userData.kind !== 'theater' || e.retiring) continue
+        sc = this._hangScreen(id, e.mesh)
+        break
+      }
+      this._screen = sc
+      if (!sc) return
+    }
+    const watching = []
+    for (const t of this.threads.values()) if (t.kind === 'watching' && typeof t.art === 'string') watching.push(t)
+    if (!watching.length) {
+      sc.plane.visible = false
+      sc.shown = ''
+      return
+    }
+    watching.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+    const t = watching[Math.floor(elapsed / 10) % watching.length]
+    const sig = `${t.id}|${t.title}|${t.preview}|${t.art}|${t.pct}`
+    if (sig === sc.shown) return
+    sc.shown = sig
+    this._paintScreen(sc, t, null)
+    sc.plane.visible = true
+    if (!t.art) return
+    let img = sc.images.get(t.art)
+    if (!img) {
+      img = new Image()
+      img.decoding = 'async'
+      img.src = t.art
+      sc.images.set(t.art, img)
+      if (sc.images.size > 12) sc.images.delete(sc.images.keys().next().value)
+    }
+    const paint = () => {
+      if (sc.shown === sig && img.naturalWidth) this._paintScreen(sc, t, img)
+    }
+    if (img.complete && img.naturalWidth) paint()
+    else img.addEventListener('load', paint, { once: true })
+  }
+
+  _hangScreen(id, mesh) {
+    const k = mesh.userData.scale || 1
+    const canvas = document.createElement('canvas')
+    canvas.width = 512
+    canvas.height = 275
+    const texture = new THREE.CanvasTexture(canvas)
+    texture.colorSpace = THREE.SRGBColorSpace
+    texture.anisotropy = 4
+    const material = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false })
+    // The recipe's screen: 2.18 x 1.17 at y 1.45, its face toward the seats at z -1.07.
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(2.18 * k, 1.17 * k), material)
+    plane.position.set(0, 1.45 * k, -1.06 * k)
+    plane.visible = false
+    mesh.add(plane)
+    mesh.userData.disposeExtras = () => {
+      mesh.remove(plane)
+      plane.geometry.dispose()
+      material.dispose()
+      texture.dispose()
+    }
+    return { id, mesh, plane, canvas, ctx: canvas.getContext('2d'), texture, images: new Map(), shown: '' }
+  }
+
+  _paintScreen(sc, t, img) {
+    const { ctx, canvas, texture } = sc
+    const W = canvas.width
+    const H = canvas.height
+    ctx.fillStyle = '#0b0d14'
+    ctx.fillRect(0, 0, W, H)
+    if (img) {
+      // Cover-fit: fill the screen, crop the rest.
+      const s = Math.max(W / img.naturalWidth, H / img.naturalHeight)
+      const w = img.naturalWidth * s
+      const h = img.naturalHeight * s
+      ctx.drawImage(img, (W - w) / 2, (H - h) / 2, w, h)
+    }
+    // A dark band for the caption, so the title reads over any backdrop.
+    const band = ctx.createLinearGradient(0, H * 0.55, 0, H)
+    band.addColorStop(0, 'rgba(5,6,12,0)')
+    band.addColorStop(1, 'rgba(5,6,12,0.92)')
+    ctx.fillStyle = band
+    ctx.fillRect(0, 0, W, H)
+    const paused = /paused/.test(String(t.preview || ''))
+    ctx.textBaseline = 'alphabetic'
+    ctx.fillStyle = '#ffffff'
+    ctx.font = '600 30px system-ui, -apple-system, "Segoe UI", sans-serif'
+    let title = String(t.title || '')
+    while (title.length > 3 && ctx.measureText(title).width > W - 40) title = `${title.slice(0, -2).trimEnd()}…`
+    ctx.fillText(title, 20, H - 62)
+    ctx.fillStyle = paused ? '#ffd27a' : '#c9d3ff'
+    ctx.font = '500 20px system-ui, -apple-system, "Segoe UI", sans-serif'
+    ctx.fillText(`${paused ? '⏸' : '▶'} ${t.watcher || t.cwd || 'someone'} · ${Math.round(t.pct || 0)}%`, 20, H - 32)
+    // The playback position, along the bottom edge.
+    ctx.fillStyle = 'rgba(255,255,255,0.18)'
+    ctx.fillRect(0, H - 8, W, 8)
+    ctx.fillStyle = paused ? '#ffd27a' : '#e8553f'
+    ctx.fillRect(0, H - 8, (W * Math.min(100, Math.max(0, t.pct || 0))) / 100, 8)
+    if (!img) {
+      ctx.fillStyle = 'rgba(255,255,255,0.08)'
+      ctx.font = '700 120px system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText('▶', W / 2, H * 0.62)
+      ctx.textAlign = 'left'
+    }
+    texture.needsUpdate = true
+  }
+
+  /**
    * Every hex wears its name. Blake tried the fade-in-when-busy version and preferred the
    * map he can read; the label toggle still hides them all at once.
    */
@@ -1009,6 +1126,7 @@ export class Colony {
 
   update(dt, elapsed, focus) {
     this._syncPlates()
+    this._syncScreen(elapsed)
     this._syncBeams(dt)
     this._syncSignals(dt)
     this._syncStarMarks(dt, elapsed)

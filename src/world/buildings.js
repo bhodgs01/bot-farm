@@ -2404,6 +2404,7 @@ export function createBuilding({ seed = 1, accent = 0xc96442, kind = null } = {}
 
   mesh.userData.kind = chosen
   mesh.userData.label = label
+  mesh.userData.scale = k // for anything hung on the piece afterwards, in the recipe's units
   mesh.userData.height = height
   mesh.userData.footprint = footprint
   mesh.userData.uniforms = uniforms
