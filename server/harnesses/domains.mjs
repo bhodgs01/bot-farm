@@ -19,10 +19,30 @@ const DOMAINS = String(process.env.DOMAINS || 'kcproto.com,ngvtalent.com,cyber-g
   .filter(Boolean)
 const fmtDate = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Chicago' })
 
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36'
+/** The registry's own RDAP for the common TLDs, with the rdap.org redirector as the fallback. */
+function rdapUrls(domain) {
+  const tld = domain.split('.').pop()
+  const direct = { com: 'https://rdap.verisign.com/com/v1/domain/', net: 'https://rdap.verisign.com/net/v1/domain/', care: 'https://rdap.identitydigital.services/rdap/domain/', org: 'https://rdap.publicinterestregistry.org/rdap/domain/' }[tld]
+  return [direct ? `${direct}${domain}` : null, `https://rdap.org/domain/${encodeURIComponent(domain)}`].filter(Boolean)
+}
 async function expiry(domain) {
-  const res = await fetch(`https://rdap.org/domain/${encodeURIComponent(domain)}`, { headers: { Accept: 'application/rdap+json, application/json' }, redirect: 'follow', signal: AbortSignal.timeout(15000) })
-  if (!res.ok) throw new Error(`rdap ${domain} → ${res.status}`)
-  const json = await res.json()
+  let json = null
+  let last = ''
+  for (const url of rdapUrls(domain)) {
+    try {
+      const res = await fetch(url, { headers: { Accept: 'application/rdap+json, application/json', 'User-Agent': UA }, redirect: 'follow', signal: AbortSignal.timeout(15000) })
+      if (!res.ok) {
+        last = `${url.replace(/^https?:\/\//, '').split('/')[0]} → ${res.status}`
+        continue
+      }
+      json = await res.json()
+      break
+    } catch (e) {
+      last = e.message
+    }
+  }
+  if (!json) throw new Error(`rdap ${domain}: ${last}`)
   const ev = (json.events || []).find((e) => e.eventAction === 'expiration')
   const registrar = (json.entities || []).find((e) => (e.roles || []).includes('registrar'))
   const name = registrar?.vcardArray?.[1]?.find((v) => v[0] === 'fn')?.[3] || ''
