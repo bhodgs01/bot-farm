@@ -69,7 +69,16 @@ export function installVr({ engine, colony, rig, hud, settings }) {
   // that can open a headset session (or when the page is asked for it with ?vr=1).
   function addButton() {
     hud.setVrAvailable?.(true)
-    state.button = true
+    // And a pill at the bottom of the screen: the Quest browser zooms and crops the page
+    // in ways that can push the rail out of sight, and this is the one control that must
+    // be reachable from a headset.
+    const pill = document.createElement('button')
+    pill.className = 'btn primary vr-pill'
+    pill.textContent = 'Enter VR'
+    pill.title = 'Walk the colony in a headset'
+    pill.addEventListener('click', () => state.toggle())
+    document.body.appendChild(pill)
+    state.button = pill
   }
   state.toggle = async () => {
     if (renderer.xr.isPresenting) {
@@ -91,6 +100,7 @@ export function installVr({ engine, colony, rig, hud, settings }) {
     state.active = true
     sessionStartedAt = performance.now()
     hud.setVrActive?.(true)
+    if (state.button?.textContent !== undefined) state.button.textContent = 'Leave VR'
     // The camera moves into the player group; the rig stops driving it.
     scene.add(player)
     player.add(camera)
@@ -106,6 +116,7 @@ export function installVr({ engine, colony, rig, hud, settings }) {
   function onEnd() {
     state.active = false
     hud.setVrActive?.(false)
+    if (state.button?.textContent !== undefined) state.button.textContent = 'Enter VR'
     hideHover()
     hidePanel()
     hideHelp()

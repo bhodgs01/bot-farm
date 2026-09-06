@@ -1503,6 +1503,13 @@ kbd {
 #btn-rename:hover { opacity: 1; }
 #btn-mic.listening { color: #ff6b6b; animation: pulse 1s infinite; }
 @keyframes pulse { 50% { opacity: 0.4; } }
+.vr-pill { position: fixed; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 60; padding: 12px 22px; font-size: 16px; border-radius: 999px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45); }
+/* A short viewport (a headset browser, a landscape phone) gets a rail that fits rather than one that runs off the bottom. */
+.rail { max-height: calc(100dvh - 24px); overflow-y: auto; scrollbar-width: none; }
+@media (max-height: 520px) {
+  .rail { top: 50%; transform: translateY(-50%); gap: 2px; padding: 4px; }
+  .rail .btn { width: 32px; height: 32px; }
+}
 #btn-home.held { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55) inset; }
 .thread-pop .intro p { margin: 0; font-size: 13px; line-height: 1.45; opacity: 0.92; }
 .thread-pop .intro .btn { justify-self: start; }
