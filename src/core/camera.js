@@ -129,6 +129,8 @@ export class CameraRig {
     if (this._pointers.size === 2) {
       this._mode = 'pinch'
       this._pinch = this._pinchDistance()
+      this._twist = this._pinchAngle()
+      this.interacting = true
       this._grab(...this._pinchCentre())
       return
     }
@@ -166,6 +168,18 @@ export class CameraRig {
         this._sync()
       }
       this._pinch = d
+      // Twist the two fingers and the colony turns with them: the heading follows the angle
+      // between the touches, applied straight to the live heading so it never lags a wrist.
+      const angle = this._pinchAngle()
+      if (this._twist != null) {
+        let da = angle - this._twist
+        if (da > Math.PI) da -= Math.PI * 2
+        if (da < -Math.PI) da += Math.PI * 2
+        this.desiredAzimuth -= da
+        this.azimuth = this.desiredAzimuth
+        this.orbiting = false
+      }
+      this._twist = angle
       // Two fingers pan as well as zoom, both anchored on the point between them.
       this._dragGround(cx, cy)
       return
@@ -219,6 +233,7 @@ export class CameraRig {
       this.suppressed = false
       this._hasAnchor = false
     } else if (this._pointers.size === 1) {
+      this._twist = null
       this._mode = 'pan'
       const [only] = this._pointers.values()
       this._last.set(only.x, only.y)
@@ -251,6 +266,12 @@ export class CameraRig {
   _pinchCentre() {
     const [a, b] = [...this._pointers.values()]
     return [(a.x + b.x) / 2, (a.y + b.y) / 2]
+  }
+
+  /** The heading of the line between two touches, for twist-to-rotate. */
+  _pinchAngle() {
+    const [a, b] = [...this._pointers.values()]
+    return Math.atan2(b.y - a.y, b.x - a.x)
   }
 
   _clampTarget() {
