@@ -85,10 +85,19 @@ async function fetchThreads() {
     Station: cur.stationName ? `${cur.stationName}${updated ? ` at ${updated} CT` : ''}` : '',
   }
 
+  const desc = String(cur.description || '').toLowerCase()
+  const sky = {
+    cloud: /overcast/.test(desc) ? 1 : /mostly cloudy/.test(desc) ? 0.75 : /partly|scattered/.test(desc) ? 0.4 : /few clouds/.test(desc) ? 0.15 : /fog|mist|haze|smoke/.test(desc) ? 0.7 : 0,
+    rain: /rain|shower|drizzle|storm|thunder/.test(desc),
+    storm: /thunder|storm/.test(desc),
+    fog: /fog|mist|haze|smoke/.test(desc),
+    snow: /snow|sleet|flurr/.test(desc),
+  }
   return [
     {
       id: 'weather:now',
       kind: 'weather',
+      sky,
       title: `${icon} Weather`,
       plate: temp != null ? `${temp}°` : '',
       preview: [details.Now, today ? `${today.name}: ${today.short}, ${today.tempF}°` : '', alertLine ? `⚠ ${alertLine}` : ''].filter(Boolean).join(NL),

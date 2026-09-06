@@ -34,6 +34,8 @@ const ICON = {
   folder: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7.4A1.4 1.4 0 0 1 4.4 6h4.2l2 2.5h7A1.4 1.4 0 0 1 19 9.9v7.7a1.4 1.4 0 0 1-1.4 1.4H4.4A1.4 1.4 0 0 1 3 17.6z"/></svg>`,
   copy: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>`,
   locate: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7.6"/><path d="M12 1.8v2.6M12 19.6v2.6M1.8 12h2.6M19.6 12h2.6"/></svg>`,
+  tour: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18c4-9 6-9 8 0s4 9 8 0"/><circle cx="4" cy="18" r="1.6" fill="currentColor" stroke="none"/><circle cx="20" cy="18" r="1.6" fill="currentColor" stroke="none"/></svg>`,
+  move: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20M8 6l4-4 4 4M8 18l4 4 4-4M6 8l-4 4 4 4M18 8l4 4-4 4"/></svg>`,
   orbit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="4"/><ellipse cx="12" cy="12" rx="10.2" ry="4.6" transform="rotate(-24 12 12)"/><circle cx="21" cy="8.2" r="1.5" fill="currentColor" stroke="none"/></svg>`,
 }
 
@@ -335,6 +337,8 @@ export class Hud {
     on('#btn-home', 'click', () => this.actions.resetView?.())
     on('#btn-next', 'click', () => this.actions.focusStatus?.('waiting'))
     on('#btn-orbit', 'click', () => this.setOrbit(this.actions.toggleOrbit?.()))
+    on('#btn-tour', 'click', () => this.setTour(this.actions.toggleTour?.()))
+    on('#btn-move-zone', 'click', () => this.actions.moveZone?.(this.project?.name))
     on('#btn-planet', 'click', () => this.actions.cyclePlanet?.())
     on('#btn-time', 'click', () => this.actions.cycleTime?.())
     on('#btn-open', 'click', () => this.actions.openThread?.())
@@ -826,6 +830,10 @@ export class Hud {
     this.$('#btn-orbit').setAttribute('aria-pressed', String(Boolean(on)))
   }
 
+  setTour(on) {
+    this.$('#btn-tour').setAttribute('aria-pressed', String(Boolean(on)))
+  }
+
   toggleSettings(force) {
     const panel = this.$('.settings')
     const open = force ?? panel.classList.contains('closed')
@@ -1014,6 +1022,7 @@ const TEMPLATE = `
           <div class="path"></div>
         </div>
         <button class="btn icon ghost" id="btn-locate" title="Fly to this zone">${ICON.locate}</button>
+        <button class="btn icon ghost" id="btn-move-zone" title="Move this hex: tap where it should go (drop on another hex to swap)">${ICON.move}</button>
       </div>
       <div class="project-actions">
         <button class="btn primary" id="btn-new-session" title="Start a new thread in this folder (C)">${ICON.plus} New conversation</button>
@@ -1043,6 +1052,7 @@ const TEMPLATE = `
   <button class="btn icon" id="btn-next" title="Next astronaut waiting on you (N)">${ICON.next}</button>
   <div class="sep"></div>
   <button class="btn icon" id="btn-orbit" title="Orbit mode — sweep around the colony (O)" aria-pressed="false">${ICON.orbit}</button>
+  <button class="btn icon" id="btn-tour" title="Tour — visit every hex that needs you (T)" aria-pressed="false">${ICON.tour}</button>
   <button class="btn icon" id="btn-planet" title="Change planet (Tab)">${ICON.globe}</button>
   <button class="btn icon" id="btn-time" title="Change the time of day (L)">${ICON.sun}</button>
 </div>

@@ -740,6 +740,34 @@ export class Colony {
     this.plotCells = clean
   }
 
+  /** Which hex cell a world point is in. */
+  cellAt(x, z) {
+    return worldToHex(x, z)
+  }
+
+  /** The zone holding a cell, if any. */
+  zoneAtCell(cell) {
+    for (const [name, cells] of this.plotCells) if (cells.some((c) => c.q === cell.q && c.r === cell.r)) return name
+    return null
+  }
+
+  /**
+   * Move a zone to a cell by hand. Dropping on another zone swaps their roots; a grown zone
+   * gives up its extra cells and regrows from the new root on the next pass. The ship's
+   * cell is never available. Returns what happened, for the toast.
+   */
+  moveZoneTo(name, cell) {
+    const mine = this.plotCells.get(name)
+    if (!mine || !mine.length) return { ok: false, why: `${name} has no ground yet` }
+    if (cell.q === SHIP_CELL.q && cell.r === SHIP_CELL.r) return { ok: false, why: 'the ship lives there' }
+    if (mine.some((c) => c.q === cell.q && c.r === cell.r)) return { ok: false, why: `${name} is already there` }
+    const other = this.zoneAtCell(cell)
+    const root = mine[0]
+    if (other) this.plotCells.set(other, [{ q: root.q, r: root.r }])
+    this.plotCells.set(name, [{ q: cell.q, r: cell.r }])
+    return { ok: true, swapped: other }
+  }
+
   /** The same, on the way out. */
   layoutForSave() {
     const out = {}

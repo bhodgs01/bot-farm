@@ -62,7 +62,7 @@ const DECK_HEIGHT = DECK_TOP + DECK_SKIRT
 const SLOTS_PER_CELL = 7
 const MAX_CELLS = 9
 /** The lattice cell the ship owns. Nothing else may be placed there. */
-const SHIP_CELL = { q: -2, r: 1 }
+export const SHIP_CELL = { q: -2, r: 1 }
 
 const HEX_DIRS = [
   [1, 0],

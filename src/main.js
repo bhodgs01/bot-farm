@@ -625,10 +625,149 @@ engine.canvas.addEventListener('pointerleave', () => {
 
 // ── keyboard ──────────────────────────────────────────────────────────────────────────
 
+// ── search: slash, type, Enter ────────────────────────────────────────────────────────
+let finder = null
+function openFinder() {
+  if (!finder) {
+    finder = document.createElement('div')
+    finder.className = 'finder'
+    finder.innerHTML = '<input placeholder="Find a worker or a hex…" autocomplete="off" spellcheck="false"><div class="hits" hidden></div>'
+    document.body.appendChild(finder)
+    const input = finder.querySelector('input')
+    const hits = finder.querySelector('.hits')
+    let sel = 0
+    let found = []
+    const render = () => {
+      hits.innerHTML = found.map((f, i) => `<div class="hit ${i === sel ? 'sel' : ''}" data-i="${i}"><span>${f.label}</span><span class="z">${f.zone}</span></div>`).join('')
+      hits.hidden = found.length === 0
+      for (const el of hits.querySelectorAll('.hit')) el.addEventListener('click', () => go(Number(el.dataset.i)))
+    }
+    const go = (i) => {
+      const f = found[i]
+      closeFinder()
+      if (!f) return
+      if (f.id) actions.focusThread(f.id)
+      else actions.focusProject(f.zone)
+    }
+    input.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase()
+      found = []
+      if (q) {
+        for (const plot of colony.plotOrder) if (plot.name.toLowerCase().includes(q)) found.push({ label: plot.name, zone: 'hex', id: null })
+        for (const t of threads) if (`${t.title} ${t.project} ${t.cwd || ''}`.toLowerCase().includes(q)) found.push({ label: t.title, zone: t.project, id: t.id })
+      }
+      found = found.slice(0, 8)
+      sel = 0
+      render()
+    })
+    input.addEventListener('keydown', (e) => {
+      e.stopPropagation()
+      if (e.key === 'Escape') closeFinder()
+      else if (e.key === 'Enter') go(sel)
+      else if (e.key === 'ArrowDown') { sel = Math.min(found.length - 1, sel + 1); render() }
+      else if (e.key === 'ArrowUp') { sel = Math.max(0, sel - 1); render() }
+    })
+  }
+  finder.hidden = false
+  const input = finder.querySelector('input')
+  input.value = ''
+  finder.querySelector('.hits').hidden = true
+  input.focus()
+}
+function closeFinder() {
+  if (finder) finder.hidden = true
+}
+
+// ── saved views: one keystroke to a corner of the map ─────────────────────────────────
+const VIEWS = {
+  1: { name: 'Clients', zones: ['KC Proto', 'Inbox', 'KC AI Club', 'Embassy Landscape', 'CorrosionDC', 'CyberGrade', 'NGV Talent', 'NED Builds', 'Frances', 'Roast Bot'] },
+  2: { name: 'Infrastructure', zones: ['Cluster', 'Backups', 'Watchdog', 'Brain', 'Hetzner DR', 'Print Service', 'Plex', 'Newsroom'] },
+  3: { name: 'Home', zones: ['Home', 'Garden', 'Garage', 'Chores'] },
+  4: { name: 'Money', zones: ['Active Projects', 'In Process', 'Completed', 'Trade Floor', 'Countdown'] },
+}
+function showView(n) {
+  const v = VIEWS[n]
+  if (!v) return
+  const plots = colony.plotOrder.filter((p) => v.zones.includes(p.name))
+  if (!plots.length) return
+  const c = new THREE.Vector3()
+  for (const p of plots) c.add(p.center)
+  c.divideScalar(plots.length)
+  let spread = 0
+  for (const p of plots) spread = Math.max(spread, Math.hypot(p.center.x - c.x, p.center.z - c.z))
+  rig.focus(c, { distance: Math.min(90, Math.max(30, spread * 1.7 + 18)) })
+  hud.toast(`${v.name}`)
+}
+
+// ── tour: orbit the hexes that need you, one after another ────────────────────────────
+let tour = null
+function stopTour() {
+  if (!tour) return
+  clearInterval(tour.timer)
+  tour = null
+  hud.setTour(false)
+}
+function tourStep() {
+  const urgent = colony.plotOrder.filter((p) => colony.urgentPlots?.has(p.id))
+  const list = urgent.length ? urgent : colony.plotOrder
+  if (!list.length) return
+  tour.i = (tour.i + 1) % list.length
+  const plot = list[tour.i]
+  rig.focus(plot.middle || plot.center, { distance: 30 })
+  rig.setOrbit(true)
+  hud.setOrbit(true)
+  hud.toast(`${plot.name}${urgent.length ? ` · ${urgent.length} need you` : ''}`)
+}
+function toggleTour() {
+  if (tour) {
+    stopTour()
+    return false
+  }
+  tour = { i: -1, timer: setInterval(tourStep, 8000) }
+  tourStep()
+  hud.setTour(true)
+  return true
+}
+actions.toggleTour = toggleTour
+engine.canvas.addEventListener('pointerdown', () => stopTour())
+
+// ── move a hex: pick it from the zone panel, then tap where it goes ──────────────────
+let moveZone = null
+let movePress = null
+actions.moveZone = (name) => {
+  if (!name) return
+  moveZone = name
+  engine.canvas.style.cursor = 'crosshair'
+  hud.toast(`Tap where ${name} should go. Tap another hex to swap. Esc to cancel.`)
+}
+engine.canvas.addEventListener('pointerdown', (e) => {
+  movePress = moveZone ? { x: e.clientX, y: e.clientY } : null
+})
+window.addEventListener('pointerup', (e) => {
+  if (!moveZone || !movePress) return
+  const press = movePress
+  movePress = null
+  if (Math.hypot(e.clientX - press.x, e.clientY - press.y) > 8) return // that was a drag, not a tap
+  const ground = rig.groundPoint(e.clientX, e.clientY, hoverGround)
+  if (!ground) return
+  const cell = colony.cellAt(ground.x, ground.z)
+  const r = colony.moveZoneTo(moveZone, cell)
+  const name = moveZone
+  moveZone = null
+  engine.canvas.style.cursor = 'grab'
+  if (!r.ok) {
+    hud.toast(r.why, 'err')
+    return
+  }
+  applyThreads(threads.slice())
+  hud.toast(r.swapped ? `Swapped ${name} with ${r.swapped}` : `Moved ${name}`)
+})
+
 window.addEventListener('keydown', (e) => {
   // Never steal keys from a field the user is actually typing in.
   const t = e.target
   if (t instanceof HTMLInputElement || t instanceof HTMLSelectElement || t instanceof HTMLTextAreaElement) return
+  if (tour && e.key !== 't' && e.key !== 'T') stopTour()
 
   // ⌘\ (⌃\ elsewhere) dismisses the chrome, the same as H — the shortcut every editor
   // uses for its sidebar, and the one hand that is already on the keyboard.
@@ -640,6 +779,28 @@ window.addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey) return
 
   switch (e.key) {
+    case '/':
+      e.preventDefault()
+      openFinder()
+      break
+    case 'Escape':
+      closeFinder()
+      if (moveZone) {
+        moveZone = null
+        engine.canvas.style.cursor = 'grab'
+        hud.toast('Move cancelled')
+      }
+      break
+    case '1':
+    case '2':
+    case '3':
+    case '4':
+      showView(Number(e.key))
+      break
+    case 't':
+    case 'T':
+      hud.setTour(toggleTour())
+      break
     case 'h':
     case 'H':
       hud.toggleUi()
@@ -789,6 +950,9 @@ async function poll() {
   try {
     const res = await fetchThreads()
     applyNap(Boolean(res.nap))
+    // The sky follows the weather desk: clouds dim the sun, rain thickens the haze.
+    const w = (res.threads || []).find((t) => t.id === 'weather:now')
+    if (w?.sky) colony.sky.setWeather?.(w.sky)
     await adoptRemoteState()
     applyThreads(res.threads || [])
     hud.removeBoot()

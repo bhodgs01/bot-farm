@@ -375,6 +375,14 @@ export class Sky {
     this.sun.target.updateMatrixWorld()
   }
 
+  /** What the weather desk says the sky is doing; applied on the next setTime. */
+  setWeather(w) {
+    const next = w && typeof w === 'object' ? { cloud: Number(w.cloud) || 0, rain: Boolean(w.rain), fog: Boolean(w.fog), storm: Boolean(w.storm) } : null
+    const changed = JSON.stringify(next) !== JSON.stringify(this.weather || null)
+    this.weather = next
+    if (changed && this.time != null) this.setTime(this.time)
+  }
+
   setTime(t) {
     this.time = ((t % 1) + 1) % 1
     const planet = this.planet
@@ -405,6 +413,13 @@ export class Sky {
     const sunColor = this._c1.set(planet.sun.color).lerp(this.duskColor, golden * 0.7 * planet.atmosphere)
     this.sun.color.copy(sunColor)
     this.sun.intensity = THREE.MathUtils.lerp(planet.sun.night, planet.sun.intensity, day)
+    // Weather from the desk: cloud dims the sun, rain and fog pull the haze in close.
+    const wx = this.weather || {}
+    const cloud = Math.max(0, Math.min(1, Number(wx.cloud) || 0))
+    this.sun.intensity *= 1 - 0.55 * cloud
+    const haze = 1 - 0.4 * cloud - (wx.rain ? 0.2 : 0) - (wx.fog ? 0.35 : 0)
+    this.scene.fog.near = planet.fog.near * Math.max(0.25, haze)
+    this.scene.fog.far = planet.fog.far * Math.max(0.35, haze)
     this._placeSun()
 
     this.hemi.color.set(planet.ambient.sky)
@@ -412,7 +427,7 @@ export class Sky {
     // The hemisphere light drops right back when IBL is carrying the ambient — running both
     // at full strength double-counts the sky and flattens everything out.
     const hemiScale = this.settings.get('ibl') ? 0.55 : 1
-    this.hemi.intensity = THREE.MathUtils.lerp(planet.ambient.intensity * 0.22, planet.ambient.intensity, day) * hemiScale
+    this.hemi.intensity = THREE.MathUtils.lerp(planet.ambient.intensity * 0.22, planet.ambient.intensity, day) * hemiScale * (1 - 0.2 * cloud)
     // Enough of a bounce that surfaces turned away from the sun read as dark rather than as
     // holes in the image. On an airless world this stands in for regolith bounce.
     this.fill.intensity = THREE.MathUtils.lerp(0.34, 0.26, day)
