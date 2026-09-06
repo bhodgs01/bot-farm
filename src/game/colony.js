@@ -1024,6 +1024,7 @@ export class Colony {
     const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, toneMapped: false, alphaTest: 0.05 })
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(w * k, h * k), material)
     plane.position.set(x * k, y * k, z * k)
+    plane.rotation.y = Math.PI
     plane.renderOrder = 2
     mesh.add(plane)
     const before = mesh.userData.disposeExtras
