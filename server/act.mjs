@@ -11,6 +11,7 @@
 import { refreshProjects } from './harnesses/projects.mjs'
 import { refreshTasks } from './harnesses/tasks.mjs'
 import { refreshChores } from './harnesses/chores.mjs'
+import { refreshJanine } from './harnesses/janine.mjs'
 
 const VIKUNJA = (process.env.VIKUNJA_URL || 'http://vikunja.vikunja.svc.cluster.local:3456').replace(/\/$/, '') + '/api/v1'
 const VIKUNJA_TOKEN = process.env.VIKUNJA_TOKEN || ''
@@ -110,4 +111,37 @@ export async function setProjectStatus({ id, status, who }) {
   console.log(`act: ${who} moved project ${id} ${before.status} → ${status}`)
   refreshProjects()
   return seen
+}
+
+// ── a raised hand becomes a ticket ───────────────────────────────────────────────────────
+/** Which Vikunja project a hex's tickets go to. Anything unlisted lands in Client Ops. */
+const PROJECT_FOR_ZONE = { 'KC Proto': 2, Inbox: 1, CorrosionDC: 3, 'NGV Talent': 4, 'Embassy Landscape': 5, 'NED Builds': 6, CyberGrade: 7, 'KC AI Club': 8, Frances: 9 }
+
+export async function createTicket({ thread, who }) {
+  if (!VIKUNJA_TOKEN) throw new Error('No Vikunja token on this server')
+  const project = PROJECT_FOR_ZONE[thread.project] || 2
+  const headers = { Authorization: `Bearer ${VIKUNJA_TOKEN}`, Accept: 'application/json', 'Content-Type': 'application/json' }
+  const facts = Object.entries(thread.details || {})
+    .filter(([, v]) => v !== '' && v != null)
+    .map(([k, v]) => `${k}: ${String(v).replace(/\s+/g, ' ').slice(0, 300)}`)
+    .join('\n')
+  const description = [`From Bot Farm (${thread.project}).`, thread.preview ? String(thread.preview).slice(0, 600) : '', facts, thread.ref?.url ? `Link: ${thread.ref.url}` : ''].filter(Boolean).join('\n\n')
+  const r = await fetch(`${VIKUNJA}/projects/${project}/tasks`, { method: 'PUT', headers, body: JSON.stringify({ title: String(thread.title || 'Bot Farm').replace(/^[^\w$]+/, '').slice(0, 200), description }), signal: AbortSignal.timeout(10000) })
+  if (!r.ok) throw new Error(`ticket create → ${r.status}`)
+  const task = await r.json()
+  console.log(`act: ${who} filed ticket #${task.id} in project ${project}: ${task.title}`)
+  refreshTasks()
+  return task
+}
+
+// ── Janine's held drafts: send it, or skip it ────────────────────────────────────────────
+const JANINE = (process.env.JANINE_URL || 'http://janine.janine.svc.cluster.local:3120').replace(/\/$/, '')
+export async function janineDraftAction({ draftKey, action, who }) {
+  if (!['approve', 'skip', 'handled'].includes(action)) throw new Error('Bad action')
+  const r = await fetch(`${JANINE}/api/draft/action`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ draftKey, action }), signal: AbortSignal.timeout(20000) })
+  const j = await r.json().catch(() => ({}))
+  if (!r.ok || j.success === false) throw new Error(j.error || `janine → ${r.status}`)
+  console.log(`act: ${who} told Janine to ${action} ${draftKey}`)
+  refreshJanine()
+  return j
 }

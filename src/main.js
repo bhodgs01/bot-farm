@@ -24,6 +24,8 @@ import {
   actProject,
   actTask,
   actChore,
+  actTicket,
+  actJanine,
   actAck,
   actStar,
   actNews,
@@ -182,6 +184,19 @@ const actions = {
         Object.assign(thread, { unread: false, count: 0, actions: [], gitBranch: 'read', details: { ...(thread.details || {}), Status: 'read' } })
         applyThreads(threads.slice())
         setTimeout(poll, 1500)
+        return
+      }
+      if (status === 'ticket') {
+        const r = await actTicket(thread.id)
+        hud.toast(`Ticket #${r.task?.id ?? ''} filed: ${thread.title}`)
+        setTimeout(poll, 1500)
+        return
+      }
+      if (thread.harness === 'janine' && (status === 'approve' || status === 'skip')) {
+        await actJanine(thread.id, status)
+        hud.toast(status === 'approve' ? `Janine sent it: ${thread.title}` : `Skipped: ${thread.title}`)
+        colony.beamUp(thread.id)
+        setTimeout(poll, 3200)
         return
       }
       if (thread.harness === 'chores' && status === 'chore') {

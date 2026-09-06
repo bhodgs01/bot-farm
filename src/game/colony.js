@@ -68,6 +68,7 @@ const ZONE_ACCENT = {
   Countdown: 0xc95c5c,
   Garage: 0x8a6a4f,
   'Hetzner DR': 0x6a7fa6,
+  Ledger: 0x5fae6a,
 }
 
 /**

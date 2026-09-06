@@ -86,6 +86,12 @@ export const actTask = (taskId) => post('/api/act/task', { id: taskId })
 /** Mark one of Blake's chores done (every id the astronaut stands for). */
 export const actChore = (ids) => post('/api/act/chore', { ids })
 
+/** File the worker's situation as a Vikunja ticket in its client's project. */
+export const actTicket = (threadId) => post('/api/act/ticket', { id: threadId })
+
+/** Tell Janine to send or skip a held draft. */
+export const actJanine = (threadId, action) => post('/api/act/janine', { id: threadId, action })
+
 /** Remove a known flag (or put it back). The flag returns on its own if the failure changes. */
 export const actAck = (threadId, on) => post('/api/act/ack', { id: threadId, on })
 

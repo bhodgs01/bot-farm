@@ -1499,6 +1499,7 @@ kbd {
 .thread-pop .details { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 12px; max-height: 190px; overflow: auto; }
 .thread-pop .details[hidden], .thread-pop .stage[hidden] { display: none; }
 .thread-pop .details .k { opacity: 0.55; white-space: nowrap; }
+.thread-pop .details img.cam { grid-column: 1 / -1; width: 100%; border-radius: 8px; background: #000; min-height: 40px; }
 .thread-pop .details .v { overflow-wrap: anywhere; }
 .finder { position: fixed; top: 12vh; left: 50%; transform: translateX(-50%); width: min(520px, calc(100vw - 24px)); z-index: 60; display: grid; gap: 4px; }
 .finder input { width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(16, 18, 26, 0.96); color: inherit; outline: none; }

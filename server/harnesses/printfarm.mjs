@@ -66,6 +66,7 @@ async function fetchThreads() {
         id: `print:${p.id}`,
         kind: 'printing',
         landmark: 'printer',
+        camera: p.camera_url || '',
         progress,
         title: `${p.job_name || 'Print'}`.slice(0, 120),
         preview: [client ? `for ${client}` : 'one-off', `on ${p.name}`, layers, eta(p.eta_seconds), state === 'paused' ? 'PAUSED' : '']
@@ -102,6 +103,7 @@ async function fetchThreads() {
       out.push({
         id: `print:${p.id}`,
         landmark: 'printer',
+        camera: p.camera_url || '',
         title: broken ? `⚠ ${p.name}` : p.name,
         preview: broken ? String(p.error_text).slice(0, 200) : offline ? `${p.name} is offline` : `${p.name} idle${p.job_name ? ` · last: ${p.job_name}` : ''}${client ? ` · dedicated to ${client}` : ''}`,
         project: 'Print Service',

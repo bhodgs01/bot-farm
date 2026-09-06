@@ -597,15 +597,17 @@ export class Hud {
     const hasStories = Array.isArray(thread.stories) && thread.stories.length > 0
     // The reader shows the stories one at a time, so the headline list would say it twice.
     const entries = Object.entries(thread.details || {}).filter(([k, v]) => v !== '' && v != null && !(hasStories && k === 'Headlines'))
-    details.innerHTML = entries.map(([k, v]) => `<div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(String(v))}</div>`).join('')
-    details.hidden = entries.length === 0
+    details.innerHTML = (thread.camera ? `<img class="cam" src="${escapeHtml(thread.camera)}" alt="printer camera" loading="lazy">` : '') + entries.map(([k, v]) => `<div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(String(v))}</div>`).join('')
+    details.hidden = entries.length === 0 && !thread.camera
     // Stage buttons: what this thread can be moved to next.
     const stage = this.$('.thread-pop .stage')
-    const STAGE_LABEL = { active: 'Make active', in_process: 'Start work', completed: 'Mark complete', paid: 'Paid ✓', done: 'Close ticket ✓', chore: 'Done ✓', read: 'Read ✓', ack: 'Remove flag', unack: 'Flag again', star: '★ Star', unstar: 'Unstar' }
+    const STAGE_LABEL = { active: 'Make active', in_process: 'Start work', completed: 'Mark complete', paid: 'Paid ✓', done: 'Close ticket ✓', chore: 'Done ✓', read: 'Read ✓', ticket: '🎫 Make it a ticket', approve: 'Send it ✓', skip: 'Skip', ack: 'Remove flag', unack: 'Flag again', star: '★ Star', unstar: 'Unstar' }
     // A flagged worker offers to have the flag removed; an acknowledged one offers it back.
     this.renderReader(thread)
-    const acts = (Array.isArray(thread.actions) ? thread.actions : []).filter((a) => !(hasStories && a === 'read')).concat(thread.hasError ? ['ack'] : thread.acked ? ['unack'] : []).concat(thread.watched ? ['unstar'] : ['star'])
-    stage.innerHTML = acts.map((a) => `<button class="btn ${a === 'paid' || a === 'done' || a === 'chore' ? 'primary' : ''}" data-stage="${escapeHtml(a)}">${escapeHtml(STAGE_LABEL[a] || a)}</button>`).join('')
+    // Any raised hand can become a ticket, unless it already is one.
+    const ticketable = (thread.unread || thread.hasError) && !['tasks', 'janine'].includes(thread.harness) && !/^(chief|ledger|deadline):/.test(thread.id)
+    const acts = (Array.isArray(thread.actions) ? thread.actions : []).filter((a) => !(hasStories && a === 'read')).concat(ticketable ? ['ticket'] : []).concat(thread.hasError ? ['ack'] : thread.acked ? ['unack'] : []).concat(thread.watched ? ['unstar'] : ['star'])
+    stage.innerHTML = acts.map((a) => `<button class="btn ${a === 'paid' || a === 'done' || a === 'chore' || a === 'approve' ? 'primary' : ''}" data-stage="${escapeHtml(a)}">${escapeHtml(STAGE_LABEL[a] || a)}</button>`).join('')
     stage.hidden = acts.length === 0
     for (const b of stage.querySelectorAll('button')) b.addEventListener('click', () => this.actions.stageThread?.(b.dataset.stage))
 

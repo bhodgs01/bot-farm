@@ -59,13 +59,18 @@ async function fetchThreads() {
       source: 'janine',
       canOpen: true,
       canArchive: false,
+      actions: ['approve', 'skip'],
       exit: 'beam',
-      ref: { emailId: d.emailId, threadId: d.threadId },
+      ref: { emailId: d.emailId, threadId: d.threadId, key },
     }
   })
 }
 
 let cache = { at: 0, data: null, inflight: null }
+/** Forget the last read: a draft was just sent or skipped. */
+export function refreshJanine() {
+  cache = { at: 0, data: null, inflight: null }
+}
 async function scanThreads() {
   const age = Date.now() - cache.at
   if (cache.data && age < TTL_MS) return cache.data

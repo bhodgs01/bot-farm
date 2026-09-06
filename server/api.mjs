@@ -12,17 +12,125 @@ import {
   setThreadArchived,
 } from './scan.mjs'
 import { ask, chatEnabled } from './ask.mjs'
-import { setProjectStatus, closeTask, completeChores } from './act.mjs'
+import { setProjectStatus, closeTask, completeChores, createTicket, janineDraftAction } from './act.mjs'
 import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
 import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGenerate, update as newsUpdate, topicById, todayKC, newsEnabled } from './news.mjs'
 import { refreshNews } from './harnesses/news.mjs'
 import { napMode, fetchNap } from './harnesses/home.mjs'
+
+// ── history: who had a hand up, hour by hour ─────────────────────────────────────────────
+const HISTORY_DIR = path.join(DATA_DIR, 'history')
+let lastHistoryAt = 0
+async function readHistory(day) {
+  try {
+    return JSON.parse(await fsp.readFile(path.join(HISTORY_DIR, `${day}.json`), 'utf8'))
+  } catch {
+    return []
+  }
+}
+async function recordHistory(threads) {
+  if (Date.now() - lastHistoryAt < 60 * 60 * 1000) return
+  lastHistoryAt = Date.now()
+  const day = todayKC()
+  const hands = threads
+    .filter((t) => !t.archived && (t.unread || t.hasError))
+    .map((t) => ({ id: t.id, title: t.title, project: t.project, kind: t.hasError ? 'blocked' : 'waiting' }))
+  const list = await readHistory(day)
+  list.push({ at: Date.now(), hands })
+  await fsp.mkdir(HISTORY_DIR, { recursive: true })
+  await fsp.writeFile(path.join(HISTORY_DIR, `${day}.json`), JSON.stringify(list))
+  // thirty days is plenty
+  try {
+    const files = (await fsp.readdir(HISTORY_DIR)).filter((f) => f.endsWith('.json')).sort()
+    for (const f of files.slice(0, Math.max(0, files.length - 30))) await fsp.unlink(path.join(HISTORY_DIR, f))
+  } catch {
+    /* fine */
+  }
+}
+/** "10:00 ▲ Rusty (CorrosionDC)" lines from today's snapshots. */
+async function timelineToday() {
+  const list = await readHistory(todayKC())
+  const fmt = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' })
+  const lines = []
+  let prev = new Map()
+  for (const snap of list) {
+    const now = new Map(snap.hands.map((h) => [h.id, h]))
+    for (const [id, h] of now) if (!prev.has(id)) lines.push(`${fmt.format(new Date(snap.at))} ▲ ${h.title} (${h.project})`)
+    for (const [id, h] of prev) if (!now.has(id)) lines.push(`${fmt.format(new Date(snap.at))} ▼ ${h.title} (${h.project})`)
+    prev = now
+  }
+  return lines.slice(-14)
+}
+
+// ── the ledger: money on the map, added up ───────────────────────────────────────────────
+const dollars = (s) => Number(String(s || '').replace(/[^0-9.]/g, '')) || 0
+function withLedger(threads) {
+  const projects = threads.filter((t) => t.id.startsWith('project:'))
+  const owed = projects.filter((t) => t.project === 'Completed').map((t) => ({ t, amount: dollars(t.roof || t.details?.Total) }))
+  const owedTotal = owed.reduce((n, o) => n + o.amount, 0)
+  const retainers = projects.map((t) => ({ t, r: String(t.details?.Retainer || '') })).filter((x) => x.r)
+  const monthly = retainers.reduce((n, x) => n + dollars(x.r) * (/year|annual/i.test(x.r) ? 1 / 12 : /week/i.test(x.r) ? 4.33 : 1), 0)
+  const inProcess = projects.filter((t) => t.project === 'In Process').reduce((n, t) => n + dollars(t.details?.Total), 0)
+  const pipeline = projects.filter((t) => t.project === 'Active Projects').reduce((n, t) => n + dollars(t.details?.Total), 0)
+  const orders = threads.filter((t) => t.id.startsWith('order:')).reduce((n, t) => n + dollars(t.model), 0)
+  const spend = dollars(threads.find((t) => t.id === 'keys:spend')?.details?.Today)
+  const pot = dollars(threads.find((t) => t.id === 'trade:pot')?.roof)
+  const money = (n) => `$${Math.round(n).toLocaleString('en-US')}`
+  const nl = String.fromCharCode(10)
+  const ledger = {
+    id: 'ledger:now',
+    kind: 'keeper',
+    landmark: 'signpost',
+    title: '📒 Ledger',
+    plate: money(owedTotal),
+    roof: monthly ? `${money(monthly)}/mo` : '',
+    preview: `${money(owedTotal)} owed on ${owed.length} finished job${owed.length === 1 ? '' : 's'} · ${money(inProcess)} in process · ${money(pipeline)} in the pipeline${monthly ? ` · ${money(monthly)}/mo retainers` : ''} · ${money(spend)} API today`,
+    details: {
+      Owed: owed.length ? owed.map((o) => `${o.t.title.replace(/^[^\w]+/, '')}: ${money(o.amount)} (${o.t.plate || ''})`).join(nl) : 'nothing outstanding',
+      'In process': money(inProcess),
+      Pipeline: `${money(pipeline)} across ${projects.filter((t) => t.project === 'Active Projects').length} active or prospect`,
+      Retainers: retainers.length ? retainers.map((x) => `${x.t.title.replace(/^[^\w]+/, '')}: ${x.r}`).join(nl) : 'none on the board',
+      'Print orders open': orders ? money(orders) : 'none',
+      'API spend today': money(spend),
+      'Trade pot': pot ? money(pot) : '',
+    },
+    project: 'Ledger',
+    projectPath: 'ledger://now',
+    worktree: '',
+    cwd: 'ledger',
+    gitBranch: owedTotal ? `${money(owedTotal)} owed` : 'clear',
+    model: '',
+    effort: '',
+    createdAt: Date.parse('2026-09-05T12:00:00Z') - 2,
+    lastActivityAt: Date.now(),
+    lastFocusedAt: 0,
+    running: false,
+    unread: false,
+    hasError: false,
+    starred: false,
+    routine: '',
+    prState: '',
+    archived: false,
+    hasTranscript: false,
+    sizeBytes: 4000,
+    source: 'bot-farm',
+    harness: 'projects',
+    harnessName: 'Projects board',
+    canOpen: false,
+    canArchive: false,
+    ref: {},
+  }
+  return [...threads, ledger]
+}
 
 /**
  * The chief of staff: a synthetic worker who carries the whole map's facts, so Blake can
  * ask one astronaut "what's my day" and get the needs-you list, the next deadline, the
  * weather, his sleep and today's spend in one answer. Stands at the countdown post.
  */
+let chiefTimeline = []
+setInterval(() => timelineToday().then((l) => (chiefTimeline = l)).catch(() => {}), 5 * 60 * 1000)
+timelineToday().then((l) => (chiefTimeline = l)).catch(() => {})
 function withChief(threads) {
   const by = new Map(threads.map((t) => [t.id, t]))
   const wants = threads.filter((t) => !t.archived && (t.unread || t.hasError) && !t.id.startsWith('chief:'))
@@ -44,6 +152,7 @@ function withChief(threads) {
     You: you ? you.preview : '',
     Spend: spend ? spend.details?.Today || '' : '',
     Crew: `${threads.length} on the map`,
+    Today: chiefTimeline.join(nl) || 'no changes recorded yet',
   }
   const chief = {
     id: 'chief:day',
@@ -358,7 +467,9 @@ export async function apiMiddleware(req, res, next) {
 
   try {
     if (url.pathname === '/api/threads' && req.method === 'GET') {
-      const threads = withChief(await applyStars(await applyAcks(await reconcileArchived(await scanThreads()))))
+      const scanned = await applyStars(await applyAcks(await reconcileArchived(await scanThreads())))
+      recordHistory(scanned).catch(() => {})
+      const threads = withChief(withLedger(scanned))
       return send(res, 200, { nap: napMode(), threads, scannedAt: Date.now() })
     }
 
@@ -434,6 +545,45 @@ export async function apiMiddleware(req, res, next) {
       } catch (err) {
         return send(res, 409, { ok: false, error: String(err?.message || err) })
       }
+    }
+
+    // A raised hand becomes a Vikunja ticket in the hex's client project.
+    if (url.pathname === '/api/act/ticket' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to file tickets', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      const { id } = await readJsonBody(req, 16 * 1024)
+      const thread = (await scanThreads()).find((t) => t.id === id)
+      if (!thread) return send(res, 404, { error: 'That worker has walked off the map' })
+      try {
+        const task = await createTicket({ thread, who })
+        return send(res, 200, { ok: true, task: { id: task.id, title: task.title, project: task.project_id } })
+      } catch (err) {
+        return send(res, 409, { ok: false, error: String(err?.message || err) })
+      }
+    }
+
+    // Janine's held draft: send it or skip it, from the card.
+    if (url.pathname === '/api/act/janine' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to act on drafts', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      const { id, action } = await readJsonBody(req, 16 * 1024)
+      const thread = (await scanThreads()).find((t) => t.id === id)
+      if (!thread?.ref?.key) return send(res, 404, { error: 'That draft is gone' })
+      try {
+        const r = await janineDraftAction({ draftKey: thread.ref.key, action: String(action), who })
+        return send(res, 200, { ok: true, message: r.message || '' })
+      } catch (err) {
+        return send(res, 409, { ok: false, error: String(err?.message || err) })
+      }
+    }
+
+    // The day so far: hourly snapshots of who had a hand up.
+    if (url.pathname === '/api/history' && req.method === 'GET') {
+      const day = url.searchParams.get('day') || todayKC()
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return send(res, 400, { error: 'Bad day' })
+      return send(res, 200, { day, snapshots: await readHistory(day) })
     }
 
     if (url.pathname === '/api/act/project' && req.method === 'POST') {
