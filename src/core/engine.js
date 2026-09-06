@@ -304,7 +304,10 @@ export class Engine {
     for (const u of this.updaters) u.update?.(dt, this.elapsed)
 
     this.renderer.info.reset()
-    if (this.composer && (this.settings.get('bloom') || this.settings.get('antialias') || this.settings.get('tiltShift'))) {
+    // Inside a headset the post chain is skipped: WebXR renders both eyes itself, and
+    // resizing the drawing buffer mid-session is not ours to do.
+    const presenting = this.renderer.xr?.isPresenting
+    if (!presenting && this.composer && (this.settings.get('bloom') || this.settings.get('antialias') || this.settings.get('tiltShift'))) {
       this._syncDepthTexture()
       this.composer.render(dt)
     } else {
@@ -312,7 +315,7 @@ export class Engine {
     }
 
     this.perf.sample(dt, this.renderer.info)
-    if (this.settings.get('autoQuality')) this._governQuality()
+    if (!presenting && this.settings.get('autoQuality')) this._governQuality()
   }
 
   /**

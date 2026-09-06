@@ -24,6 +24,7 @@ const ICON = {
   next: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v4.5M12 16h.01"/></svg>`,
   sun: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>`,
   globe: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15 15 0 0 1 0 18 15 15 0 0 1 0-18z"/></svg>`,
+  vr: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"><path d="M3 8.5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-3.5l-1.6-2.2a2.4 2.4 0 0 0-3.8 0L8.5 16.5H5a2 2 0 0 1-2-2z"/><circle cx="8" cy="11.5" r="1.3"/><circle cx="16" cy="11.5" r="1.3"/></svg>`,
   camera: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M3 8.5h3.2l1.5-2h8.6l1.5 2H21v11H3z"/><circle cx="12" cy="14" r="3.4"/></svg>`,
   help: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.2a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .8-1 1.6v.4"/><path d="M12 17h.01"/></svg>`,
   open: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-8.5 8.5"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>`,
@@ -384,6 +385,7 @@ export class Hud {
       if (this.selected) this.setSelection(this.selected.agent, this.selected.thread, { mode: 'card' })
     })
     on('#btn-planet', 'click', () => this.actions.cyclePlanet?.())
+    on('#btn-vr', 'click', () => this.actions.toggleVr?.())
     on('#btn-time', 'click', () => this.actions.cycleTime?.())
     on('#btn-open', 'click', () => this.actions.openThread?.())
     on('#btn-collapse', 'click', () => this.toggleCollapse())
@@ -951,6 +953,16 @@ export class Hud {
     this.$('#btn-tour').setAttribute('aria-pressed', String(Boolean(on)))
   }
 
+  /** The VR switch on the rail: shown only where a headset session is possible. */
+  setVrAvailable(on) {
+    this.$('#btn-vr').hidden = !on
+  }
+
+  setVrActive(on) {
+    this.$('#btn-vr').setAttribute('aria-pressed', String(Boolean(on)))
+    this.$('#btn-vr').title = on ? 'Leave VR' : 'Walk the colony in VR (headset)'
+  }
+
   toggleSettings(force) {
     const panel = this.$('.settings')
     const open = force ?? panel.classList.contains('closed')
@@ -1172,6 +1184,7 @@ const TEMPLATE = `
   <button class="btn icon" id="btn-tour" title="Tour — visit every hex that needs you (T)" aria-pressed="false">${ICON.tour}</button>
   <button class="btn icon" id="btn-planet" title="Change planet (Tab)">${ICON.globe}</button>
   <button class="btn icon" id="btn-time" title="Change the time of day (L)">${ICON.sun}</button>
+  <button class="btn icon" id="btn-vr" title="Walk the colony in VR (headset)" aria-pressed="false" hidden>${ICON.vr}</button>
 </div>
 
 <div class="settings panel closed">

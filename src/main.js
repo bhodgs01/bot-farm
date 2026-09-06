@@ -9,6 +9,7 @@ import { PLANETS } from './world/planet.js'
 import { loadKit } from './world/kit.js'
 import { crewRig, loadCrew } from './agents/crew.js'
 import { TIMES } from './world/sky.js'
+import { installVr } from './vr.js'
 import {
   fetchThreads,
   fetchState,
@@ -138,6 +139,8 @@ const hoverGround = new THREE.Vector3()
 
 const actions = {
   resetView: () => rig.resetView(),
+  /** The rail's headset button: enter or leave VR. */
+  toggleVr: () => vr?.toggle?.(),
 
   /** Give a worker a name of Blake's own; an empty name gives the source's back. */
   renameWorker: (id, name) => {
@@ -438,6 +441,8 @@ const actions = {
 }
 
 const hud = new Hud(app, settings, actions)
+// VR sidecar: shows the rail switch when a headset session is possible.
+const vr = installVr({ engine, colony, rig, hud, settings })
 // The sidebar is permanent, so the card beside an astronaut has a wall to stay clear of.
 const sideWidth = () => (window.innerWidth <= 820 ? 0 : 334)
 hud.setSideWidth(sideWidth())
@@ -1388,8 +1393,10 @@ setInterval(applyClock, 30 * 1000)
 
 engine.add({
   update(dt, elapsed) {
-    rig.update(dt)
-    colony.update(dt, elapsed, rig.target)
+    // In a headset the player group owns the camera; the rig sits out.
+    if (vr.active) vr.update(dt)
+    else rig.update(dt)
+    colony.update(dt, elapsed, vr.active ? vr.player.position : rig.target)
     // Whatever the camera is orbiting is what should be in focus.
     engine.setFocusDistance(rig.distance)
 
@@ -1406,7 +1413,7 @@ engine.add({
 
 engine.start()
 // Debug handle for headless checks and the console; nothing in the app reads it.
-window.__botfarm = { actions, colony, settings, rig, nap: applyNap }
+window.__botfarm = { actions, colony, settings, rig, vr, nap: applyNap }
 
 boot()
 
