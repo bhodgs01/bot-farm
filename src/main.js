@@ -60,7 +60,8 @@ const engine = new Engine(settings).mount(app)
 const rig = new CameraRig(engine.camera, engine.canvas, settings)
 const colony = new Colony(engine.scene, settings, engine.camera, engine.renderer)
 
-let state = { archived: [], archivedAt: {}, opened: [], plots: {}, seen: {} }
+let state = { archived: [], archivedAt: {}, opened: [], plots: {}, seen: {}, home: null }
+let homeApplied = false
 // Set once the saved state has actually arrived. A page that booted while the server was
 // restarting has an empty layout in hand, and saving that would re-lay the whole colony.
 let stateLoaded = false
@@ -102,6 +103,15 @@ const hoverGround = new THREE.Vector3()
 
 const actions = {
   resetView: () => rig.resetView(),
+
+  /** The view on screen right now becomes home: the Home button and every page load return to it. */
+  setHome: () => {
+    state.home = rig.pose()
+    rig.setHome(state.home)
+    homeApplied = true
+    queueSave()
+    hud.toast('This view is home now')
+  },
 
   screenshot: () => {
     // Render one more frame, then read the buffer before the compositor clears it — the
@@ -1070,6 +1080,14 @@ async function adoptRemoteState() {
   state.plots = remote.plots || {}
   state.archived = remote.archived || []
   state.archivedAt = remote.archivedAt || {}
+  // The saved home view: a fresh page jumps straight to it; a change from another device
+  // is remembered for the next Home press.
+  const home = remote.home && typeof remote.home === 'object' ? remote.home : null
+  if (JSON.stringify(home) !== JSON.stringify(state.home) || (home && !homeApplied)) {
+    state.home = home
+    rig.setHome(home, { jump: !homeApplied })
+    homeApplied = true
+  }
   colony.restoreLayout(state.plots)
 }
 
@@ -1312,7 +1330,7 @@ engine.add({
 
 engine.start()
 // Debug handle for headless checks and the console; nothing in the app reads it.
-window.__botfarm = { actions, colony, settings, nap: applyNap }
+window.__botfarm = { actions, colony, settings, rig, nap: applyNap }
 
 boot()
 

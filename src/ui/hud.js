@@ -226,6 +226,7 @@ export class Hud {
     // View.
     const view = group('View')
     view.append(
+      this._button('Set this view as home', 'Set', () => this.actions.setHome?.(), 'The Home button and every page load return to the angle and zoom on screen now.'),
       this._toggle('Return to isometric', 'autoFrame', 'Eases the angle back when you stop dragging.'),
       this._slider('Field of view', 'fov', 20, 60, 1, (v) => `${v}°`),
       this._toggle('Project labels', 'showLabels'),
@@ -242,6 +243,17 @@ export class Hud {
     l.className = 'label'
     l.innerHTML = `<span>${label}</span>${hint ? `<span class="hint">${hint}</span>` : ''}`
     row.appendChild(l)
+    return row
+  }
+
+  _button(label, caption, fn, hint) {
+    const row = this._row(label, hint)
+    const b = document.createElement('button')
+    b.type = 'button'
+    b.className = 'btn'
+    b.textContent = caption
+    b.addEventListener('click', fn)
+    row.appendChild(b)
     return row
   }
 

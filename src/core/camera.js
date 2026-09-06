@@ -60,6 +60,8 @@ export class CameraRig {
     this.desiredPolar = ISO_POLAR
     this.distance = 62
     this.desiredDistance = 62
+    /** Blake's saved view: where Home and a fresh page land. Null means the iso default. */
+    this.home = null
 
     this.idleFor = 0
     this.interacting = false
@@ -311,12 +313,42 @@ export class CameraRig {
 
   resetView() {
     this.orbiting = false
-    this.desiredTarget.set(0, 0, 0)
-    this.desiredDistance = 62
-    this.desiredPolar = ISO_POLAR
-    this.desiredAzimuth = this._nearestIso()
+    if (this.home) {
+      this.desiredTarget.set(this.home.x, 0, this.home.z)
+      this.desiredDistance = THREE.MathUtils.clamp(this.home.distance, MIN_DIST, MAX_DIST)
+      this.desiredPolar = THREE.MathUtils.clamp(this.home.polar, MIN_POLAR, MAX_POLAR)
+      this.desiredAzimuth = this._nearestTurn(this.home.azimuth)
+    } else {
+      this.desiredTarget.set(0, 0, 0)
+      this.desiredDistance = 62
+      this.desiredPolar = ISO_POLAR
+      this.desiredAzimuth = this._nearestIso()
+    }
     this._zoom = null
     this.idleFor = 99
+  }
+
+  /** The view as it is right now, in the form the home pose is saved in. */
+  pose() {
+    return { azimuth: this.desiredAzimuth, polar: this.desiredPolar, distance: this.desiredDistance, x: this.desiredTarget.x, z: this.desiredTarget.z }
+  }
+
+  /** Remember a home view; with `jump` the camera goes there at once, no easing. */
+  setHome(pose, { jump = false } = {}) {
+    const ok = pose && ['azimuth', 'polar', 'distance', 'x', 'z'].every((k) => Number.isFinite(Number(pose[k])))
+    this.home = ok ? { azimuth: Number(pose.azimuth), polar: Number(pose.polar), distance: Number(pose.distance), x: Number(pose.x), z: Number(pose.z) } : null
+    if (!ok || !jump) return
+    this.resetView()
+    this.azimuth = this.desiredAzimuth
+    this.polar = this.desiredPolar
+    this.distance = this.desiredDistance
+    this.target.copy(this.desiredTarget)
+    this._sync()
+  }
+
+  /** `heading`, expressed in the revolution nearest the current one, so easing never goes the long way round. */
+  _nearestTurn(heading) {
+    return heading + Math.round((this.desiredAzimuth - heading) / (Math.PI * 2)) * Math.PI * 2
   }
 
   /**
@@ -380,8 +412,8 @@ export class CameraRig {
     // clean 45° and the tilt returns to the iso angle. Position and zoom are left alone.
     if (!this.orbiting && this.settings.get('autoFrame') && this.idleFor > 2.2 && !this.interacting) {
       const ease = Math.min(1.4, (this.idleFor - 2.2) * 0.7)
-      this.desiredAzimuth = damp(this.desiredAzimuth, this._nearestIso(), ease, dt)
-      this.desiredPolar = damp(this.desiredPolar, ISO_POLAR, ease, dt)
+      this.desiredAzimuth = damp(this.desiredAzimuth, this.home ? this._nearestTurn(this.home.azimuth) : this._nearestIso(), ease, dt)
+      this.desiredPolar = damp(this.desiredPolar, this.home ? this.home.polar : ISO_POLAR, ease, dt)
     }
 
     const lambda = this.settings.get('reducedMotion') ? 40 : 9

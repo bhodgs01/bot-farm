@@ -238,6 +238,14 @@ const emptyState = () => ({
 const asObject = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {})
 const asArray = (v) => (Array.isArray(v) ? v : [])
 
+/** The saved home view: angle, tilt, zoom and the ground point it looks at. Null when unset. */
+function asPose(v) {
+  if (!v || typeof v !== 'object') return null
+  const n = (k) => Number(v[k])
+  const pose = { azimuth: n('azimuth'), polar: n('polar'), distance: n('distance'), x: n('x'), z: n('z') }
+  return Object.values(pose).every(Number.isFinite) ? pose : null
+}
+
 async function readState() {
   try {
     const raw = JSON.parse(await fsp.readFile(STATE_FILE, 'utf8'))
@@ -249,6 +257,7 @@ async function readState() {
       plots: asObject(raw.plots),
       seen: asObject(raw.seen),
       settings: raw.settings && typeof raw.settings === 'object' ? raw.settings : null,
+      home: asPose(raw.home),
       updatedAt: Number(raw.updatedAt) || 0,
     }
   } catch {
@@ -270,6 +279,7 @@ async function writeState(next) {
     plots: asObject(next.plots),
     seen: asObject(next.seen),
     settings: next.settings && typeof next.settings === 'object' ? next.settings : null,
+    home: asPose(next.home),
     updatedAt: Date.now(),
   }
   await fsp.mkdir(DATA_DIR, { recursive: true })
