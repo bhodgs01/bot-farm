@@ -43,6 +43,7 @@ function weekWindow(now = new Date()) {
 const fmtDay = new Intl.DateTimeFormat('en-US', { timeZone: TZ, weekday: 'short' })
 const fmtTime = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hour: 'numeric', minute: '2-digit' })
 const fmtDate = new Intl.DateTimeFormat('en-US', { timeZone: TZ, month: 'short', day: 'numeric' })
+const fmtDom = new Intl.DateTimeFormat('en-US', { timeZone: TZ, day: 'numeric' })
 
 async function gapi(path, token) {
   const res = await fetch(`https://www.googleapis.com/calendar/v3/${path}`, { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000) })
@@ -81,9 +82,8 @@ async function fetchThreads() {
   const next = upcoming.find((e) => !e.allDay) || upcoming[0]
   out.push({
     id: 'cal:week',
-    kind: 'task',
+    kind: 'info', // the blue i: the whole week is on the card, nothing to act on here
     landmark: 'countdown',
-    count: upcoming.length,
     title: '📅 Next 7 days',
     preview: upcoming.length ? upcoming.slice(0, 16).map((e) => `- ${line(e)}`).join(String.fromCharCode(10)) + (upcoming.length > 16 ? `${String.fromCharCode(10)}... and ${upcoming.length - 16} more` : '') : 'Nothing left on the calendar this week',
     project: ZONE,
@@ -119,6 +119,8 @@ async function fetchThreads() {
     out.push({
       id: `cal:${e.id}`,
       kind: 'task',
+      // The day of the month over the head, so the week reads at a glance.
+      plate: fmtDom.format(e.start),
       title: `${live ? '🔴' : within ? '🗓️' : '📆'} ${e.title}`.slice(0, 120),
       preview: [`${fmtDay.format(e.start)} ${e.allDay ? 'all day' : `${fmtTime.format(e.start)} - ${fmtTime.format(e.end)}`}`, e.where, e.who.length ? `with ${e.who.join(', ')}` : '', e.cal].filter(Boolean).join(' · '),
       project: ZONE,
