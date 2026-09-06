@@ -115,7 +115,7 @@ export async function setProjectStatus({ id, status, who }) {
 
 // ── a raised hand becomes a ticket ───────────────────────────────────────────────────────
 /** Which Vikunja project a hex's tickets go to. Anything unlisted lands in Client Ops. */
-const PROJECT_FOR_ZONE = { 'KC Proto': 2, Inbox: 1, CorrosionDC: 3, 'NGV Talent': 4, 'Embassy Landscape': 5, 'NED Builds': 6, CyberGrade: 7, 'KC AI Club': 8, Frances: 9 }
+const PROJECT_FOR_ZONE = { 'KC Proto': 2, Calendar: 2, Inbox: 1, CorrosionDC: 3, 'NGV Talent': 4, 'Embassy Landscape': 5, 'NED Builds': 6, CyberGrade: 7, 'KC AI Club': 8, Frances: 9 }
 
 export async function createTicket({ thread, who }) {
   if (!VIKUNJA_TOKEN) throw new Error('No Vikunja token on this server')

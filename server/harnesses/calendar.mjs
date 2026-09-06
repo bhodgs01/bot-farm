@@ -1,7 +1,7 @@
 /**
  * Harness adapter: the calendar — this week, as one keeper plus today's meetings.
  *
- * The keeper stands on KC Proto with the number of events still to come this week over his
+ * The keeper stands on the Calendar hex with the number of events still to come this week over his
  * head; hovering lists them by day. Every event inside the next 24 hours is its own
  * astronaut with a hand up and a `?`, so tomorrow morning is visible from orbit tonight.
  *
@@ -17,7 +17,7 @@ const TZ = 'America/Chicago'
 const TTL_MS = 5 * 60 * 1000
 const SOON_MS = 2 * 60 * 60 * 1000
 const DAY_MS = 24 * 60 * 60 * 1000
-const ZONE = 'KC Proto'
+const ZONE = 'Calendar'
 
 let access = { token: '', expiresAt: 0 }
 async function accessToken() {
@@ -82,6 +82,7 @@ async function fetchThreads() {
   out.push({
     id: 'cal:week',
     kind: 'task',
+    landmark: 'countdown',
     count: upcoming.length,
     title: '📅 Next 7 days',
     preview: upcoming.length ? upcoming.slice(0, 16).map((e) => `- ${line(e)}`).join(String.fromCharCode(10)) + (upcoming.length > 16 ? `${String.fromCharCode(10)}... and ${upcoming.length - 16} more` : '') : 'Nothing left on the calendar this week',

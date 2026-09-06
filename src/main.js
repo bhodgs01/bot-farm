@@ -695,7 +695,7 @@ function closeFinder() {
 
 // ── saved views: one keystroke to a corner of the map ─────────────────────────────────
 const VIEWS = {
-  1: { name: 'Clients', zones: ['KC Proto', 'Inbox', 'KC AI Club', 'Embassy Landscape', 'CorrosionDC', 'CyberGrade', 'NGV Talent', 'NED Builds', 'Frances', 'Roast Bot'] },
+  1: { name: 'Clients', zones: ['KC Proto', 'Calendar', 'Inbox', 'KC AI Club', 'Embassy Landscape', 'CorrosionDC', 'CyberGrade', 'NGV Talent', 'NED Builds', 'Frances', 'Roast Bot'] },
   2: { name: 'Infrastructure', zones: ['Cluster', 'Backups', 'Watchdog', 'Brain', 'Hetzner DR', 'Print Service', 'Plex', 'Newsroom'] },
   3: { name: 'Home', zones: ['Home', 'Garden', 'Garage', 'Chores'] },
   4: { name: 'Money', zones: ['Active Projects', 'In Process', 'Completed', 'Trade Floor', 'Countdown'] },
