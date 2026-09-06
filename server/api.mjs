@@ -97,7 +97,7 @@ function withLedger(threads) {
       'API spend today': money(spend),
       'Trade pot': pot ? money(pot) : '',
     },
-    project: 'Ledger',
+    project: 'pay me mother fucker',
     projectPath: 'ledger://now',
     worktree: '',
     cwd: 'ledger',

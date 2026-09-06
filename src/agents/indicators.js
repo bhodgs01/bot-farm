@@ -56,6 +56,8 @@ export const BADGE = {
 }
 
 /** Badge tint. Pushed past 1.0 so the bloom pass gives them a soft halo. */
+/** ...and pulled back by this much: at full boost the halo swallowed the glyph. */
+const BADGE_DIM = 0.58
 const BADGE_COLOR = {
   0: [0.42, 1.35, 2.9],
   1: [2.9, 0.6, 0.5],
@@ -278,7 +280,7 @@ export class Indicators {
       const p = badge === BADGE.printing ? Number(agent.thread?.progress) : NaN
       progress[n] = Number.isFinite(p) ? Math.max(0, Math.min(1, p)) : badge === BADGE.printing ? 0 : -1
 
-      const c = BADGE_COLOR[badge] || [1, 1, 1]
+      const c = (BADGE_COLOR[badge] || [1, 1, 1]).map((v) => v * BADGE_DIM)
       this._color.setRGB(c[0], c[1], c[2])
       this.mesh.setColorAt(n, this._color)
       n++

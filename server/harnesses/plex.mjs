@@ -47,7 +47,7 @@ async function fetchSessions() {
       kind: 'watching',
       title: show.slice(0, 120),
       preview: `${user} is ${state === 'paused' ? 'paused' : 'watching'} · ${pct}% in${player ? ` · ${player}` : ''}`,
-      project: 'Plex',
+      project: 'Blakeflix',
       projectPath: 'plex://sessions',
       worktree: '',
       cwd: user,
@@ -123,7 +123,7 @@ function openThread(ref) {
 
 export default {
   id: 'plex',
-  name: 'Plex',
+  name: 'Blakeflix',
   detect: async () => Boolean(TOKEN),
   scanThreads,
   openThread,

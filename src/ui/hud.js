@@ -1145,7 +1145,7 @@ const TEMPLATE = `
       <div class="legend-row"><i class="badge" style="background:#1a2b46;color:#8fb4ee">?</i> an agent is waiting on you: click to open its dashboard</div>
       <div class="legend-row"><i class="badge" style="background:#3a2d10;color:#f0c46a">&#9993;</i> unread mail from that client, waiting patiently on its hex</div>
       <div class="legend-row"><i class="badge" style="background:#10303a;color:#7fd0f0">&#9113;</i> a print request came in</div>
-      <div class="legend-row"><i class="badge" style="background:#3a2210;color:#f0a06a">&#9654;</i> somebody is watching Plex</div>
+      <div class="legend-row"><i class="badge" style="background:#3a2210;color:#f0a06a">&#9654;</i> somebody is watching Blakeflix</div>
       <div class="legend-row"><i class="badge" style="background:#103a30;color:#7ff0c0">&#9684;</i> a print in progress: the ring fills as it completes</div>
       <div class="legend-row"><i class="badge" style="background:#3a2d10;color:#f0c46a">&#9707;</i> a door, window or garage left open</div>
       <div class="legend-row"><i class="badge" style="background:#14301a;color:#8fe0a0">&#128167;</i> a plant whose soil has gone dry</div>

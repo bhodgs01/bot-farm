@@ -58,7 +58,7 @@ const ZONE_ACCENT = {
   Inbox: 0xc96442,
   'Trade Floor': 0x3fa8a0,
   Newsroom: 0x8a93a6,
-  Plex: 0xc95c5c,
+  Blakeflix: 0xc95c5c,
   'Active Projects': 0xc96442,
   'In Process': 0xb8942a,
   Completed: 0x4f9a63,
@@ -68,7 +68,7 @@ const ZONE_ACCENT = {
   Countdown: 0xc95c5c,
   Garage: 0x8a6a4f,
   'Hetzner DR': 0x6a7fa6,
-  Ledger: 0x5fae6a,
+  'pay me mother fucker': 0x5fae6a,
   Calendar: 0x6f8fd6,
 }
 
@@ -585,6 +585,8 @@ export class Colony {
       const pos = plot.worldSlot(index)
       mesh.position.copy(pos)
       mesh.rotation.y = ((hashString(thread.id) >>> 8) % 360) * (Math.PI / 180)
+      // The cinema faces the default view, screen toward the camera.
+      if (mesh.userData.kind === 'theater') mesh.rotation.y += Math.PI
       // New buildings rise from nothing rather than appearing whole.
       mesh.userData.setProgress(0)
       this.worldGroup.add(mesh)
