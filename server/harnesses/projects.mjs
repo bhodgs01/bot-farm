@@ -93,8 +93,9 @@ async function fetchThreads() {
         landmark: p.status === 'completed' ? 'crate' : 'bench',
         actions: NEXT[p.status] || [],
         // Over the head: days owed on a finished job, days of silence on a prospect.
-        plate: owedDays != null ? `${owedDays}d` : '',
-        roof: p.status === 'completed' && amount ? money(amount) : undefined,
+        // A finished job wears its dollar amount over its head, like the pot and the ledger.
+        plate: p.status === 'completed' && amount ? money(amount) : '',
+        roof: undefined,
         alertKey: owedDays != null && owedDays >= RECEIVABLE_DAYS ? `owed:${p.id}:${owedDays}` : '',
         details: {
           Client: p.client || '',
@@ -127,7 +128,7 @@ async function fetchThreads() {
         lastActivityAt: started,
         lastFocusedAt: 0,
         running: p.status === 'in_process',
-        unread: p.status === 'prospect' || p.status === 'completed',
+        unread: false,
         // Prospects never raise a hand — landing one can take months, so silence is not a
         // thing to act on. Only an unpaid finished job (a receivable) flags.
         hasError: owedDays != null && owedDays >= RECEIVABLE_DAYS,
