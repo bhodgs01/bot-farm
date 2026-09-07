@@ -291,8 +291,8 @@ const KINDS = {
   lobster: { build: createClawd, name: 'Clawd', intro: "I'm Clawd, the mascot. Red, chunky, mostly claws. I patrol the paths and pinch at nothing in particular. Named after the feral one in the cluster." },
   gecko: {
     build: createPickle,
-    name: 'Pickle',
-    intro: "I'm Pickle, Kai's leopard gecko. I amble the colony and store my snacks in my tail.",
+    name: 'Carti',
+    intro: "I'm Carti, Kai's leopard gecko. I amble the colony and store my snacks in my tail.",
     reminder: () => (isFridayKC() ? { badge: '🦗', note: "Crickets today — Kai's gecko needs feeding." } : null),
   },
 }
