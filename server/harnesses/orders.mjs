@@ -32,6 +32,9 @@ async function fetchThreads() {
       return {
         id: `order:${o.id}`,
         kind: 'order',
+        // Each live order waits at the pickup counter — parcels stacked, the customer beside
+        // it — instead of loitering at the operator's bench.
+        landmark: 'orderCounter',
         title: `🧾 ${who}${o.quantity ? ` ×${o.quantity}` : ''}`,
         preview: [`${status}${o.quoted_cents ? ` · ${money(o.quoted_cents)}` : ''}`, [o.printer_name, o.color_name, o.material].filter(Boolean).join(' · '), o.note || ''].filter(Boolean).join(NL),
         details: {

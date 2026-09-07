@@ -38,8 +38,13 @@ async function recordHistory(threads) {
   const hands = threads
     .filter((t) => !t.archived && (t.unread || t.hasError))
     .map((t) => ({ id: t.id, title: t.title, project: t.project, kind: t.hasError ? 'blocked' : 'waiting' }))
+  // Milestones worth a chief's daily log even when they never ask for anything: a job
+  // delivered into the pay-me pile (with its figure), and a print run going on the bed.
+  const marks = threads
+    .filter((t) => !t.archived && (t.project === 'Pay me mother fucker' || t.kind === 'printing'))
+    .map((t) => ({ id: t.id, title: t.title, project: t.project, kind: t.kind === 'printing' ? 'print' : 'done', amount: t.project === 'Pay me mother fucker' ? t.plate || '' : '' }))
   const list = await readHistory(day)
-  list.push({ at: Date.now(), hands })
+  list.push({ at: Date.now(), hands, marks })
   await fsp.mkdir(historyDir(), { recursive: true })
   await fsp.writeFile(path.join(historyDir(), `${day}.json`), JSON.stringify(list))
   // thirty days is plenty
@@ -54,15 +59,28 @@ async function recordHistory(threads) {
 async function timelineToday() {
   const list = await readHistory(todayKC())
   const fmt = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' })
-  const lines = []
-  let prev = new Map()
+  const events = []
+  let prevHands = new Map()
+  let prevMarks = new Map()
   for (const snap of list) {
-    const now = new Map(snap.hands.map((h) => [h.id, h]))
-    for (const [id, h] of now) if (!prev.has(id)) lines.push(`${fmt.format(new Date(snap.at))} ▲ ${h.title} (${h.project})`)
-    for (const [id, h] of prev) if (!now.has(id)) lines.push(`${fmt.format(new Date(snap.at))} ▼ ${h.title} (${h.project})`)
-    prev = now
+    // Hands going up and coming down: what wanted you, and what you cleared.
+    const hands = new Map(snap.hands.map((h) => [h.id, h]))
+    for (const [id, h] of hands) if (!prevHands.has(id)) events.push({ at: snap.at, text: `▲ ${h.title} (${h.project})` })
+    for (const [id, h] of prevHands) if (!hands.has(id)) events.push({ at: snap.at, text: `▼ ${h.title} (${h.project})` })
+    prevHands = hands
+    // Milestones: a job delivered (with its figure), a print run started.
+    const marks = new Map((snap.marks || []).map((m) => [m.id, m]))
+    for (const [id, m] of marks) {
+      if (prevMarks.has(id)) continue
+      const glyph = m.kind === 'print' ? '🖨' : '✅'
+      events.push({ at: snap.at, text: `${glyph} ${m.title}${m.amount ? ` ${m.amount}` : ''} (${m.project})` })
+    }
+    prevMarks = marks
   }
-  return lines.slice(-14)
+  return events
+    .sort((a, b) => a.at - b.at)
+    .slice(-16)
+    .map((e) => `${fmt.format(new Date(e.at))} ${e.text}`)
 }
 
 // ── the ledger: money on the map, added up ───────────────────────────────────────────────

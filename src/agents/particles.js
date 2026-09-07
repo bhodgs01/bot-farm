@@ -269,6 +269,30 @@ export class Particles {
     )
   }
 
+  /** A cough of dark exhaust out the back of a revving engine. `ground` is the deck it sits on. */
+  exhaust(x, y, z, ground = 0) {
+    if (!this.enabled) return
+    for (let i = 0; i < 3; i++) {
+      const a = Math.random() * Math.PI * 2
+      this.dust.spawn(
+        x + Math.cos(a) * 0.1,
+        y + 0.05,
+        z,
+        Math.cos(a) * 0.18,
+        0.32 + Math.random() * 0.22,
+        -0.55 - Math.random() * 0.35,
+        0.2,
+        0.2,
+        0.22,
+        0.16 + Math.random() * 0.12,
+        0.7 + Math.random() * 0.5,
+        1.9,
+        -0.22,
+        ground
+      )
+    }
+  }
+
   /** Confetti for a finished thread. `ground` is what the celebrating agent is standing on. */
   cheer(x, y, z, color, ground = 0) {
     if (!this.enabled) return

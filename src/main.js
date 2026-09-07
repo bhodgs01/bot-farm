@@ -494,6 +494,8 @@ function select(id, { fly = false, mode } = {}) {
     return
   }
   colony.astronauts.setSelected(agent)
+  // Poke the FJ40 and it revs: a bounce, a shimmy, a cough of exhaust out the back.
+  if (id === 'garage:fj40') colony.revFj40()
   const thread = threads.find((t) => t.id === id) || agent.thread
   hud.setSelection(agent, thread, { mode })
   // Picking somebody is also picking the zone they are standing on: the sidebar follows.

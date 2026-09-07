@@ -1204,6 +1204,7 @@ export class Colony {
     this.ship.update(dt, elapsed, night)
 
     this._growBuildings(dt)
+    this._revAnim(dt)
     this.astronauts.update(dt, elapsed)
     this.astronauts.updateRings(elapsed)
     this.indicators.update(this.astronauts.agents, elapsed, (a) => this._badgeFor(a))
@@ -1216,6 +1217,45 @@ export class Colony {
     this._updatePlots(night, elapsed)
     this._updateScaffolds()
     this._updateLabels(dt)
+  }
+
+  /**
+   * A poke to the FJ40 (or any building given the `fj40` landmark): a quick rev. The truck
+   * catches, bounces on its springs with a little shimmy, and coughs exhaust out the back,
+   * settling in about a second. Clicking the truck triggers it.
+   */
+  revFj40(id = 'garage:fj40') {
+    const entry = this.buildings.get(id)
+    if (!entry || entry.rev) return
+    entry.rev = { t: 0, restY: entry.mesh.position.y, nextPuff: 0 }
+  }
+
+  _revAnim(dt) {
+    const DUR = 1.05
+    for (const [, entry] of this.buildings) {
+      const rev = entry.rev
+      if (!rev) continue
+      rev.t += dt
+      const k = rev.t / DUR
+      if (k >= 1) {
+        entry.mesh.position.y = rev.restY
+        entry.mesh.rotation.z = 0
+        entry.rev = null
+        continue
+      }
+      // Two hard revs that decay: the engine catches, bounces, then settles on its springs.
+      const env = Math.pow(1 - k, 1.5)
+      const beat = Math.sin(k * Math.PI * 6)
+      entry.mesh.position.y = rev.restY + Math.abs(beat) * 0.16 * env
+      entry.mesh.rotation.z = beat * 0.055 * env
+      // Exhaust out the back on the first, hardest revs (the piece's rear is -z, unrotated).
+      rev.nextPuff -= dt
+      if (rev.nextPuff <= 0 && k < 0.72) {
+        rev.nextPuff = 0.13
+        const p = entry.mesh.position
+        this.particles.exhaust(p.x, p.y + 0.55, p.z - 1.5, entry.mesh.position.y - 0.4)
+      }
+    }
   }
 
   _growBuildings(dt) {
