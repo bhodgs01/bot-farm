@@ -564,46 +564,8 @@ export class Hud {
     this.$('#btn-reveal').disabled = !project.path
     this.$('#btn-copy-path').disabled = !project.path
 
-    const n = project.threads.length
-    const waiting = project.threads.filter((t) => ['waiting', 'blocked', 'mail', 'print', 'door', 'plant', 'visitor'].includes(t.status)).length
-    this.$('.side .threads-head').innerHTML =
-      `<span>${n} thread${n === 1 ? '' : 's'}</span>` + (waiting ? `<span class="want">${waiting} need you</span>` : '')
-
-    const list = this.$('.side .threads')
-    // A poll rewrites these rows every time a live thread's timestamp moves. Losing your
-    // place in a forty-thread repo every fifteen seconds would make the list unusable.
-    const scroll = list.scrollTop
-    list.innerHTML = ''
-    for (const t of project.threads) {
-      const b = document.createElement('button')
-      b.type = 'button'
-      b.className = `thread ${statusClass(t.status)}`
-      b.setAttribute('aria-pressed', String(t.id === project.selectedId))
-      b.title = STATUS_LABEL[t.status] || t.status
-      b.innerHTML =
-        '<i class="pip"></i>' +
-        `<span class="t">${escapeHtml(t.title || 'Untitled thread')}</span>` +
-        `<span class="when">${ago(t.lastActivityAt)}</span>` +
-        (t.worktree ? `<span class="wt">⑂ ${escapeHtml(t.worktree)}</span>` : '')
-      b.addEventListener('click', () => this.actions.focusThread?.(t.id))
-      list.appendChild(b)
-      // A long repo can hide the astronaut you just clicked in the world. Scrolled by hand
-      // rather than with `scrollIntoView`, which walks up the ancestors and will happily
-      // scroll the *page* — and a page that can scroll at all is one keystroke away from
-      // the whole HUD sitting sideways with nothing to put it back.
-      if (t.id === project.selectedId && this._scrolledTo !== t.id) {
-        this._scrolledTo = t.id
-        const row = b
-        requestAnimationFrame(() => {
-          const top = row.offsetTop
-          const bottom = top + row.offsetHeight
-          if (top < list.scrollTop) list.scrollTop = top
-          else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight
-        })
-      }
-    }
-    list.scrollTop = scroll
-    if (!project.selectedId) this._scrolledTo = null
+    // The hexes are Blake's recurring AI projects, not a thread list — the astronauts on
+    // the map are the items, so the panel no longer repeats them as a "threads" list.
   }
 
   /**
@@ -1164,8 +1126,6 @@ const TEMPLATE = `
           <button class="btn" id="btn-copy-path" title="Copy the folder path">${ICON.copy} Copy path</button>
         </div>
       </div>
-      <div class="threads-head"></div>
-      <div class="threads"></div>
     </div>
   </div>
 </aside>

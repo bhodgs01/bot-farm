@@ -50,7 +50,7 @@ app.insertAdjacentHTML(
   `<div class="boot"><div class="inner">
      <img class="art" src="/boot-art.webp" alt="" width="1024" height="1024" decoding="async">
      <h1>Bot Farm</h1>
-     <p>Scanning for agent threads…</p>
+     <p>Loading your projects…</p>
      <div class="bar"><i></i></div>
    </div></div>`
 )
