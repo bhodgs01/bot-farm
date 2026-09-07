@@ -598,8 +598,9 @@ export class Colony {
 
   _syncBuilding(thread, plot, index) {
     let entry = this.buildings.get(thread.id)
-    // Whole, always. A building that has finished rising is a building you can see all of.
-    const target = 1
+    // Whole, always — unless the thread names a fill level (money piles), where the reveal
+    // height stands for how full it is, so the pile rises and falls with the number.
+    const target = Number.isFinite(thread.fill) ? THREE.MathUtils.clamp(thread.fill, 0.06, 1) : 1
 
     if (!entry) {
       const mesh = createBuilding({ seed: hashString(thread.id), accent: plot.accent, kind: thread.landmark || ZONE_LANDMARK[thread.project] || null })

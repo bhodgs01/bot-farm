@@ -83,7 +83,9 @@ function withLedger(threads) {
   const ledger = {
     id: 'ledger:now',
     kind: 'keeper',
-    landmark: 'signpost',
+    landmark: 'coins',
+    // The pile is what is owed, against a nominal $10k board, so a big receivable stands tall.
+    fill: Math.max(0.1, Math.min(1, owedTotal / 10000)),
     title: '📒 Ledger',
     // No figures over the keeper's head: the map gets shown around. The numbers are on
     // the card, one click away.

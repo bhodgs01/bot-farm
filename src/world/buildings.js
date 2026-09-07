@@ -55,7 +55,7 @@ const KIND_SCALE = {
   printer: 0.55, bench: 0.5, yard: 0.55, desk: 0.75, newsstand: 0.6, planter: 0.8, crate: 0.8,
   // one per hex: the landmark, big enough to name the place from across the map
   hq: 0.95, clubhouse: 0.95, house: 0.95, tradingfloor: 0.9, shield: 0.95, launchpad: 0.95,
-  recruitdesk: 0.85, grill: 0.85, vault: 0.9, controltower: 0.95, garage: 0.95, outpost: 0.9,
+  recruitdesk: 0.85, grill: 0.85, vault: 0.9, controltower: 0.95, garage: 0.95, outpost: 0.9, coins: 0.8,
   apartment: 0.9, theater: 0.9, kennel: 0.9, fj40: 0.95, dish: 1, pumpjack: 1, deck: 0.95, gazebo: 0.95,
   // small fixtures that stand alone
   signpost: 0.7, tvwall: 0.7, keyrack: 0.7, meter: 0.7, countdown: 0.7, mailbox: 0.7,
@@ -1436,6 +1436,33 @@ const KINDS = {
       c.geom(pan, CELL.GREY, { x, y: 1.44, z: -0.91 })
     }
     return 'Grill'
+  },
+
+  /**
+   * A pile of money, in the hex's own colour: a tall centre stack ringed by shorter ones and
+   * a few loose coins. The reveal height is driven by how much money there is (thread.fill),
+   * so the pile literally rises with the pot and the receivables.
+   */
+  coins(c, rand) {
+    const stack = (x, z, r, coins) => {
+      for (let i = 0; i < coins; i++) {
+        const g = new THREE.CylinderGeometry(r, r, 0.09, 18)
+        c.geom(g, i % 3 === 0 ? CELL.WHITE : CELL.TRIM, { x, y: 0.06 + i * 0.092, z, ry: rand() * 0.5 })
+      }
+    }
+    // Centre column tallest, so the reveal (bottom-up) reads as a rising pile.
+    stack(0, 0, 0.42, 12)
+    stack(0.62, 0.2, 0.36, 8)
+    stack(-0.5, -0.34, 0.34, 6)
+    stack(0.15, -0.66, 0.3, 5)
+    stack(-0.66, 0.5, 0.28, 4)
+    // A couple of loose coins lying flat on the deck.
+    for (let i = 0; i < 5; i++) {
+      const a = rand() * Math.PI * 2
+      const d = 0.9 + rand() * 0.5
+      c.geom(new THREE.CylinderGeometry(0.22, 0.22, 0.05, 16), CELL.TRIM, { x: Math.cos(a) * d, y: 0.026, z: Math.sin(a) * d, ry: rand() })
+    }
+    return 'Coins'
   },
 
   vault(c, rand) {
