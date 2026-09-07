@@ -14,99 +14,84 @@ const WALK = 1.5 // m/s, an amble
 function createClawd() {
   const g = new THREE.Group()
   const mat = (color) => new THREE.MeshStandardMaterial({
-    color,
-    roughness: 0.78,
-    metalness: 0.02,
-    flatShading: true
+    color, roughness: 0.78, metalness: 0.02, flatShading: true
   })
   const shell = mat(0xc7402f)
-  const highlight = mat(0xe15b42)
+  const bright = mat(0xe15b42)
   const joint = mat(0x79291f)
   const black = mat(0x151b20)
   const white = mat(0xffeed8)
 
-  const mesh = (parent, geometry, material, x = 0, y = 0, z = 0) => {
-    const m = new THREE.Mesh(geometry, material)
+  const oval = (x, y, z) => {
+    const geo = new THREE.SphereGeometry(1, 10, 7)
+    geo.scale(x, y, z)
+    return geo
+  }
+  const add = (parent, geo, material, x = 0, y = 0, z = 0) => {
+    const m = new THREE.Mesh(geo, material)
     m.position.set(x, y, z)
     m.castShadow = true
     m.receiveShadow = true
     parent.add(m)
     return m
   }
-  const oval = (rx, ry, rz) => {
-    const geometry = new THREE.SphereGeometry(1, 10, 7)
-    geometry.scale(rx, ry, rz)
-    return geometry
-  }
 
-  // Rounded shell, pitched slightly toward the face.
-  const body = mesh(g, oval(0.27, 0.23, 0.34), shell, 0, 0.39, -0.08)
+  const body = add(g, oval(0.27, 0.23, 0.34), shell, 0, 0.39, -0.08)
   body.rotation.x = 0.12
-  mesh(g, oval(0.235, 0.115, 0.29), joint, 0, 0.27, -0.075)
+  add(g, oval(0.235, 0.115, 0.29), joint, 0, 0.27, -0.075)
 
-  // The head mesh owns its face, stalks, and antennae.
-  const headGeometry = oval(0.245, 0.215, 0.24)
-  headGeometry.translate(0, 0.06, 0.1)
-  const head = mesh(g, headGeometry, highlight, 0, 0.43, 0.16)
+  const hg = oval(0.245, 0.215, 0.24)
+  hg.translate(0, 0.06, 0.1)
+  const head = add(g, hg, bright, 0, 0.43, 0.16)
   g.userData.head = head
 
   for (const s of [-1, 1]) {
-    const stalkGeometry = new THREE.CylinderGeometry(0.04, 0.055, 0.2, 7)
-    stalkGeometry.translate(0, 0.1, 0)
-    const stalk = mesh(head, stalkGeometry, shell, s * 0.13, 0.2, 0.17)
+    const sg = new THREE.CylinderGeometry(0.04, 0.055, 0.2, 7)
+    sg.translate(0, 0.1, 0)
+    const stalk = add(head, sg, shell, s * 0.13, 0.2, 0.17)
     stalk.rotation.z = -s * 0.22
+    add(stalk, oval(0.065, 0.074, 0.063), black, 0, 0.22, 0.012)
+    add(stalk, oval(0.019, 0.021, 0.012), white, -0.015, 0.242, 0.066)
 
-    mesh(stalk, oval(0.065, 0.074, 0.063), black, 0, 0.22, 0.012)
-    mesh(stalk, oval(0.019, 0.021, 0.012), white, -0.015, 0.242, 0.066)
-
-    // One curved primitive per antenna, sweeping upward and backward.
-    const antennaGeometry = new THREE.TorusGeometry(
-      0.32, 0.018, 5, 12, 1.65
-    )
-    antennaGeometry.translate(-0.32, 0, 0)
-    antennaGeometry.rotateY(-Math.PI / 2)
-    const antenna = mesh(
-      head, antennaGeometry, joint, s * 0.18, 0.17, 0.06
-    )
+    const ag = new THREE.TorusGeometry(0.32, 0.018, 5, 12, 1.65)
+    ag.translate(-0.32, 0, 0)
+    ag.rotateY(-Math.PI / 2)
+    const antenna = add(head, ag, joint, s * 0.18, 0.17, 0.06)
     antenna.rotation.y = s * 0.28
   }
 
-  // Six short walking legs terminate above the ground plane.
+  const legAngle = 2.48
+  const legRootY = -0.34 * Math.cos(legAngle)
   for (const s of [-1, 1]) {
     for (const z of [-0.26, -0.055, 0.15]) {
-      const legGeometry = new THREE.ConeGeometry(0.065, 0.32, 6)
-      legGeometry.translate(0, 0.16, 0)
-      legGeometry.rotateZ(s * 2.48)
-      mesh(g, legGeometry, shell, s * 0.19, 0.3, z)
+      const lg = new THREE.ConeGeometry(0.065, 0.34, 6)
+      lg.translate(0, 0.17, 0)
+      lg.rotateZ(s * legAngle)
+      add(g, lg, shell, s * 0.19, legRootY, z)
     }
   }
 
-  // Tail root is a single mesh with its geometry offset from the rump pivot.
-  const tailGeometry = oval(0.205, 0.12, 0.135)
-  tailGeometry.translate(0, -0.025, -0.09)
-  const tail = mesh(g, tailGeometry, shell, 0, 0.37, -0.31)
+  const tg = oval(0.205, 0.12, 0.135)
+  tg.translate(0, -0.025, -0.09)
+  const tail = add(g, tg, shell, 0, 0.37, -0.31)
   g.userData.tail = tail
+  add(tail, oval(0.181, 0.103, 0.055), joint, 0, -0.027, -0.178)
+  add(tail, oval(0.17, 0.105, 0.115), shell, 0, -0.005, -0.235)
+  add(tail, oval(0.146, 0.087, 0.048), joint, 0, 0.013, -0.307)
+  add(tail, oval(0.135, 0.088, 0.095), bright, 0, 0.045, -0.36)
 
-  // Child segments follow the root mesh through the entire wag.
-  mesh(tail, oval(0.181, 0.103, 0.055), joint, 0, -0.027, -0.178)
-  mesh(tail, oval(0.17, 0.105, 0.115), shell, 0, -0.005, -0.235)
-  mesh(tail, oval(0.146, 0.087, 0.048), joint, 0, 0.013, -0.307)
-  mesh(tail, oval(0.135, 0.088, 0.095), highlight, 0, 0.045, -0.36)
-
-  // Three broad fan lobes finish the upward-curving tail.
   for (const s of [-1, 0, 1]) {
-    const fanGeometry = oval(0.09, 0.045, 0.115)
-    fanGeometry.translate(0, 0, -0.07)
-    const fan = mesh(tail, fanGeometry, shell, s * 0.065, 0.08, -0.39)
+    const fg = oval(0.09, 0.045, 0.115)
+    fg.translate(0, 0, -0.065)
+    const fan = add(tail, fg, shell, s * 0.065, 0.08, -0.37)
     fan.rotation.y = -s * 0.48
     fan.rotation.x = 0.24
   }
 
-  // Forward-reaching arms and two independent claw assemblies.
   g.userData.claws = []
   for (const s of [-1, 1]) {
-    const armGeometry = oval(0.09, 0.09, 0.205)
-    const arm = mesh(g, armGeometry, joint, s * 0.285, 0.35, 0.25)
+    const arm = add(g, oval(0.09, 0.09, 0.205), joint,
+      s * 0.285, 0.35, 0.25)
     arm.rotation.y = s * 0.5
 
     const claw = new THREE.Group()
@@ -114,16 +99,12 @@ function createClawd() {
     claw.rotation.y = s * 0.18
     g.add(claw)
 
-    // Rounded palm and fixed lower finger.
-    mesh(claw, oval(0.145, 0.115, 0.18), shell, 0, 0, 0.08)
-    mesh(claw, oval(0.105, 0.06, 0.17), highlight, 0, -0.065, 0.245)
+    add(claw, oval(0.145, 0.115, 0.18), shell, 0, 0, 0.08)
+    add(claw, oval(0.105, 0.06, 0.17), bright, 0, -0.065, 0.245)
 
-    // Offset geometry puts the opening hinge at the jaw's rear.
-    // Engine: jaw.rotation.x = -open; negative X lifts the +Z tip.
-    const jawGeometry = oval(0.12, 0.07, 0.2)
-    jawGeometry.translate(0, 0.015, 0.18)
-    const jaw = mesh(claw, jawGeometry, highlight, 0, 0.075, 0.025)
-    claw.userData.jaw = jaw
+    const jg = oval(0.12, 0.07, 0.2)
+    jg.translate(0, 0.015, 0.18)
+    claw.userData.jaw = add(claw, jg, bright, 0, 0.075, 0.025)
     g.userData.claws.push(claw)
   }
 
@@ -134,92 +115,186 @@ function createClawd() {
 function createColonyDog() {
   const g = new THREE.Group()
   const mat = (color) => new THREE.MeshStandardMaterial({
-    color,
-    roughness: 0.82,
-    metalness: 0.01,
-    flatShading: true
+    color, roughness: 0.82, metalness: 0.01, flatShading: true
   })
   const tan = mat(0xc48b52)
   const cream = mat(0xefcf96)
   const brown = mat(0x65402d)
   const black = mat(0x192026)
-  const collarMaterial = mat(0x348f98)
+  const teal = mat(0x348f98)
   const white = mat(0xfff5dc)
 
-  const mesh = (parent, geometry, material, x = 0, y = 0, z = 0) => {
-    const m = new THREE.Mesh(geometry, material)
+  const oval = (x, y, z) => {
+    const geo = new THREE.SphereGeometry(1, 10, 7)
+    geo.scale(x, y, z)
+    return geo
+  }
+  const add = (parent, geo, material, x = 0, y = 0, z = 0) => {
+    const m = new THREE.Mesh(geo, material)
     m.position.set(x, y, z)
     m.castShadow = true
     m.receiveShadow = true
     parent.add(m)
     return m
   }
-  const oval = (rx, ry, rz) => {
-    const geometry = new THREE.SphereGeometry(1, 10, 7)
-    geometry.scale(rx, ry, rz)
-    return geometry
-  }
 
-  // Low barrel body and broad cream chest.
-  mesh(g, oval(0.29, 0.285, 0.435), tan, 0, 0.385, -0.12)
-  mesh(g, oval(0.215, 0.22, 0.15), cream, 0, 0.4, 0.2)
+  add(g, oval(0.29, 0.285, 0.435), tan, 0, 0.385, -0.12)
+  add(g, oval(0.215, 0.22, 0.15), cream, 0, 0.4, 0.2)
 
-  // Four sturdy, flat-bottomed paws.
   for (const x of [-0.185, 0.185]) {
     for (const z of [-0.395, 0.16]) {
-      mesh(
-        g,
-        new THREE.CylinderGeometry(0.09, 0.12, 0.28, 8),
-        tan,
-        x, 0.14, z
-      )
+      add(g, new THREE.CylinderGeometry(0.09, 0.12, 0.28, 8),
+        tan, x, 0.14, z)
     }
   }
 
-  // Collar wraps the forward neck.
-  mesh(
-    g,
-    new THREE.TorusGeometry(0.205, 0.035, 6, 12),
-    collarMaterial,
-    0, 0.48, 0.265
-  )
+  add(g, new THREE.TorusGeometry(0.205, 0.035, 6, 12),
+    teal, 0, 0.48, 0.265)
 
-  // Neck-pivoted head owns all facial features.
-  const headGeometry = oval(0.255, 0.245, 0.255)
-  headGeometry.translate(0, 0.1, 0.065)
-  const head = mesh(g, headGeometry, tan, 0, 0.52, 0.275)
+  const hg = oval(0.255, 0.245, 0.255)
+  hg.translate(0, 0.1, 0.065)
+  const head = add(g, hg, tan, 0, 0.52, 0.265)
   g.userData.head = head
 
-  // Rounded muzzle, oversized nose, and bright forward-facing eyes.
-  mesh(head, oval(0.18, 0.115, 0.185), cream, 0, 0.025, 0.29)
-  mesh(head, oval(0.105, 0.075, 0.065), black, 0, 0.07, 0.47)
-  for (const s of [-1, 1]) {
-    mesh(head, oval(0.048, 0.061, 0.035), black, s * 0.125, 0.18, 0.285)
-    mesh(head, oval(0.014, 0.017, 0.012), white, s * 0.125 - 0.01, 0.201, 0.315)
+  add(head, oval(0.18, 0.115, 0.185), cream, 0, 0.025, 0.29)
+  add(head, oval(0.105, 0.075, 0.065), black, 0, 0.07, 0.46)
 
-    // Floppy ears are attached to the head and hang from their roots.
-    const earGeometry = oval(0.1, 0.2, 0.115)
-    earGeometry.translate(0, -0.135, 0)
-    const ear = mesh(head, earGeometry, brown, s * 0.235, 0.2, 0.035)
+  for (const s of [-1, 1]) {
+    add(head, oval(0.048, 0.061, 0.035), black,
+      s * 0.125, 0.18, 0.285)
+    add(head, oval(0.014, 0.017, 0.012), white,
+      s * 0.125 - 0.01, 0.201, 0.315)
+
+    const eg = oval(0.1, 0.2, 0.115)
+    eg.translate(0, -0.135, 0)
+    const ear = add(head, eg, brown, s * 0.235, 0.2, 0.035)
     ear.rotation.z = s * 0.16
     ear.rotation.x = -0.15
   }
 
-  // Single tail mesh: base at the rump, tip rising toward -Z.
-  // Engine: tail.rotation.y = wag; the authored upward angle is in geometry.
-  const tailGeometry = new THREE.ConeGeometry(0.09, 0.4, 8)
-  tailGeometry.translate(0, 0.2, 0)
-  tailGeometry.rotateX(-1.05)
-  const tail = mesh(g, tailGeometry, brown, 0, 0.45, -0.44)
-  g.userData.tail = tail
+  const tg = new THREE.ConeGeometry(0.09, 0.4, 8)
+  tg.translate(0, 0.2, 0)
+  tg.rotateX(-1.05)
+  g.userData.tail = add(g, tg, brown, 0, 0.45, -0.44)
 
   g.scale.setScalar(0.85)
   return g
 }
 
+function createPickle() {
+  const g = new THREE.Group()
+  const mat = (color) => new THREE.MeshStandardMaterial({
+    color, roughness: 0.86, metalness: 0.01, flatShading: true
+  })
+  const sand = mat(0xe8c15a)
+  const cream = mat(0xf4dda0)
+  const spots = mat(0x765032)
+  const eyes = mat(0x22242a)
+  const white = mat(0xfff4d7)
+
+  const oval = (x, y, z) => {
+    const geo = new THREE.SphereGeometry(1, 10, 7)
+    geo.scale(x, y, z)
+    return geo
+  }
+  const add = (parent, geo, material, x = 0, y = 0, z = 0) => {
+    const m = new THREE.Mesh(geo, material)
+    m.position.set(x, y, z)
+    m.castShadow = true
+    m.receiveShadow = true
+    parent.add(m)
+    return m
+  }
+
+  add(g, oval(0.205, 0.14, 0.34), sand, 0, 0.245, 0.025)
+  add(g, oval(0.18, 0.07, 0.29), cream, 0, 0.16, 0.055)
+
+  for (const s of [-1, 1]) {
+    for (const z of [-0.19, 0.23]) {
+      const leg = add(g, oval(0.18, 0.075, 0.09), sand,
+        s * 0.23, 0.12, z)
+      leg.rotation.z = -s * 0.25
+      leg.rotation.y = s * (z > 0 ? -0.35 : 0.35)
+      add(g, oval(0.115, 0.055, 0.12), cream,
+        s * 0.365, 0.055, z + 0.025)
+    }
+  }
+
+  const hg = oval(0.265, 0.16, 0.24)
+  hg.translate(0, 0.025, 0.1)
+  const head = add(g, hg, sand, 0, 0.285, 0.34)
+  g.userData.head = head
+  add(head, oval(0.205, 0.075, 0.16), cream, 0, -0.045, 0.21)
+
+  for (const s of [-1, 1]) {
+    add(head, oval(0.077, 0.096, 0.075), eyes,
+      s * 0.225, 0.095, 0.13)
+    add(head, oval(0.022, 0.026, 0.018), white,
+      s * 0.235, 0.125, 0.192)
+    add(head, oval(0.019, 0.012, 0.012), spots,
+      s * 0.08, 0.03, 0.335)
+  }
+
+  const smile = new THREE.TorusGeometry(0.12, 0.012, 5, 12, Math.PI)
+  smile.scale(1.25, 0.38, 1)
+  smile.rotateZ(Math.PI)
+  add(head, smile, spots, 0, -0.025, 0.354)
+
+  for (const [x, z, r] of [
+    [-0.105, -0.14, 0.043],
+    [0.09, -0.08, 0.05],
+    [-0.1, 0.065, 0.048],
+    [0.1, 0.15, 0.043],
+    [0.015, 0.24, 0.038]
+  ]) {
+    const u = (x / 0.205) ** 2 + ((z - 0.025) / 0.34) ** 2
+    const y = 0.245 + 0.14 * Math.sqrt(1 - u)
+    add(g, oval(r, 0.018, r * 1.15), spots, x, y, z)
+  }
+
+  const profile = [
+    new THREE.Vector2(0, 0),
+    new THREE.Vector2(0.085, 0),
+    new THREE.Vector2(0.13, 0.09),
+    new THREE.Vector2(0.155, 0.2),
+    new THREE.Vector2(0.135, 0.31),
+    new THREE.Vector2(0.09, 0.43),
+    new THREE.Vector2(0.04, 0.53),
+    new THREE.Vector2(0, 0.58)
+  ]
+  const tg = new THREE.LatheGeometry(profile, 12)
+  tg.translate(0, -0.015, 0)
+  tg.rotateX(-Math.PI / 2)
+  const tail = add(g, tg, sand, 0, 0.23, -0.265)
+  g.userData.tail = tail
+
+  add(tail, oval(0.047, 0.016, 0.053), spots, -0.035, 0.146, -0.18)
+  add(tail, oval(0.042, 0.016, 0.048), spots, 0.028, 0.126, -0.3)
+  add(tail, oval(0.029, 0.014, 0.036), spots, 0, 0.073, -0.44)
+
+  g.scale.setScalar(0.85)
+  return g
+}
+
+let _fridayCache = { at: 0, val: false }
+/** True on a Kansas City Friday, cached to the minute — Pickle's cricket day. */
+function isFridayKC() {
+  const now = Date.now()
+  if (now - _fridayCache.at < 60000) return _fridayCache.val
+  const wd = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'America/Chicago' }).format(new Date())
+  _fridayCache = { at: now, val: wd === 'Fri' }
+  return _fridayCache.val
+}
+
 const KINDS = {
   dog: { build: createColonyDog, name: "Ja'Barkus", intro: "I'm Ja'Barkus, the house dog. I have no job on the map — I just trot between the hexes and wag at everyone. Good boy." },
   lobster: { build: createClawd, name: 'Clawd', intro: "I'm Clawd, the mascot. Red, chunky, mostly claws. I patrol the paths and pinch at nothing in particular. Named after the feral one in the cluster." },
+  gecko: {
+    build: createPickle,
+    name: 'Pickle',
+    intro: "I'm Pickle, Kai's leopard gecko. I amble the colony and store my snacks in my tail.",
+    reminder: () => (isFridayKC() ? { badge: '🦗', note: "Crickets today — Kai's gecko needs feeding." } : null),
+  },
 }
 
 /** A little name that floats over a pet's head, always facing the camera. */
@@ -267,6 +342,7 @@ export class Mascots {
     this._tmp = new THREE.Vector3()
     this.spawn('dog')
     this.spawn('lobster')
+    this.spawn('gecko')
   }
 
   spawn(kind) {
@@ -279,7 +355,11 @@ export class Mascots {
     const m = {
       kind,
       name: spec.name,
+      baseName: spec.name,
       intro: spec.intro,
+      baseIntro: spec.intro,
+      reminderFn: spec.reminder || null,
+      reminderKey: '',
       nameplate,
       mesh,
       pos: new THREE.Vector3(0, 0, 0),
@@ -293,6 +373,25 @@ export class Mascots {
     m.pos.copy(m.target) // start already somewhere on the map
     this._pickTarget(m)
     this.list.push(m)
+    this._applyReminder(m)
+  }
+
+  /** A pet with a reminder (Pickle on Fridays) wears a 🦗 on its name and adds a line to its card. */
+  _applyReminder(m) {
+    if (!m.reminderFn) return
+    const r = m.reminderFn()
+    const key = r ? r.badge : ''
+    if (key === m.reminderKey) return
+    m.reminderKey = key
+    m.name = r ? `${r.badge} ${m.baseName}` : m.baseName
+    m.intro = r ? `${m.baseIntro}
+
+${r.note}` : m.baseIntro
+    this.group.remove(m.nameplate)
+    m.nameplate.material.map?.dispose?.()
+    m.nameplate.material.dispose?.()
+    m.nameplate = makeNameplate(m.name)
+    this.group.add(m.nameplate)
   }
 
   /** Somewhere near a random hex, so the wanderers stay where they can be seen. */
@@ -333,6 +432,7 @@ export class Mascots {
       const ground = this.colony.groundAt(m.pos.x, m.pos.z)
       m.mesh.position.set(m.pos.x, ground + (walking ? Math.abs(Math.sin(elapsed * 8 + m.phase)) * 0.04 : 0), m.pos.z)
       m.mesh.rotation.y = m.yaw
+      this._applyReminder(m)
       if (m.nameplate) m.nameplate.position.set(m.pos.x, m.mesh.position.y + 1.15, m.pos.z)
       // Character: the dog wags, the lobster works its claws.
       if (m.kind === 'dog' && m.mesh.userData.tail) m.mesh.userData.tail.rotation.y = Math.sin(elapsed * 9 + m.phase) * 0.6
