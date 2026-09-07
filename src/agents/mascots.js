@@ -217,7 +217,44 @@ function createColonyDog() {
   return g
 }
 
-const KINDS = { dog: createColonyDog, lobster: createClawd }
+const KINDS = {
+  dog: { build: createColonyDog, name: "Ja'Barkus", intro: "I'm Ja'Barkus, the house dog. I have no job on the map — I just trot between the hexes and wag at everyone. Good boy." },
+  lobster: { build: createClawd, name: 'Clawd', intro: "I'm Clawd, the mascot. Red, chunky, mostly claws. I patrol the paths and pinch at nothing in particular. Named after the feral one in the cluster." },
+}
+
+/** A little name that floats over a pet's head, always facing the camera. */
+function makeNameplate(text) {
+  const cw = 256
+  const ch = 72
+  const cv = document.createElement('canvas')
+  cv.width = cw
+  cv.height = ch
+  const ctx = cv.getContext('2d')
+  ctx.font = "600 34px system-ui, -apple-system, 'Segoe UI', sans-serif"
+  ctx.textBaseline = 'middle'
+  const w = Math.min(cw - 12, ctx.measureText(text).width + 40)
+  const x = (cw - w) / 2
+  ctx.fillStyle = 'rgba(8,10,20,0.72)'
+  const r = 20
+  ctx.beginPath()
+  ctx.moveTo(x + r, 8)
+  ctx.arcTo(x + w, 8, x + w, ch - 8, r)
+  ctx.arcTo(x + w, ch - 8, x, ch - 8, r)
+  ctx.arcTo(x, ch - 8, x, 8, r)
+  ctx.arcTo(x, 8, x + w, 8, r)
+  ctx.closePath()
+  ctx.fill()
+  ctx.fillStyle = '#ffffff'
+  ctx.textAlign = 'center'
+  ctx.fillText(text, cw / 2, ch / 2 + 1)
+  const tex = new THREE.CanvasTexture(cv)
+  tex.colorSpace = THREE.SRGBColorSpace
+  tex.anisotropy = 4
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }))
+  sp.scale.set(0.9, 0.9 * ch / cw, 1)
+  sp.renderOrder = 12
+  return sp
+}
 
 export class Mascots {
   constructor(scene, colony) {
@@ -233,12 +270,17 @@ export class Mascots {
   }
 
   spawn(kind) {
-    const build = KINDS[kind]
-    if (!build) return
-    const mesh = build()
+    const spec = KINDS[kind]
+    if (!spec) return
+    const mesh = spec.build()
     this.group.add(mesh)
+    const nameplate = makeNameplate(spec.name)
+    this.group.add(nameplate)
     const m = {
       kind,
+      name: spec.name,
+      intro: spec.intro,
+      nameplate,
       mesh,
       pos: new THREE.Vector3(0, 0, 0),
       target: new THREE.Vector3(),
@@ -291,6 +333,7 @@ export class Mascots {
       const ground = this.colony.groundAt(m.pos.x, m.pos.z)
       m.mesh.position.set(m.pos.x, ground + (walking ? Math.abs(Math.sin(elapsed * 8 + m.phase)) * 0.04 : 0), m.pos.z)
       m.mesh.rotation.y = m.yaw
+      if (m.nameplate) m.nameplate.position.set(m.pos.x, m.mesh.position.y + 1.15, m.pos.z)
       // Character: the dog wags, the lobster works its claws.
       if (m.kind === 'dog' && m.mesh.userData.tail) m.mesh.userData.tail.rotation.y = Math.sin(elapsed * 9 + m.phase) * 0.6
       if (m.kind === 'lobster' && m.mesh.userData.claws) {
@@ -298,6 +341,23 @@ export class Mascots {
         for (const claw of m.mesh.userData.claws) claw.userData.jaw.rotation.x = -open
       }
     }
+  }
+
+  /** The pet nearest the pointer, in screen space, or null. Head-height, like the astronaut picker. */
+  pick(camera, ndcX, ndcY, aspect, maxDist = 0.06) {
+    let best = null
+    let bd = maxDist
+    const v = this._tmp
+    for (const m of this.list) {
+      v.set(m.mesh.position.x, m.mesh.position.y + 0.8, m.mesh.position.z).project(camera)
+      if (v.z > 1) continue
+      const d = Math.hypot((v.x - ndcX) * aspect, v.y - ndcY)
+      if (d < bd) {
+        bd = d
+        best = m
+      }
+    }
+    return best
   }
 
   setVisible(on) {

@@ -115,6 +115,19 @@ const hoverTip = document.createElement('div')
 hoverTip.className = 'hover-tip'
 hoverTip.hidden = true
 document.body.appendChild(hoverTip)
+
+// A small card for a wandering pet: who it is, no job. Click one to open it, click away to close.
+const petCard = document.createElement('div')
+petCard.className = 'pet-card'
+petCard.hidden = true
+document.body.appendChild(petCard)
+function showPetCard(m, e) {
+  petCard.innerHTML = `<b>${esc(m.name)}</b><span>${esc(m.intro)}</span>`
+  petCard.hidden = false
+  const w = petCard.offsetWidth
+  petCard.style.left = `${Math.min(e.clientX + 16, window.innerWidth - w - 8)}px`
+  petCard.style.top = `${Math.min(e.clientY + 16, window.innerHeight - petCard.offsetHeight - 8)}px`
+}
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
 function showHoverTip(agent, e) {
   const t = agent?.thread
@@ -689,7 +702,13 @@ engine.canvas.addEventListener('pointermove', (e) => {
   const agent = colony.pick(p.x, p.y, p.aspect)
   hoverId = agent?.id ?? null
   colony.astronauts.setHover(agent)
-  showHoverTip(agent, e)
+  const pet = !agent && colony.mascots ? colony.mascots.pick(engine.camera, p.x, p.y, p.aspect) : null
+  if (pet) {
+    hoverTip.innerHTML = `<b>${esc(pet.name)}</b><i>a wandering pet</i>`
+    hoverTip.hidden = false
+    hoverTip.style.left = `${Math.min(e.clientX + 16, window.innerWidth - hoverTip.offsetWidth - 8)}px`
+    hoverTip.style.top = `${Math.min(e.clientY + 18, window.innerHeight - hoverTip.offsetHeight - 8)}px`
+  } else showHoverTip(agent, e)
   // Pointing at a quiet plot is what makes its name appear.
   const plot = plotUnder(e, p)
   colony.setHoveredPlot(plot)
@@ -723,6 +742,12 @@ engine.canvas.addEventListener('pointerup', (e) => {
     select(agent.id, { mode: colony.astronauts.pickPart === 'badge' ? 'card' : 'intro' })
     return
   }
+  const pet = colony.mascots ? colony.mascots.pick(engine.camera, p.x, p.y, p.aspect) : null
+  if (pet) {
+    showPetCard(pet, e)
+    return
+  }
+  petCard.hidden = true
   // Nobody there: a zone's deck or its name plate opens that repo's sidebar instead, and
   // bare ground puts everything down.
   const plot = plotUnder(e, p)

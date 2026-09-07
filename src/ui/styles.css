@@ -1507,6 +1507,9 @@ kbd {
 .thread-pop .details { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 12px; max-height: 190px; overflow: auto; }
 .thread-pop .details[hidden], .thread-pop .stage[hidden], .thread-pop .intro[hidden] { display: none; }
 .thread-pop .intro { display: grid; gap: 8px; }
+.pet-card { position: fixed; z-index: 55; max-width: 260px; padding: 10px 13px; border-radius: 12px; background: rgba(10, 12, 20, 0.92); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 8px 30px rgba(0,0,0,0.5); pointer-events: none; display: grid; gap: 5px; }
+.pet-card b { font-size: 14px; color: #fff; }
+.pet-card span { font-size: 12px; line-height: 1.45; color: #cdd6ef; }
 #btn-rename { align-self: flex-start; opacity: 0.55; }
 #btn-rename:hover { opacity: 1; }
 #btn-mic.listening { color: #ff6b6b; animation: pulse 1s infinite; }
