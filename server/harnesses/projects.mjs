@@ -93,9 +93,9 @@ async function fetchThreads() {
         landmark: p.status === 'completed' ? 'crate' : 'bench',
         actions: NEXT[p.status] || [],
         // Over the head: days owed on a finished job, days of silence on a prospect.
-        plate: owedDays != null ? `${owedDays}d` : quietDays != null ? `${quietDays}d` : '',
+        plate: owedDays != null ? `${owedDays}d` : '',
         roof: p.status === 'completed' && amount ? money(amount) : undefined,
-        alertKey: owedDays != null && owedDays >= RECEIVABLE_DAYS ? `owed:${p.id}:${owedDays}` : quiet ? `quiet:${p.id}` : '',
+        alertKey: owedDays != null && owedDays >= RECEIVABLE_DAYS ? `owed:${p.id}:${owedDays}` : '',
         details: {
           Client: p.client || '',
           Project: p.name || '',
@@ -120,7 +120,7 @@ async function fetchThreads() {
         },
         worktree: '',
         cwd: p.email || '',
-        gitBranch: owedDays != null && owedDays >= RECEIVABLE_DAYS ? `owed ${owedDays}d` : quiet ? `quiet ${quietDays}d` : LABEL[p.status],
+        gitBranch: owedDays != null && owedDays >= RECEIVABLE_DAYS ? `owed ${owedDays}d` : LABEL[p.status],
         model: amount ? money(amount) : '',
         effort: '',
         createdAt: created,
@@ -128,7 +128,9 @@ async function fetchThreads() {
         lastFocusedAt: 0,
         running: p.status === 'in_process',
         unread: p.status === 'prospect' || p.status === 'completed',
-        hasError: (owedDays != null && owedDays >= RECEIVABLE_DAYS) || quiet,
+        // Prospects never raise a hand — landing one can take months, so silence is not a
+        // thing to act on. Only an unpaid finished job (a receivable) flags.
+        hasError: owedDays != null && owedDays >= RECEIVABLE_DAYS,
         starred: p.priority === 'hot',
         routine: '',
         prState: '',
