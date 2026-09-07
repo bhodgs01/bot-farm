@@ -523,6 +523,10 @@ export class Astronauts {
     const jitter = () => (Math.random() - 0.5) * 1.4
     const atPost = false
     const start = new THREE.Vector3(door.x + jitter(), 0, door.z + jitter())
+    // A mid-session arrival that wants Blake hustles out of the ship so he catches it walking,
+    // instead of a lone figure strolling in unnoticed. The opening parade already hustles.
+    const wantsYou = ['waiting', 'blocked', 'mail', 'print', 'door', 'plant', 'visitor'].includes(entry.status)
+    const hustle = settled || wantsYou
 
     const agent = {
       id: entry.id,
@@ -537,8 +541,8 @@ export class Astronauts {
       vel: new THREE.Vector3(),
       yaw: Math.random() * Math.PI * 2,
       targetYaw: 0,
-      speed: WALK_SPEED * (0.86 + Math.random() * 0.28) * (settled ? 3.2 : 1),
-      rush: settled, // the opening parade hustles; the pace drops back on arrival
+      speed: WALK_SPEED * (0.86 + Math.random() * 0.28) * (settled ? 3.2 : hustle ? 2.2 : 1),
+      rush: hustle, // the opening parade and mid-session arrivals hustle; the pace drops back on arrival
       phase: Math.random() * Math.PI * 2,
       bob: 0,
       state: atPost ? 'walking' : 'spawning',
