@@ -69,6 +69,7 @@ async function fetchThreads() {
       } catch {
         return
       }
+      const calm = zone === 'KC Proto' // captured in the specific project; here just present
       for (const t of Array.isArray(tasks) ? tasks : []) {
         if (t.done) continue
         const due = validDate(t.due_date)
@@ -94,8 +95,8 @@ async function fetchThreads() {
           lastActivityAt: validDate(t.updated) || validDate(t.created) || now,
           lastFocusedAt: 0,
           running: false,
-          unread: !overdue,
-          hasError: Boolean(overdue),
+          unread: calm ? false : !overdue,
+          hasError: calm ? false : Boolean(overdue),
           actions: ['done'],
           details: {
             Ticket: `#${t.id}`,
@@ -150,8 +151,8 @@ async function fetchThreads() {
       lastActivityAt: now,
       lastFocusedAt: 0,
       running: false,
-      unread: soon > 0,
-      hasError: overdue > 0,
+      unread: false,
+      hasError: false,
       starred: false,
       routine: '',
       prState: '',
