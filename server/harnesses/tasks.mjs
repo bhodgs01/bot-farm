@@ -19,8 +19,7 @@ const SOON_MS = 24 * 60 * 60 * 1000
  * Projects that are somebody else's to-do list, not Blake's. The Marc Coaching Hub writes
  * follow-ups for Marc's own team into Vikunja; they are his to chase, not Blake's.
  */
-// FJ40 lives in Vikunja + the Clawd dashboard, not as astronauts on the map.
-const NOT_MINE = /coaching hub|^fj40$/i
+const NOT_MINE = /coaching hub/i
 
 /** Vikunja project title → hex. Anything unlisted keeps its own title as the hex name. */
 const ZONE_FOR = [
