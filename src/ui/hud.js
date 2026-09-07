@@ -457,6 +457,7 @@ export class Hud {
       if (queueSaved === '1' || (queueSaved === null && phone)) this.toggleQueue(true)
     } catch {}
     on('#btn-archive', 'click', () => this.actions.archiveThread?.())
+    on('#btn-ride', 'click', () => this.actions.rideAlong?.(this.selected?.thread?.id))
     on('#btn-deselect', 'click', () => this.actions.select?.(null))
     on('#btn-new-session', 'click', () => this.actions.newConversation?.())
     on('#btn-reveal', 'click', () => this.actions.revealProject?.())
@@ -1212,6 +1213,7 @@ const TEMPLATE = `
   <div class="pair">
     <button class="btn primary" id="btn-open" title="Open this thread in the harness it came from (Enter)">${ICON.open} Open</button>
     <button class="btn" id="btn-archive" title="Archive — this astronaut walks back to the ship (A)">${ICON.archive} Archive</button>
+    <button class="btn" id="btn-ride" title="Ride along — the camera follows this worker (F)">🎥 Ride along</button>
   </div>
   <div class="chat">
     <div class="log"></div>

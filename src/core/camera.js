@@ -53,6 +53,8 @@ export class CameraRig {
 
     this.target = new THREE.Vector3(0, 0, 0)
     this.desiredTarget = this.target.clone()
+    /** When set, a function returning a world point the camera should keep centred (ride-along). */
+    this.followFn = null
 
     this.azimuth = ISO_AZIMUTHS[0]
     this.desiredAzimuth = this.azimuth
@@ -211,6 +213,7 @@ export class CameraRig {
    * reads as slipping, however small the lag.
    */
   _dragGround(clientX, clientY) {
+    if (this.followFn) this.followFn = null // taking the wheel drops the ride-along
     if (!this._hasAnchor) return
     if (!this.groundPoint(clientX, clientY, this._hit)) return
 
@@ -311,8 +314,19 @@ export class CameraRig {
     this.idleFor = 99 // settle to isometric right away rather than after a pause
   }
 
+  /** Ride along with a moving point (an astronaut). Pass null to stop. */
+  follow(fn) {
+    this.followFn = typeof fn === 'function' ? fn : null
+    if (this.followFn) {
+      this.orbiting = false
+      this.desiredDistance = THREE.MathUtils.clamp(Math.min(this.desiredDistance, 22), MIN_DIST, MAX_DIST)
+    }
+    return Boolean(this.followFn)
+  }
+
   resetView() {
     this.orbiting = false
+    this.followFn = null
     if (this.home) {
       this.desiredTarget.set(this.home.x, 0, this.home.z)
       this.desiredDistance = THREE.MathUtils.clamp(this.home.distance, MIN_DIST, MAX_DIST)
@@ -394,6 +408,18 @@ export class CameraRig {
 
   update(dt) {
     if (!this.interacting) this.idleFor += dt
+
+    // Ride-along: hold the target on whoever we are following, easing so a walking crew
+    // member does not jerk the view. A manual drag clears followFn and hands control back.
+    if (this.followFn) {
+      const p = this.followFn()
+      if (p) {
+        this.desiredTarget.x = damp(this.desiredTarget.x, p.x, 6, dt)
+        this.desiredTarget.z = damp(this.desiredTarget.z, p.z, 6, dt)
+        this._clampTarget()
+        this.idleFor = 3 // let the isometric rest ease work while riding
+      } else this.followFn = null
+    }
 
     // The sweep yields while you are working the camera and eases back in a couple of
     // seconds after you let go. Cutting it in and out at full rate reads as a glitch — and

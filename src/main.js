@@ -139,6 +139,26 @@ const hoverGround = new THREE.Vector3()
 
 const actions = {
   resetView: () => rig.resetView(),
+
+  /** Ride along with an astronaut: the camera keeps them centred until you drag or press F again. */
+  rideAlong: (id) => {
+    const target = id || selectedId
+    if (!target) return false
+    if (rig.followFn) {
+      rig.follow(null)
+      hud.toast('Ride-along off')
+      return false
+    }
+    const on = rig.follow(() => {
+      const a = colony.agentFor(target)
+      return a && a.state !== 'gone' ? { x: a.pos.x, z: a.pos.z } : null
+    })
+    if (on) {
+      select(target, {})
+      hud.toast(`Riding along with ${colony.agentFor(target)?.thread?.title || 'them'}`)
+    }
+    return on
+  },
   /** The rail's headset button: enter or leave VR. */
   toggleVr: () => vr?.toggle?.(),
 
@@ -1030,6 +1050,10 @@ window.addEventListener('keydown', (e) => {
     case 'l':
     case 'L':
       actions.cycleTime()
+      break
+    case 'f':
+    case 'F':
+      actions.rideAlong()
       break
     case 'o':
     case 'O':
