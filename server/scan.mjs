@@ -14,12 +14,22 @@ import { HARNESSES, detectedHarnesses, harnessById } from './harnesses/index.mjs
  * A harness that throws is skipped rather than allowed to take the scan down with it: one
  * broken adapter should cost you that harness's threads, not the whole colony.
  */
+const SCAN_TIMEOUT_MS = 20000
+/** A harness scan that overruns is dropped for this poll, not allowed to hang the map. */
+function withTimeout(promise, id) {
+  let timer
+  const guard = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`scan timed out after ${SCAN_TIMEOUT_MS}ms`)), SCAN_TIMEOUT_MS)
+  })
+  return Promise.race([promise, guard]).finally(() => clearTimeout(timer))
+}
+
 export async function scanThreads() {
-  const harnesses = await detectedHarnesses()
+  const harnesses = await withTimeout(detectedHarnesses(), 'detect').catch(() => [])
   const lists = await Promise.all(
     harnesses.map(async (h) => {
       try {
-        const threads = await h.scanThreads()
+        const threads = await withTimeout(Promise.resolve(h.scanThreads()), h.id)
         return threads.map((t) => ({ ...t, harness: h.id, harnessName: h.name }))
       } catch (err) {
         console.warn(`bot-crossing: harness "${h.id}" failed to scan —`, err?.message || err)
