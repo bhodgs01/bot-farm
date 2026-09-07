@@ -554,6 +554,11 @@ function deriveAgent(agent, snap, signals, probeUp) {
   }
   if (probeUp === false) problems.push('dashboard not answering')
   if (sig.error) problems.push(sig.message)
+  // Collapse identical lines (several pods of one failing workload read as one problem), so
+  // the flag and its alertKey do not shift with how many pods happen to be failing.
+  const problemsUnique = [...new Set(problems)]
+  problems.length = 0
+  problems.push(...problemsUnique)
 
   let cpu = 0
   let busiest = ''
