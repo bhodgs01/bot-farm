@@ -1153,6 +1153,9 @@ export class Astronauts {
         case 'celebrating':
           key = 'cheer'
           break
+        case 'you':
+          key = 'wave'
+          break
         // Sitting down is a one-shot that hands over to the loop when it finishes, so an
         // agent that has just nodded off lowers itself rather than snapping into a sit.
         case 'sleeping':

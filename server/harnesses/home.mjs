@@ -398,7 +398,8 @@ async function fetchThreads() {
       lastActivityAt: now,
       lastFocusedAt: 0,
       running: false,
-      unread: rough,
+      // You wave to mark yourself on the map; never a flag, whatever the night was like.
+      unread: false,
       hasError: false,
       starred: false,
       routine: '',

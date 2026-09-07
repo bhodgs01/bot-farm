@@ -69,7 +69,7 @@ const ZONE_ACCENT = {
   Countdown: 0xc95c5c,
   Garage: 0x8a6a4f,
   'Hetzner DR': 0x6a7fa6,
-  'pay me mother fucker': 0x5fae6a,
+  'Pay me mother fucker': 0x5fae6a,
   Calendar: 0x6f8fd6,
 }
 
@@ -82,11 +82,12 @@ const ZONE_LANDMARK = {
   'Embassy Landscape': 'yard',
 }
 
-export const STATUS_ORDER = ['blocked', 'visitor', 'door', 'plant', 'mail', 'print', 'waiting', 'working', 'watching', 'printing', 'celebrating', 'info', 'watched', 'idle', 'sleeping']
+export const STATUS_ORDER = ['blocked', 'visitor', 'door', 'plant', 'mail', 'print', 'waiting', 'working', 'watching', 'printing', 'celebrating', 'info', 'watched', 'you', 'idle', 'sleeping']
 
 export const STATUS_LABEL = {
   working: 'Working',
   waiting: 'Waiting on you',
+  you: 'You',
   mail: 'New mail',
   print: 'Print request',
   watching: 'Streaming',
@@ -115,6 +116,8 @@ export function statusFor(thread, now = Date.now()) {
   if (thread.kind === 'plant') return 'plant'
   if (thread.kind === 'visitor') return 'visitor'
   if (thread.kind === 'person') return thread.running ? 'working' : 'idle'
+  // You are always just 'you' — waving so Blake can spot himself, never a flag.
+  if (thread.kind === 'you') return 'you'
   // A source can put a worker to sleep on purpose (Mary before her first movement, the scoreboard between games).
   if (thread.asleep && !thread.hasError) return 'sleeping'
   if (thread.hasError) return 'blocked'
@@ -150,6 +153,7 @@ const BADGE_FOR = {
   celebrating: BADGE.done,
   sleeping: BADGE.none,
   idle: BADGE.none,
+  you: BADGE.none,
   spawning: BADGE.spawning,
   leaving: BADGE.leaving,
 }

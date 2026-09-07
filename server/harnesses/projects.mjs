@@ -13,7 +13,7 @@
 const API = (process.env.JANINE_URL || 'http://janine.janine.svc.cluster.local:3120').replace(/\/$/, '')
 const OPEN_URL = process.env.PROJECTS_OPEN_URL || 'https://clawd.kcproto.com/'
 const TTL_MS = 60 * 1000
-const ZONE_FOR_STATUS = { prospect: 'Active Projects', active: 'Active Projects', in_process: 'In Process', completed: 'pay me mother fucker' }
+const ZONE_FOR_STATUS = { prospect: 'Active Projects', active: 'Active Projects', in_process: 'In Process', completed: 'Pay me mother fucker' }
 const PRINT_RATE = Number(process.env.PJ_PRINT_RATE) || 0.3
 const SETUP_FEE = Number(process.env.PJ_SETUP_FEE) || 3
 
