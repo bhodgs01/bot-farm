@@ -731,6 +731,8 @@ export class Hud {
     // often is how a HUD starts costing frames.
     this._cardSize = { w: card.offsetWidth, h: card.offsetHeight }
     this.$('#btn-open').disabled = thread.canOpen === false
+    // Archive is only real when the source allows it; chores clear via Done, not Archive.
+    this.$('#btn-archive').hidden = thread.canArchive === false
   }
 
   /** Fold the panel down to its brand bar. Remembered per browser. */
