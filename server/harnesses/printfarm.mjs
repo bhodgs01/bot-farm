@@ -91,7 +91,7 @@ async function fetchThreads() {
         archived: false,
         hasTranscript: false,
         // The card's bar reads log10(bytes); map completion onto its 1KB..3MB range.
-        sizeBytes: Math.round(1000 * Math.pow(10, 3.5 * Math.max(0.01, progress))),
+        sizeBytes: Math.max(40000, Math.round(1000 * Math.pow(10, 3.5 * Math.max(0.01, progress)))),
         source: 'print-farm',
         canOpen: true,
         canArchive: false,
@@ -102,11 +102,10 @@ async function fetchThreads() {
       const broken = state === 'error' && p.error_text
       out.push({
         id: `print:${p.id}`,
-        // A printer that finished and is sitting idle steps back to the operator's workshop
-        // as quiet crew, so the one machine actually printing is the only printer building
-        // standing on the hex — you cannot miss the live print. A broken or offline printer
-        // keeps its own machine so you can see, and go fix, exactly which one.
-        landmark: broken || offline ? 'printer' : undefined,
+        // Every printer is its own machine on the hex, always, so the whole farm reads at a
+        // glance. The one actually printing stands out on its own — a ring that fills over
+        // its operator's head and a build that rises with the print.
+        landmark: 'printer',
         camera: p.camera_url || '',
         title: broken ? `⚠ ${p.name}` : p.name,
         preview: broken ? String(p.error_text).slice(0, 200) : offline ? `${p.name} is offline` : `${p.name} idle${p.job_name ? ` · last: ${p.job_name}` : ''}${client ? ` · dedicated to ${client}` : ''}`,
@@ -128,7 +127,10 @@ async function fetchThreads() {
         prState: '',
         archived: false,
         hasTranscript: false,
-        sizeBytes: 1000 * (1 + (Number(p.layer_total) || 0) / 10),
+        // A floor so every idle printer reads as a full machine on the hex, not a stub;
+        // more layers on the last job build a little taller. A live print (other branch)
+        // rises with its progress and still stands above the resting farm.
+        sizeBytes: 40000 + (Number(p.layer_total) || 0) * 200,
         source: 'print-farm',
         canOpen: true,
         canArchive: false,
