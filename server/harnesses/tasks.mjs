@@ -69,9 +69,9 @@ async function fetchThreads() {
       } catch {
         return
       }
-      // Vikunja tasks never wave or flag on the map: client work is captured by the client
-      // project on its hex, so a task astronaut here would just double the alert.
-      const calm = true
+      // A ticket on a client or FJ40 hex raises a hand so Blake can find it; only the generic
+      // KC Proto bucket stays calm (those are captured in their own client projects).
+      const calm = zone === 'KC Proto'
       for (const t of Array.isArray(tasks) ? tasks : []) {
         if (t.done) continue
         const due = validDate(t.due_date)
