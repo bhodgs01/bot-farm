@@ -589,7 +589,7 @@ export class Colony {
       mesh.rotation.y = ((hashString(thread.id) >>> 8) % 360) * (Math.PI / 180)
       // The cinema faces the default view, screen toward the camera.
       if (mesh.userData.kind === 'theater') mesh.rotation.y += Math.PI
-      if (mesh.userData.kind === 'shield') this._hangDecal(mesh, '/owl-cybergrade.png', { x: 0.56, y: 0.92, z: 1.25, w: 0.5, h: 0.5 * (715 / 500) })
+      if (mesh.userData.kind === 'shield') this._hangDecal(mesh, '/owl-cybergrade.png', { x: 0.56, y: 0.92, z: 1.28, w: 0.5, h: 0.5 * (715 / 500) })
       // New buildings rise from nothing rather than appearing whole.
       mesh.userData.setProgress(0)
       this.worldGroup.add(mesh)
@@ -1021,10 +1021,11 @@ export class Colony {
       texture.anisotropy = 4
       this._decals.set(url, texture)
     }
-    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, toneMapped: false, alphaTest: 0.05 })
+    const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true, toneMapped: false, alphaTest: 0.05, side: THREE.DoubleSide, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 })
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(w * k, h * k), material)
     plane.position.set(x * k, y * k, z * k)
-    plane.rotation.y = Math.PI
+    // The badge face is the +z side of the piece; the owl faces out with it. DoubleSide
+    // above means it reads even if the piece is ever rotated to face the other way.
     plane.renderOrder = 2
     mesh.add(plane)
     const before = mesh.userData.disposeExtras
