@@ -18,6 +18,7 @@ import { Ship } from '../world/ship.js'
 import { Astronauts } from '../agents/astronauts.js'
 import { Indicators, BADGE } from '../agents/indicators.js'
 import { Particles } from '../agents/particles.js'
+import { Mascots } from '../agents/mascots.js'
 import { Navigation } from '../agents/navigation.js'
 
 /**
@@ -230,6 +231,7 @@ export class Colony {
     this.astronauts.world = this._world()
     this.indicators = new Indicators(scene, settings, Math.max(64, settings.get('maxAgents')))
     this.particles = new Particles(scene, settings)
+    this.mascots = new Mascots(scene, this)
     this.scaffolds = new Scaffolds(scene, 320)
     this.nav = new Navigation()
     this.astronauts.setNavigation(this.nav)
@@ -1202,6 +1204,7 @@ export class Colony {
     this.astronauts.updateRings(elapsed)
     this.indicators.update(this.astronauts.agents, elapsed, (a) => this._badgeFor(a))
     this._emit(dt, elapsed)
+    this.mascots.update(dt, elapsed)
     this.particles.ambient(dt, this.camera, this.planet)
     this.particles.weather(dt, this.camera, this.sky.weather)
     this._drainCelebrations()
