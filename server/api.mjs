@@ -164,6 +164,7 @@ function withChief(threads) {
   const chief = {
     id: 'chief:day',
     kind: 'chief',
+    landmark: 'chiefOfStaff',
     title: '🎖️ Chief of staff',
     plate: wants.length ? `${wants.length}` : '',
     preview: `${wants.length} need you${deadlines[0] ? ` · next: ${deadlines[0].title.replace(/^⏳ /, '')} in ${deadlines[0].plate}` : ''}${weather ? ` · ${weather.details?.Now || ''}` : ''}`,

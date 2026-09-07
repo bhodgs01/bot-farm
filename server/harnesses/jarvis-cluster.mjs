@@ -49,7 +49,7 @@ const PROBE_TTL_MS = 30 * 1000
 export const ROSTER = [
   { id: 'mem',     name: 'Mem',     emoji: '🧠', role: 'second brain',         zone: 'Brain',           landmark: 'dish',          ns: ['graph-explorer', 'qdrant', 'neo4j', 'rag-parser'],           url: 'https://brain.kcproto.com' },
   { id: 'vera',    name: 'Vera',    emoji: '🎙️', role: 'voice AI',             zone: 'KC Proto',          ns: ['jarvis-hud', 'jarvis-watch'],                                url: 'https://hud.kcproto.com' },
-  { id: 'janine',  name: 'Janine',  emoji: '💁‍♀️', role: 'email receptionist',   zone: 'KC Proto',          ns: ['janine', 'janine2'],                                         url: 'https://janine.kcproto.com' },
+  { id: 'janine',  name: 'Janine',  emoji: '💁‍♀️', role: 'email receptionist',   zone: 'KC Proto',          landmark: 'reception', ns: ['janine', 'janine2'],                     url: 'https://janine.kcproto.com' },
   { id: 'cole',    name: 'COLE',    emoji: '🛡️', role: 'incident response',    zone: 'Watchdog',        landmark: 'kennel',          ns: ['watchdog', 'anthropic-watch'],                 url: 'https://watchdog.kcproto.com' },
   { id: 'jim',     name: 'Jim',     emoji: '📋', role: 'helpdesk',             zone: 'KC Proto',          ns: ['ticket-bot', 'kuma-ticket-bridge', 'embassy-tickets'],       url: 'https://ticket_bot.kcproto.com' },
   { id: 'phyllis', name: 'Phyllis', emoji: '🧐', role: 'QA inspector',         zone: 'Backups',           ns: ['backup-monitor', 'backups', 'kev-fleet-check'],              url: '', landmark: 'vault' },
