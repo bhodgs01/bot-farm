@@ -102,7 +102,11 @@ async function fetchThreads() {
       const broken = state === 'error' && p.error_text
       out.push({
         id: `print:${p.id}`,
-        landmark: 'printer',
+        // A printer that finished and is sitting idle steps back to the operator's workshop
+        // as quiet crew, so the one machine actually printing is the only printer building
+        // standing on the hex — you cannot miss the live print. A broken or offline printer
+        // keeps its own machine so you can see, and go fix, exactly which one.
+        landmark: broken || offline ? 'printer' : undefined,
         camera: p.camera_url || '',
         title: broken ? `⚠ ${p.name}` : p.name,
         preview: broken ? String(p.error_text).slice(0, 200) : offline ? `${p.name} is offline` : `${p.name} idle${p.job_name ? ` · last: ${p.job_name}` : ''}${client ? ` · dedicated to ${client}` : ''}`,
