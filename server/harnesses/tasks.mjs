@@ -19,7 +19,8 @@ const SOON_MS = 24 * 60 * 60 * 1000
  * Projects that are somebody else's to-do list, not Blake's. The Marc Coaching Hub writes
  * follow-ups for Marc's own team into Vikunja; they are his to chase, not Blake's.
  */
-const NOT_MINE = /coaching hub/i
+// FJ40 lives in Vikunja + the Clawd dashboard, not as astronauts on the map.
+const NOT_MINE = /coaching hub|^fj40$/i
 
 /** Vikunja project title → hex. Anything unlisted keeps its own title as the hex name. */
 const ZONE_FOR = [
@@ -69,7 +70,9 @@ async function fetchThreads() {
       } catch {
         return
       }
-      const calm = zone === 'KC Proto' // captured in the specific project; here just present
+      // Vikunja tasks never wave or flag on the map: client work is captured by the client
+      // project on its hex, so a task astronaut here would just double the alert.
+      const calm = true
       for (const t of Array.isArray(tasks) ? tasks : []) {
         if (t.done) continue
         const due = validDate(t.due_date)
