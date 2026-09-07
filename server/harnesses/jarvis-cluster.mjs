@@ -505,16 +505,31 @@ async function appSignals() {
 /** Remember when an agent was last seen doing something, so "asleep" means quiet, not unobserved. */
 const lastSeenActive = new Map()
 
+/**
+ * The stable workload behind a pod, for a flag that survives a refresh. A CronJob or
+ * Deployment mints a fresh pod name every run (`rmu-health-check-29812680-cktq6`), so a
+ * flag keyed on the exact name comes back the moment the next pod appears and any ack you
+ * made goes stale. Stripping the generated suffixes keys the flag on the thing that is
+ * actually failing (`rmu-health-check`), so removing the flag sticks until a *different*
+ * workload breaks. StatefulSet ordinals (`db-0`) are left alone.
+ */
+function workloadName(name) {
+  return String(name || '')
+    .replace(/-[a-z0-9]{5}$/, '') // pod's own random suffix
+    .replace(/-(?:[0-9]{6,}|[a-z0-9]{8,10})$/, '') // the Job's schedule number or the ReplicaSet hash
+}
+
 function podProblems(pod) {
   const out = []
+  const base = workloadName(pod.metadata?.name)
   const phase = pod.status?.phase
-  if (phase === 'Failed') out.push(`${pod.metadata.name}: Failed`)
+  if (phase === 'Failed') out.push(`${base}: Failed`)
   for (const cs of pod.status?.containerStatuses || []) {
     const waiting = cs.state?.waiting?.reason
-    if (waiting && BAD_WAITING.has(waiting)) out.push(`${pod.metadata.name}: ${waiting}`)
+    if (waiting && BAD_WAITING.has(waiting)) out.push(`${base}: ${waiting}`)
     const term = cs.lastState?.terminated
     if (term?.reason === 'OOMKilled' && Date.now() - (Date.parse(term.finishedAt) || 0) < 30 * 60 * 1000) {
-      out.push(`${pod.metadata.name}: OOMKilled`)
+      out.push(`${base}: OOMKilled`)
     }
   }
   return out
