@@ -195,9 +195,13 @@ export class Particles {
     // reads as matter. That distinction is the whole reason there are two pools.
     this.glow = new Pool(Math.ceil(budget * 0.6), THREE.AdditiveBlending)
     this.dust = new Pool(Math.ceil(budget * 0.4), THREE.NormalBlending)
-    scene.add(this.glow.points, this.dust.points)
+    // Precipitation gets its own pool so a downpour never starves the sparks and confetti,
+    // and they never starve it. Sized to the weather, not the general budget.
+    this.precip = new Pool(700, THREE.NormalBlending)
+    scene.add(this.glow.points, this.dust.points, this.precip.points)
 
     this._ambientTimer = 0
+    this._wxCarry = 0
     this.setEnabled(this.enabled)
   }
 
@@ -205,9 +209,11 @@ export class Particles {
     this.enabled = on
     this.glow.points.visible = on
     this.dust.points.visible = on
+    this.precip.points.visible = on
     if (!on) {
       this.glow.clear()
       this.dust.clear()
+      this.precip.clear()
     }
   }
 
@@ -313,6 +319,63 @@ export class Particles {
     }
   }
 
+  /**
+   * Weather from the desk, falling around the camera: rain as fast thin streaks, snow as a
+   * slow white drift, sized to how cloudy it is. Spawned in a box overhead so it is always
+   * where you are looking without simulating the whole sky. Kept gentle on purpose — the
+   * map is a calm place even in a storm.
+   */
+  weather(dt, camera, w) {
+    if (!this.enabled || !w || (!w.rain && !w.snow)) return
+    const cx = camera.position.x
+    const cz = camera.position.z
+    const snow = Boolean(w.snow)
+    // Drops per second: rain scales with cloud (a storm is heavier), snow is steady.
+    const heavy = this.settings.get('particles') === 'full' ? 1 : 0.55
+    const perSec = (snow ? 90 : 240 * (0.5 + (Number(w.cloud) || 0.6))) * heavy * (w.storm ? 1.35 : 1)
+    this._wxCarry += perSec * dt
+    let n = Math.floor(this._wxCarry)
+    this._wxCarry -= n
+    n = Math.min(n, 40)
+    for (let i = 0; i < n; i++) {
+      const x = cx + (Math.random() - 0.5) * 46
+      const z = cz + (Math.random() - 0.5) * 46
+      const y = 10 + Math.random() * 10
+      if (snow) {
+        this.precip.spawn(x, y, z, (Math.random() - 0.5) * 0.6, -1.3 - Math.random() * 0.7, (Math.random() - 0.5) * 0.6, 0.92, 0.95, 1.0, 0.11 + Math.random() * 0.05, 7, 0.6, 0.05, 0.3)
+      } else {
+        const wind = w.storm ? 2.4 : 0.9
+        this.precip.spawn(x, y, z, wind * (0.4 + Math.random() * 0.4), -13 - Math.random() * 5, wind * 0.2, 0.55, 0.63, 0.82, 0.05 + Math.random() * 0.03, 1.6, 0.02, 1.4, 0.3)
+      }
+    }
+  }
+
+  /** A soft burst over a hex when something there just came good. Bigger, calmer than a cheer. */
+  burst(x, y, z, color) {
+    if (!this.enabled) return
+    const n = this.settings.get('particles') === 'full' ? 22 : 12
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2
+      const s = 0.5 + Math.random() * 2.0
+      this.glow.spawn(
+        x + (Math.random() - 0.5) * 0.8,
+        y + 0.6,
+        z + (Math.random() - 0.5) * 0.8,
+        Math.cos(a) * s,
+        2.6 + Math.random() * 3.0,
+        Math.sin(a) * s,
+        color.r * (1.3 + Math.random()),
+        color.g * (1.3 + Math.random()),
+        color.b * (1.3 + Math.random()),
+        0.08 + Math.random() * 0.08,
+        1.4 + Math.random() * 1.1,
+        0.7,
+        0.9,
+        y
+      )
+    }
+  }
+
   /** Sleepy `z` bubbles. */
   snooze(x, y, z) {
     if (!this.enabled) return
@@ -356,6 +419,7 @@ export class Particles {
     if (!this.enabled) return
     this.glow.update(dt)
     this.dust.update(dt)
+    this.precip.update(dt)
   }
 
   get liveCount() {

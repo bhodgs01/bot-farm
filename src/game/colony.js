@@ -463,6 +463,17 @@ export class Colony {
       if (!liveIds.has(agent.id) && agent.thread?.exit === 'beam' && !['gone', 'beaming', 'leaving'].includes(agent.state)) this.beamUp(agent.id)
     }
 
+    // A hex that just came good: it wanted you last poll and does not now. Queue a soft
+    // burst over it, once the map has a baseline to compare against (never on first load).
+    if (this._prevUrgent) {
+      for (const id of this._prevUrgent) {
+        if (!urgent.has(id) && this.plots.has(id)) {
+          const plot = this.plots.get(id)
+          if (plot) (this._celebrations ||= []).push({ x: (plot.middle || plot.center).x, z: (plot.middle || plot.center).z, accent: plot.accent })
+        }
+      }
+    }
+    this._prevUrgent = new Set(urgent)
     this.threads = new Map(live.map((t) => [t.id, t]))
     this.urgentPlots = urgent
     this.activePlots = active
@@ -550,6 +561,14 @@ export class Colony {
       shipDoor: () => this.ship.shipDoor(),
       groundAt: (x, z) => this.groundAt(x, z),
     }
+  }
+
+  /** Fire the queued "it came good" bursts during the frame loop, one per frame so they read. */
+  _drainCelebrations() {
+    const q = this._celebrations
+    if (!q || !q.length) return
+    const c = q.shift()
+    this.particles.burst(c.x, DECK_TOP + 0.4, c.z, this._c.set(c.accent ?? 0x8fe6a0))
   }
 
   groundAt(x, z) {
@@ -1183,6 +1202,8 @@ export class Colony {
     this.indicators.update(this.astronauts.agents, elapsed, (a) => this._badgeFor(a))
     this._emit(dt, elapsed)
     this.particles.ambient(dt, this.camera, this.planet)
+    this.particles.weather(dt, this.camera, this.sky.weather)
+    this._drainCelebrations()
     this.particles.update(dt)
     this._updatePlots(night, elapsed)
     this._updateScaffolds()

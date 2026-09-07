@@ -377,7 +377,7 @@ export class Sky {
 
   /** What the weather desk says the sky is doing; applied on the next setTime. */
   setWeather(w) {
-    const next = w && typeof w === 'object' ? { cloud: Number(w.cloud) || 0, rain: Boolean(w.rain), fog: Boolean(w.fog), storm: Boolean(w.storm) } : null
+    const next = w && typeof w === 'object' ? { cloud: Number(w.cloud) || 0, rain: Boolean(w.rain), snow: Boolean(w.snow), fog: Boolean(w.fog), storm: Boolean(w.storm) } : null
     const changed = JSON.stringify(next) !== JSON.stringify(this.weather || null)
     this.weather = next
     if (changed && this.time != null) this.setTime(this.time)
