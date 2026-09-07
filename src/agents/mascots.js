@@ -22,56 +22,56 @@ function box(group, w, h, d, color, x, y, z, opts) {
   return m
 }
 
-/** A stubby, friendly dog: body, head, snout, ears, four legs, a tail that wags. */
+/** A stubby, friendly dog facing +z: body, head, snout, ears, four legs, a tail that wags. */
 function buildDog() {
   const g = new THREE.Group()
   const tan = 0xb9834f
   const dark = 0x6b4a2b
-  box(g, 0.62, 0.34, 0.3, tan, 0, 0.5, 0) // body
-  const head = box(g, 0.3, 0.3, 0.28, tan, 0.42, 0.62, 0) // head
-  box(g, 0.2, 0.16, 0.16, tan, 0.58, 0.55, 0) // snout
-  box(g, 0.06, 0.05, 0.1, 0x222222, 0.69, 0.58, 0) // nose
-  for (const s of [-1, 1]) box(g, 0.06, 0.14, 0.1, dark, 0.36, 0.78, 0.1 * s) // ears
-  for (const [x, z] of [[0.26, 0.11], [0.26, -0.11], [-0.24, 0.11], [-0.24, -0.11]]) box(g, 0.09, 0.34, 0.09, dark, x, 0.17, z) // legs
-  const tail = box(g, 0.08, 0.08, 0.26, tan, -0.34, 0.56, 0)
-  tail.geometry.translate(0, 0, -0.13) // pivot at the rump
-  tail.position.z = 0.13
+  box(g, 0.3, 0.34, 0.62, tan, 0, 0.5, 0) // body (long along z)
+  const head = box(g, 0.28, 0.3, 0.3, tan, 0, 0.62, 0.42) // head forward (+z)
+  box(g, 0.16, 0.16, 0.2, tan, 0, 0.55, 0.58) // snout
+  box(g, 0.1, 0.05, 0.06, 0x222222, 0, 0.58, 0.69) // nose
+  for (const s of [-1, 1]) box(g, 0.1, 0.14, 0.06, dark, 0.1 * s, 0.78, 0.36) // ears
+  for (const [x, z] of [[0.11, 0.26], [-0.11, 0.26], [0.11, -0.24], [-0.11, -0.24]]) box(g, 0.09, 0.34, 0.09, dark, x, 0.17, z) // legs
+  const tail = box(g, 0.08, 0.08, 0.26, tan, 0, 0.56, -0.34)
+  tail.geometry.translate(0, 0, 0.13) // pivot at the rump
+  tail.position.z = -0.47
   g.userData.tail = tail
   g.userData.head = head
   g.scale.setScalar(0.85)
   return g
 }
 
-/** Clawd the lobster: a red segmented body, two big claws, antennae, a tail fan. */
+/** Clawd the lobster facing +z: a red segmented body, two big claws, antennae, a tail fan. */
 function buildLobster() {
   const g = new THREE.Group()
   const red = 0xc7402f
   const dark = 0x8f2b1e
-  for (let i = 0; i < 4; i++) box(g, 0.34 - i * 0.03, 0.2, 0.24, i % 2 ? dark : red, -i * 0.2, 0.24, 0) // segmented body
-  box(g, 0.26, 0.24, 0.3, red, 0.24, 0.26, 0) // head
-  // Tail fan.
-  box(g, 0.14, 0.1, 0.34, dark, -0.78, 0.2, 0)
-  for (const s of [-1, 1]) box(g, 0.1, 0.08, 0.16, red, -0.86, 0.2, 0.12 * s)
-  // Two arms, each ending in a claw that opens and shuts.
+  for (let i = 0; i < 4; i++) box(g, 0.24, 0.2, 0.34 - i * 0.03, i % 2 ? dark : red, 0, 0.24, -i * 0.2) // segmented body along -z
+  box(g, 0.3, 0.24, 0.26, red, 0, 0.26, 0.24) // head forward (+z)
+  // Tail fan at the back (-z).
+  box(g, 0.34, 0.1, 0.14, dark, 0, 0.2, -0.78)
+  for (const s of [-1, 1]) box(g, 0.16, 0.08, 0.1, red, 0.12 * s, 0.2, -0.86)
+  // Two arms reaching forward, each ending in a claw that opens and shuts.
   const claws = []
   for (const s of [-1, 1]) {
-    box(g, 0.24, 0.07, 0.07, red, 0.42, 0.24, 0.16 * s) // arm
+    box(g, 0.07, 0.07, 0.24, red, 0.16 * s, 0.24, 0.42) // arm
     const claw = new THREE.Group()
-    claw.position.set(0.58, 0.24, 0.2 * s)
-    box(claw, 0.18, 0.14, 0.12, red, 0.06, 0, 0)
-    const jaw = box(claw, 0.16, 0.06, 0.1, dark, 0.14, 0.05, 0)
-    jaw.geometry.translate(-0.08, 0, 0)
-    jaw.position.x = 0.22
+    claw.position.set(0.2 * s, 0.24, 0.58)
+    box(claw, 0.12, 0.14, 0.18, red, 0, 0, 0.06)
+    const jaw = box(claw, 0.1, 0.06, 0.16, dark, 0, 0.05, 0.14)
+    jaw.geometry.translate(0, 0, -0.08)
+    jaw.position.z = 0.22
     claw.userData.jaw = jaw
     g.add(claw)
     claws.push(claw)
   }
   // Eye stalks and antennae.
   for (const s of [-1, 1]) {
-    box(g, 0.04, 0.14, 0.04, dark, 0.34, 0.42, 0.07 * s)
-    box(g, 0.04, 0.04, 0.04, 0x111111, 0.34, 0.5, 0.07 * s)
-    const ant = box(g, 0.02, 0.02, 0.5, dark, 0.4, 0.34, 0.05 * s)
-    ant.rotation.x = 0.5 * s
+    box(g, 0.04, 0.14, 0.04, dark, 0.07 * s, 0.42, 0.34)
+    box(g, 0.04, 0.04, 0.04, 0x111111, 0.07 * s, 0.5, 0.34)
+    const ant = box(g, 0.04, 0.02, 0.5, dark, 0.05 * s, 0.34, 0.4)
+    ant.rotation.z = 0.5 * s
   }
   g.userData.claws = claws
   g.scale.setScalar(0.8)
@@ -156,7 +156,7 @@ export class Mascots {
       if (m.kind === 'dog' && m.mesh.userData.tail) m.mesh.userData.tail.rotation.y = Math.sin(elapsed * 9 + m.phase) * 0.6
       if (m.kind === 'lobster' && m.mesh.userData.claws) {
         const open = (Math.sin(elapsed * 3 + m.phase) * 0.5 + 0.5) * 0.5
-        for (const claw of m.mesh.userData.claws) claw.userData.jaw.rotation.y = -open
+        for (const claw of m.mesh.userData.claws) claw.userData.jaw.rotation.x = -open
       }
     }
   }
