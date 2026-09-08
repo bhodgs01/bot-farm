@@ -29,8 +29,9 @@ import mary from './mary.mjs'
 import frances from './frances.mjs'
 import games from './games.mjs'
 import domains from './domains.mjs'
+import analytics from './analytics.mjs'
 
-const ALL = { 'jarvis-cluster': jarvisCluster, mailroom, plex, 'print-farm': printFarm, home, chores, tasks, trades, projects, calendar, news, weather, keys, deadlines, tvs, janine, orders, dr, garage, fleet, mary, frances, games, domains, 'claude-code': claudeCode }
+const ALL = { 'jarvis-cluster': jarvisCluster, mailroom, plex, 'print-farm': printFarm, home, chores, tasks, trades, projects, calendar, news, weather, keys, deadlines, tvs, janine, orders, dr, garage, fleet, mary, frances, games, domains, analytics, 'claude-code': claudeCode }
 const wanted = (process.env.COLONY_HARNESSES || 'jarvis-cluster,mailroom,plex,print-farm,home,chores,tasks,trades,projects,calendar,news,weather,keys,deadlines,tvs,janine,orders,dr,garage,fleet').split(',').map((s) => s.trim()).filter(Boolean)
 
 export const HARNESSES = wanted.map((id) => ALL[id]).filter(Boolean)
