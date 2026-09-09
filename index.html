@@ -17,10 +17,7 @@
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
-    <script>
-      if ('serviceWorker' in navigator && location.protocol === 'https:') {
-        addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}))
-      }
-    </script>
+    <!-- No service worker: the app is always online (Access-gated, live data), and a caching
+         worker kept pinning clients to stale builds. sw.js now self-destructs any that remain. -->
   </body>
 </html>

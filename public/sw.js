@@ -1,49 +1,37 @@
-// Bot Farm service worker.
+// Self-destructing service worker.
 //
-// Two rules, learned the hard way on the agents page: never cache anything under /api
-// (the whole point of the map is that it is live), and treat the app shell as
-// network-first so a deploy shows up on the next load rather than after a cache flush.
-// Hashed build assets are immutable and can be cached forever. Bump CACHE to evict.
-const CACHE = 'botfarm-v4'
-
-self.addEventListener('install', (e) => {
-  self.skipWaiting()
-})
+// The Bot Farm is always online — it sits behind Cloudflare Access and every screen is live
+// data — so a caching worker bought almost nothing and repeatedly pinned clients to stale
+// builds (old lamp posts, an archived worker that was long since restored). This worker now
+// clears every cache and unregisters itself, and index.html no longer registers one. Any
+// client that still has the old worker fetches this on its next navigation, wipes its caches,
+// and after one more reload loads straight from the network — and can never go stale again.
+self.addEventListener('install', () => self.skipWaiting())
 
 self.addEventListener('activate', (e) => {
   e.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))).then(() => self.clients.claim())
+    (async () => {
+      try {
+        const keys = await caches.keys()
+        await Promise.all(keys.map((k) => caches.delete(k)))
+      } catch {
+        /* nothing to clear */
+      }
+      try {
+        await self.registration.unregister()
+      } catch {
+        /* already gone */
+      }
+      // Reload any open windows so they pick up the fresh build immediately.
+      try {
+        const clients = await self.clients.matchAll({ type: 'window' })
+        for (const c of clients) c.navigate(c.url)
+      } catch {
+        /* they'll get it on the next manual reload */
+      }
+    })()
   )
 })
 
-self.addEventListener('fetch', (e) => {
-  const req = e.request
-  if (req.method !== 'GET') return
-  const url = new URL(req.url)
-  if (url.origin !== self.location.origin) return
-  if (url.pathname.startsWith('/api/')) return // live data: straight to the network, always
-
-  // Vite's hashed bundles and the model files: cache first, they never change in place.
-  if (url.pathname.startsWith('/assets/')) {
-    e.respondWith(
-      caches.open(CACHE).then(async (cache) => {
-        const hit = await cache.match(req)
-        if (hit) return hit
-        const res = await fetch(req)
-        if (res.ok) cache.put(req, res.clone())
-        return res
-      })
-    )
-    return
-  }
-
-  // Everything else (the shell, manifest, icons): network first, cache as the fallback.
-  e.respondWith(
-    fetch(req)
-      .then((res) => {
-        if (res.ok) caches.open(CACHE).then((cache) => cache.put(req, res.clone()))
-        return res
-      })
-      .catch(() => caches.match(req))
-  )
-})
+// While briefly active, never answer from a cache — go straight to the network.
+self.addEventListener('fetch', () => {})
