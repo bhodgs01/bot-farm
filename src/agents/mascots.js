@@ -8,6 +8,7 @@
  * of meshes, one straight walk at a time, no navigation grid.
  */
 import * as THREE from 'three'
+import { FAMILY_IDS, build as buildFamily, preload as preloadFamily } from './family-builders.js'
 
 const WALK = 1.5 // m/s, an amble
 
@@ -471,14 +472,12 @@ const KINDS = {
     intro: "I'm Carti, Kai's leopard gecko. I amble the colony and store my snacks in my tail.",
     reminder: () => (isFridayKC() ? { badge: '🦗', note: "Crickets today — Kai's gecko needs feeding." } : null),
   },
-  // The family: South Park-style people who walk the colony, swing their arms, and change
-  // their faces with the mood of the map. Test of one before the rest of the family lands.
-  blake: {
-    build: createBlake,
-    name: 'Blake',
-    intro: 'I could do the chore… or spend six hours automating it.',
-  },
 }
+
+// The family: South Park-style people with photographic faces (ChatGPT's Bot_Farm_Family).
+// Each walks the colony, swings its arms, and cycles expressions. Name and intro ride on the
+// built group's userData, so these entries only need the builder.
+for (const id of FAMILY_IDS) KINDS[id] = { build: () => buildFamily(id) }
 
 /** Characters built to the people contract (arms, legs, swappable faces) walk and emote. */
 const isPerson = (m) => Boolean(m.mesh.userData.arms || m.mesh.userData.legs)
@@ -529,23 +528,28 @@ export class Mascots {
     this.spawn('dog')
     this.spawn('lobster')
     this.spawn('gecko')
-    // The family lands here (this.spawn('blake') etc.) once the full set is in; the test
-    // character is off the map for now.
+    // The whole family walks the colony. Warm their face textures, then spawn each one.
+    preloadFamily()
+    for (const id of FAMILY_IDS) this.spawn(id)
   }
 
   spawn(kind) {
     const spec = KINDS[kind]
     if (!spec) return
     const mesh = spec.build()
+    if (!mesh) return
     this.group.add(mesh)
-    const nameplate = makeNameplate(spec.name)
+    // Pets carry name/intro on the KINDS entry; the family carries them on the built group.
+    const name = spec.name || mesh.userData.displayName || 'Someone'
+    const intro = spec.intro || mesh.userData.intro || ''
+    const nameplate = makeNameplate(name)
     this.group.add(nameplate)
     const m = {
       kind,
-      name: spec.name,
-      baseName: spec.name,
-      intro: spec.intro,
-      baseIntro: spec.intro,
+      name,
+      baseName: name,
+      intro,
+      baseIntro: intro,
       reminderFn: spec.reminder || null,
       reminderKey: '',
       nameplate,
