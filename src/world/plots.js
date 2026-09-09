@@ -514,32 +514,6 @@ export class Plot {
     this.group.add(this.border)
   }
 
-  /** A lamp post on one corner of each cell — the plot's own night lighting. */
-  _buildPosts() {
-    const posts = []
-    const lamps = []
-    this.localCenters.forEach(({ x, z }, i) => {
-      const [px, pz] = corner(x, z, (i * 2) % 6, TILE * 0.72)
-      const pole = new THREE.CylinderGeometry(0.055, 0.085, 1.8, 6)
-      pole.translate(px, DECK_TOP + 0.9, pz)
-      posts.push(pole)
-      const head = new THREE.SphereGeometry(0.14, 8, 6)
-      head.translate(px, DECK_TOP + 1.84, pz)
-      lamps.push(head)
-    })
-
-    const poleMesh = new THREE.Mesh(
-      BufferGeometryUtils.mergeGeometries(posts),
-      new THREE.MeshStandardMaterial({ color: 0x9a9aa2, roughness: 0.7, metalness: 0.3 })
-    )
-    poleMesh.castShadow = true
-    this.lampMaterial = new THREE.MeshBasicMaterial({ color: this.accent, toneMapped: true })
-    this.lamps = new THREE.Mesh(BufferGeometryUtils.mergeGeometries(lamps), this.lampMaterial)
-    this._lampBase = new THREE.Color(this.accent)
-    this.group.add(poleMesh, this.lamps)
-    posts.forEach((g) => g.dispose())
-    lamps.forEach((g) => g.dispose())
-  }
 
   /**
    * Ground clutter — crates, drums and a floodlight or two, hugging the kerb.
