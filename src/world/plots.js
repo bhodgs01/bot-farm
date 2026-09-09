@@ -406,7 +406,8 @@ export class Plot {
 
     this._buildDeck()
     this._buildBorder()
-    this._buildPosts()
+    // Lamp posts removed — the little per-cell poles read as clutter, and the plot border
+    // already carries the night glow and the urgent pulse.
     this._buildClutter()
     this.slots = this._buildSlots()
   }
@@ -563,12 +564,14 @@ export class Plot {
       // Two bands, both chosen to miss the buildings. The slot ring sits at 0.58 of a tile
       // and a building reaches about 1.5 units past it, so the gaps *between* consecutive
       // ring slots are clear — and so is the strip inside the kerb, past every slot.
+      // Roughly half the clutter of before: the crates and battery packs were reading as
+      // noise, so each spot's odds are cut about in half.
       const spots = []
       for (let i = 0; i < 6; i++) {
-        if (rand() > 0.45) spots.push({ a: (Math.PI / 3) * i + Math.PI / 3, r: TILE * (0.52 + rand() * 0.1) })
+        if (rand() > 0.72) spots.push({ a: (Math.PI / 3) * i + Math.PI / 3, r: TILE * (0.52 + rand() * 0.1) })
       }
       for (let i = 0; i < 3; i++) {
-        if (rand() > 0.35) spots.push({ a: rand() * Math.PI * 2, r: TILE * (0.78 + rand() * 0.07) })
+        if (rand() > 0.67) spots.push({ a: rand() * Math.PI * 2, r: TILE * (0.78 + rand() * 0.07) })
       }
 
       for (const { a, r } of spots) {
@@ -635,7 +638,7 @@ export class Plot {
       this.borderMaterial.emissiveIntensity =
         0.3 + night * 1.4 + (urgent ? 0.4 + Math.sin(elapsed * 3.4) * 0.32 : 0)
     }
-    this.lampMaterial.color.copy(this._lampBase).multiplyScalar(0.5 + night * 2.4)
+    if (this.lampMaterial) this.lampMaterial.color.copy(this._lampBase).multiplyScalar(0.5 + night * 2.4)
   }
 
   dispose() {

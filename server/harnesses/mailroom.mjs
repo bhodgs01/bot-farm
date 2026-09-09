@@ -202,6 +202,16 @@ async function fetchThreads() {
       ref: { threadId: meta.threadId, id: meta.id },
     })
   }
+  // The Inbox is the catch-all, so a full inbox would pile a crowd on one hex. Keep at most
+  // three there — the ones that most want Blake (unread or awaiting a reply first, then
+  // newest) — and leave the rest in Gmail but off the map. Client hexes are never capped.
+  const INBOX_MAX = 3
+  const inbox = out.filter((t) => t.project === 'Inbox')
+  if (inbox.length > INBOX_MAX) {
+    inbox.sort((a, b) => (b.unread ? 1 : 0) - (a.unread ? 1 : 0) || b.createdAt - a.createdAt)
+    const keep = new Set(inbox.slice(0, INBOX_MAX).map((t) => t.id))
+    return out.filter((t) => t.project !== 'Inbox' || keep.has(t.id))
+  }
   return out
 }
 
