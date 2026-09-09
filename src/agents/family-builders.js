@@ -44,6 +44,11 @@ function textureFor(id, expression) {
             t.minFilter = THREE.LinearFilter
             t.magFilter = THREE.LinearFilter
             t.generateMipmaps = false
+            // The face PNGs are 384x512 — not power-of-two. Mobile GL renders an NPOT texture
+            // blank unless it's clamped with no mipmaps, which is exactly why the heads showed
+            // on desktop but vanished on the phone. Clamp both axes.
+            t.wrapS = THREE.ClampToEdgeWrapping
+            t.wrapT = THREE.ClampToEdgeWrapping
             resolve(t)
           },
           undefined,
@@ -130,10 +135,13 @@ export function build(id) {
     headFaces.add(face)
     maps[e] = [face]
     pending.push(
-      textureFor(id, e).then((t) => {
-        material.map = t
-        material.needsUpdate = true
-      })
+      textureFor(id, e)
+        .then((t) => {
+          material.map = t
+          material.needsUpdate = true
+        })
+        // A single face that fails to load must never leave the whole head hidden.
+        .catch(() => {})
     )
   }
   // Hold the faces hidden until they decode, then reveal with the requested state intact.
