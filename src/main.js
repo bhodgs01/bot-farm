@@ -1187,6 +1187,14 @@ window.addEventListener('keydown', (e) => {
 
 function applyThreads(list) {
   threads = list = withNames(list)
+  // A worker the source says can't be archived (a live health check like Rusty) must never
+  // stay hidden by a stale archive entry — it clears by removing its flag, not by filing it
+  // away. Drop any such id from the local archive list and save the correction back.
+  const pruned = state.archived.filter((id) => !list.some((t) => t.id === id && t.canArchive === false))
+  if (pruned.length !== state.archived.length) {
+    state.archived = pruned
+    queueSave()
+  }
   const archivedSet = new Set(state.archived)
   const stats = colony.setThreads(list, archivedSet)
   hud.setStats(stats)

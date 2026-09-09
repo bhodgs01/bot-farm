@@ -105,7 +105,7 @@ async function fetchThreads() {
       lastActivityAt: now,
       lastFocusedAt: 0,
       running: false,
-      unread: d.left >= 0 && d.left <= SOON_DAYS,
+      unread: d.left <= 0, // pin to Needs-you only on the day itself or once overdue
       hasError: false,
       starred: false,
       routine: '',
@@ -142,7 +142,7 @@ async function fetchThreads() {
       lastActivityAt: now,
       lastFocusedAt: 0,
       running: false,
-      unread: true, // a thing to do: hand up until Blake clears it
+      unread: false, // a calm reminder on the Countdown; it does not nag Needs-you
       hasError: false,
       starred: false,
       routine: '',

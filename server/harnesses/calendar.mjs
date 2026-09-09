@@ -111,11 +111,15 @@ async function fetchThreads() {
     ref: { link: 'https://calendar.google.com/calendar/u/0/r/week' },
   })
 
-  // Every event still to come this week is a person; only the next 24 hours raise a hand.
+  // Every event still to come this week is a person on the hex; only TODAY's timed meetings
+  // that are not yet over raise a hand in Needs-you. A meeting already finished has dropped
+  // out of `upcoming` above, so three meetings today with one over shows as two here.
+  const endOfToday = startOfDay.getTime() + DAY_MS
   for (const e of upcoming) {
     const live = e.start <= now && e.end > now
     const within = e.start - now < DAY_MS
     const soon = !live && e.start - now < SOON_MS
+    const todayMeeting = !e.allDay && e.start < endOfToday
     out.push({
       id: `cal:${e.id}`,
       kind: 'task',
@@ -143,7 +147,7 @@ async function fetchThreads() {
       lastActivityAt: now,
       lastFocusedAt: 0,
       running: live,
-      unread: within && !live,
+      unread: todayMeeting,
       hasError: false,
       starred: false,
       routine: '',
