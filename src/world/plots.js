@@ -552,7 +552,9 @@ export class Plot {
    * Seeded off the plot's own name, so a repo's yard is laid out the same on every reload.
    */
   _buildClutter() {
-    const props = ['containers_A', 'containers_B', 'containers_C', 'containers_D', 'cargo_A', 'cargo_B', 'cargo_A_packed', 'cargo_B_packed', 'lights']
+    // 'lights' dropped — that KayKit prop is a floodlight on tall poles, and those bare poles
+    // were the clutter Blake wanted gone. Crates and cargo only now.
+    const props = ['containers_A', 'containers_B', 'containers_C', 'containers_D', 'cargo_A', 'cargo_B', 'cargo_A_packed', 'cargo_B_packed']
     if (!props.every((n) => hasPart(n))) return
 
     const rand = mulberry(hashString(this.id) + 17)
