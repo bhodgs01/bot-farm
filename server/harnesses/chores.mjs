@@ -24,6 +24,30 @@ const headline = (c) => String(c.task || '').split(NL)[0].replace(/https?:\/\/\S
 const body = (c) => String(c.task || '').split(NL).slice(1).map((l) => l.trim()).filter(Boolean).join(NL)
 const link = (c) => (String(c.task || '').match(/https?:\/\/\S+/) || [''])[0]
 
+/**
+ * Undone chore headlines per family member, for the map's family captions. Blake's own list
+ * stays the Chores hex; this is just so a kid's character can say what they owe today.
+ */
+let _famCache = { at: 0, data: null }
+export async function familyChores() {
+  if (_famCache.data && Date.now() - _famCache.at < TTL_MS) return _famCache.data
+  const res = await fetch(`${URL}/api/state`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) })
+  if (!res.ok) throw new Error(`chore-quest → ${res.status}`)
+  const state = await res.json()
+  const done = state.done || {}
+  const out = {}
+  for (const who of ['kai', 'maya', 'ema', 'misa', 'blake']) {
+    const list = Array.isArray(state.todayC?.[who]) ? state.todayC[who] : []
+    const seen = new Set()
+    out[who] = list
+      .filter((c) => !done[`${who}-${c.id}`])
+      .map(headline)
+      .filter((h) => (seen.has(h) ? false : (seen.add(h), true)))
+  }
+  _famCache = { at: Date.now(), data: out }
+  return out
+}
+
 async function fetchThreads() {
   const res = await fetch(`${URL}/api/state`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) })
   if (!res.ok) throw new Error(`chore-quest → ${res.status}`)

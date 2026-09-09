@@ -17,6 +17,7 @@ import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
 import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGenerate, update as newsUpdate, topicById, todayKC, newsEnabled } from './news.mjs'
 import { refreshNews } from './harnesses/news.mjs'
 import { napMode, fetchNap } from './harnesses/home.mjs'
+import { familyChores } from './harnesses/chores.mjs'
 import { plexArt } from './harnesses/plex.mjs'
 import { withIntros } from './intro.mjs'
 
@@ -373,6 +374,9 @@ async function reconcileArchived(threads) {
 
   return Promise.all(
     threads.map(async (thread) => {
+      // A worker the source says can't be archived (a live health check like Rusty) is never
+      // hidden by a stale archive entry — you clear its flag, you don't file it away.
+      if (thread.canArchive === false) return thread
       if (!wanted.has(thread.id)) return thread
       if (!thread.archived && thread.canArchive) {
         await setThreadArchived(thread.harness, thread.ref, true).catch(() => {})
@@ -754,6 +758,15 @@ export async function apiMiddleware(req, res, next) {
 
     if (url.pathname === '/api/nap' && req.method === 'GET') {
       return send(res, 200, { nap: await fetchNap() })
+    }
+
+    // Undone chores per family member, so the kids' characters can show what they owe today.
+    if (url.pathname === '/api/family-chores' && req.method === 'GET') {
+      try {
+        return send(res, 200, await familyChores())
+      } catch {
+        return send(res, 200, {})
+      }
     }
 
     if (url.pathname === '/api/state' && req.method === 'GET') {

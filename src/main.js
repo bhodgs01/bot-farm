@@ -116,13 +116,47 @@ hoverTip.className = 'hover-tip'
 hoverTip.hidden = true
 document.body.appendChild(hoverTip)
 
-// A small card for a wandering pet: who it is, no job. Click one to open it, click away to close.
+// A small card for a mascot: a pet says what it is, a kid shows the chores they owe today,
+// the grown-ups say their line. Click one to open it, click away to close.
 const petCard = document.createElement('div')
 petCard.className = 'pet-card'
 petCard.hidden = true
 document.body.appendChild(petCard)
+
+const PETS = new Set(['dog', 'lobster', 'gecko'])
+const KIDS = new Set(['kai', 'maya', 'ema'])
+// Undone chores per family member, refreshed lightly, for the kids' captions.
+let familyChores = {}
+async function loadFamilyChores() {
+  try {
+    familyChores = (await (await fetch('/api/family-chores')).json()) || {}
+  } catch {
+    /* keep the last good copy */
+  }
+}
+loadFamilyChores()
+setInterval(loadFamilyChores, 60000)
+
+/** The one-line subtitle under a mascot's name on hover. People are not "wandering pets". */
+function petSubtitle(m) {
+  if (PETS.has(m.kind)) return 'a wandering pet'
+  if (KIDS.has(m.kind)) {
+    const n = (familyChores[m.kind] || []).length
+    return n ? `${n} chore${n === 1 ? '' : 's'} to do` : 'chores all done 🎉'
+  }
+  return '' // Blake, Misa: the name is enough
+}
+/** The body of a mascot's click card. Kids show their chore list; everyone else their line. */
+function petBody(m) {
+  if (KIDS.has(m.kind)) {
+    const ch = familyChores[m.kind] || []
+    return ch.length ? `Chores today:\n• ${ch.join('\n• ')}` : 'No chores today 🎉'
+  }
+  return m.intro || ''
+}
+
 function showPetCard(m, e) {
-  petCard.innerHTML = `<b>${esc(m.name)}</b><span>${esc(m.intro)}</span>`
+  petCard.innerHTML = `<b>${esc(m.name)}</b><span>${esc(petBody(m)).replace(/\n/g, '<br>')}</span>`
   petCard.hidden = false
   const w = petCard.offsetWidth
   petCard.style.left = `${Math.min(e.clientX + 16, window.innerWidth - w - 8)}px`
@@ -445,6 +479,13 @@ const actions = {
   archiveThread: async () => {
     const thread = threads.find((t) => t.id === selectedId)
     if (!thread) return
+    // Some workers are never archived — a live health check, a chore, the ledger. The button
+    // is hidden for them, but the keyboard shortcut used to archive them anyway. Refuse it and
+    // point at the right move.
+    if (thread.canArchive === false) {
+      hud.toast(thread.hasError ? 'Not archivable — use Remove flag to clear it' : 'This one is not archivable')
+      return
+    }
     try {
       const res = await archiveThread(thread, true)
       state.archived = [...new Set([...state.archived, thread.id])]
@@ -706,7 +747,7 @@ engine.canvas.addEventListener('pointermove', (e) => {
   colony.astronauts.setHover(agent)
   const pet = !agent && colony.mascots ? colony.mascots.pick(engine.camera, p.x, p.y, p.aspect) : null
   if (pet) {
-    hoverTip.innerHTML = `<b>${esc(pet.name)}</b><i>a wandering pet</i>`
+    hoverTip.innerHTML = `<b>${esc(pet.name)}</b>${((s) => (s ? `<i>${esc(s)}</i>` : ''))(petSubtitle(pet))}`
     hoverTip.hidden = false
     hoverTip.style.left = `${Math.min(e.clientX + 16, window.innerWidth - hoverTip.offsetWidth - 8)}px`
     hoverTip.style.top = `${Math.min(e.clientY + 18, window.innerHeight - hoverTip.offsetHeight - 8)}px`
