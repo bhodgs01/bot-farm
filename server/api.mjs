@@ -18,6 +18,7 @@ import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGen
 import { refreshNews } from './harnesses/news.mjs'
 import { napMode, fetchNap } from './harnesses/home.mjs'
 import { familyChores } from './harnesses/chores.mjs'
+import { hasValidAuth } from './auth.mjs'
 import { plexArt } from './harnesses/plex.mjs'
 import { withIntros } from './intro.mjs'
 
@@ -402,6 +403,9 @@ const CHAT_ALLOWED = new Set(
 )
 function chatIdentity(req) {
   if (process.env.COLONY_PUBLIC !== '1') return 'local'
+  // The same-origin password gate already let this request through; a valid cookie is identity
+  // enough to talk to the workers and move things on the map.
+  if (hasValidAuth(req)) return 'blake'
   const email = String(req.headers['cf-access-authenticated-user-email'] || '').toLowerCase()
   return email && CHAT_ALLOWED.has(email) ? email : ''
 }

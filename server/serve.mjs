@@ -4,6 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { apiMiddleware } from './api.mjs'
 import { startScheduler } from './news.mjs'
+import { needsAuth, hasValidAuth, checkPassword, makeSetCookie, loginPage } from './auth.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const DIST = path.join(here, '..', 'dist')
@@ -42,6 +43,39 @@ function resolveInDist(pathname) {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost')
+
+  // Same-origin password gate for the public map host. News and localhost are never gated.
+  if (needsAuth(req.headers.host)) {
+    if (url.pathname === '/api/login' && req.method === 'POST') {
+      let body = ''
+      req.on('data', (c) => {
+        body += c
+        if (body.length > 4096) req.destroy()
+      })
+      req.on('end', () => {
+        let pw = ''
+        try {
+          pw = JSON.parse(body || '{}').password
+        } catch {
+          /* bad body */
+        }
+        if (checkPassword(pw)) {
+          res.writeHead(200, { 'Content-Type': 'application/json', 'Set-Cookie': makeSetCookie(), 'Cache-Control': 'no-store' }).end('{"ok":true}')
+        } else {
+          res.writeHead(401, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end('{"ok":false}')
+        }
+      })
+      return
+    }
+    if (!hasValidAuth(req)) {
+      if (url.pathname.startsWith('/api/')) {
+        res.writeHead(401, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end('{"error":"auth required"}')
+        return
+      }
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }).end(loginPage())
+      return
+    }
+  }
 
   if (url.pathname.startsWith('/api/')) {
     return apiMiddleware(req, res, null)
