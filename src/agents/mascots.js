@@ -529,7 +529,8 @@ export class Mascots {
     this.spawn('dog')
     this.spawn('lobster')
     this.spawn('gecko')
-    this.spawn('blake')
+    // The family lands here (this.spawn('blake') etc.) once the full set is in; the test
+    // character is off the map for now.
   }
 
   spawn(kind) {
@@ -651,25 +652,20 @@ ${r.note}` : m.baseIntro
         }
         if (m.mesh.userData.head) m.mesh.userData.head.rotation.y = Math.sin(elapsed * 0.6 + m.phase) * 0.22 * (1 - m.gait)
         if (m.mesh.userData.expressions && elapsed >= m.exprUntil) {
-          const name = this._pickExpression()
-          this._setExpression(m, name)
-          m.exprUntil = elapsed + (name === 'sleepy' ? 8 : name === 'neutral' ? 4 + Math.random() * 3 : 2 + Math.random() * 2)
+          this._setExpression(m, this._pickExpression(m))
+          m.exprUntil = elapsed + 2 + Math.random() // a fresh face every 2-3 seconds
         }
       }
     }
   }
 
-  /** Pick a face from the mood of the map: sleepy after dark, a bit annoyed when things want you. */
-  _pickExpression() {
-    const night = this.colony?.sky?.nightFactor ?? 0
-    if (night > 0.6) return 'sleepy'
-    const s = this.colony?.stats
-    const wants = s ? (s.waiting || 0) + (s.blocked || 0) + (s.mail || 0) + (s.door || 0) + (s.visitor || 0) : 0
-    const r = Math.random()
-    if (wants > 0 && r < 0.35) return 'annoyed'
-    if (r < 0.45) return 'happy'
-    if (r < 0.55) return 'surprised'
-    return 'neutral'
+  /** A random face, never the same one twice in a row — the character cycles through them. */
+  _pickExpression(m) {
+    const keys = Object.keys(m.mesh.userData.expressions || {})
+    if (keys.length <= 1) return keys[0] || 'neutral'
+    let name = m.expr
+    while (name === m.expr) name = keys[(Math.random() * keys.length) | 0]
+    return name
   }
 
   /** Show one named face, hide the rest. Meshes were all built up front, one set per expression. */
