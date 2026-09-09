@@ -276,6 +276,182 @@ function createPickle() {
   return g
 }
 
+function createBlake() {
+  const g = new THREE.Group()
+
+  const mat = (color) => new THREE.MeshStandardMaterial({
+    color,
+    roughness: 0.8,
+    metalness: 0.02,
+    flatShading: true
+  })
+
+  const skin = mat(0xe4ae88)
+  const hair = mat(0x514137)
+  const beard = mat(0x79513c)
+  const shirt = mat(0x159daf)
+  const pants = mat(0x35465b)
+  const shoes = mat(0x242830)
+  const frames = mat(0x242322)
+  const white = mat(0xfffcf3)
+  const dark = mat(0x26201e)
+
+  const add = (parent, geo, material, x = 0, y = 0, z = 0) => {
+    const m = new THREE.Mesh(geo, material)
+    m.position.set(x, y, z)
+    m.castShadow = true
+    m.receiveShadow = true
+    parent.add(m)
+    return m
+  }
+
+  const oval = (x, y, z) => {
+    const g = new THREE.SphereGeometry(1, 12, 8)
+    g.scale(x, y, z)
+    return g
+  }
+
+  // Chunky shirt: wider at the bottom.
+  add(g, new THREE.CylinderGeometry(
+    0.235, 0.285, 0.49, 10
+  ), shirt, 0, 0.665, 0)
+
+  // Hip origins. Geometry extends downward from each joint.
+  const legs = []
+  for (const s of [-1, 1]) {
+    const geo = new THREE.BoxGeometry(0.17, 0.25, 0.19)
+    geo.translate(0, -0.125, 0)
+    const leg = add(g, geo, pants, s * 0.125, 0.37, 0)
+
+    // Shoe bottom is exactly y = 0 in the standing pose.
+    add(
+      leg,
+      new THREE.BoxGeometry(0.205, 0.12, 0.29),
+      shoes,
+      0, -0.31, 0.045
+    )
+    legs.push(leg)
+  }
+
+  // Shoulder origins. Mitten hands inherit the arm swing.
+  const arms = []
+  for (const s of [-1, 1]) {
+    const geo = oval(0.10, 0.155, 0.105)
+    geo.translate(0, -0.135, 0)
+    const arm = add(g, geo, shirt, s * 0.30, 0.855, 0)
+    add(arm, oval(0.095, 0.09, 0.10), skin, 0, -0.305, 0.015)
+    arms.push(arm)
+  }
+
+  // Head pivots at the neck; its center is above the origin.
+  const headGeo = oval(0.365, 0.35, 0.29)
+  headGeo.translate(0, 0.24, 0)
+  const head = add(g, headGeo, skin, 0, 1.065, 0)
+
+  // All following coordinates are local to the head.
+  for (const s of [-1, 1]) {
+    add(head, oval(0.065, 0.095, 0.065), skin,
+      s * 0.35, 0.22, 0)
+  }
+
+  // Cropped hair: rear cap leaves the high forehead exposed.
+  add(head, oval(0.351, 0.30, 0.175), hair, 0, 0.285, -0.13)
+  add(head, oval(0.19, 0.045, 0.105), hair, 0, 0.566, -0.065)
+
+  // Big South Park eyes with tiny fixed pupils.
+  for (const s of [-1, 1]) {
+    add(head, oval(0.112, 0.119, 0.035), white,
+      s * 0.119, 0.285, 0.264)
+    add(head, oval(0.019, 0.024, 0.012), dark,
+      s * 0.105, 0.281, 0.300)
+  }
+
+  // Bold glasses. Flattened oval rings remain legible at map scale.
+  for (const s of [-1, 1]) {
+    const ring = new THREE.TorusGeometry(0.112, 0.014, 4, 12)
+    ring.scale(1.10, 0.99, 0.65)
+    add(head, ring, frames, s * 0.128, 0.285, 0.310)
+  }
+  add(head, new THREE.BoxGeometry(0.042, 0.023, 0.022),
+    frames, 0, 0.308, 0.313)
+
+  // Simple flat beard and moustache, behind expression mouths.
+  add(head, oval(0.225, 0.115, 0.037), beard, 0, 0.074, 0.220)
+  add(head, oval(0.107, 0.029, 0.015), beard, 0, 0.150, 0.270)
+
+  // Face variants: every mesh belongs to the head.
+  // Eyes and glasses stay fixed; only these meshes are toggled.
+  const mouthLine = (width, height, y) =>
+    add(head, new THREE.BoxGeometry(width, height, 0.012),
+      dark, 0, y, 0.275)
+
+  const brow = (x, y, angle = 0) => {
+    const m = add(
+      head,
+      new THREE.BoxGeometry(0.092, 0.020, 0.012),
+      hair, x, y, 0.268
+    )
+    m.rotation.z = angle
+    return m
+  }
+
+  const mouthNeutral = mouthLine(0.080, 0.014, 0.094)
+
+  // Lower semicircle: a clear U-shaped smile.
+  const smileGeo = new THREE.TorusGeometry(
+    0.061, 0.011, 4, 12, Math.PI
+  )
+  smileGeo.rotateZ(Math.PI)
+  smileGeo.scale(1, 0.62, 0.55)
+  const mouthSmile = add(head, smileGeo, dark, 0, 0.119, 0.279)
+  const browHappyL = brow(-0.122, 0.424, -0.10)
+  const browHappyR = brow(0.122, 0.424, 0.10)
+
+  const mouthO = add(head, oval(0.031, 0.040, 0.010),
+    dark, 0, 0.091, 0.278)
+  const browUpL = brow(-0.122, 0.449, 0)
+  const browUpR = brow(0.122, 0.449, 0)
+
+  const mouthFlat = mouthLine(0.099, 0.017, 0.085)
+  const browAngryL = brow(-0.119, 0.410, -0.28)
+  const browAngryR = brow(0.119, 0.410, 0.28)
+
+  const mouthSmall = mouthLine(0.043, 0.013, 0.087)
+
+  // Flat upper-half eye covers, behind the glasses.
+  // The underlying eye whites and pupils never change.
+  const lidGeo = () => {
+    const geo = new THREE.SphereGeometry(
+      1, 12, 4, 0, Math.PI * 2, 0, Math.PI / 2
+    )
+    geo.scale(0.111, 0.119, 0.010)
+    return geo
+  }
+  const eyelidL = add(head, lidGeo(), skin,
+    -0.119, 0.285, 0.310)
+  const eyelidR = add(head, lidGeo(), skin,
+    0.119, 0.285, 0.310)
+
+  g.userData.arms = arms
+  g.userData.legs = legs
+  g.userData.head = head
+
+  g.userData.expressions = {
+    neutral: [mouthNeutral],
+    happy: [mouthSmile, browHappyL, browHappyR],
+    surprised: [mouthO, browUpL, browUpR],
+    annoyed: [mouthFlat, browAngryL, browAngryR],
+    sleepy: [mouthSmall, eyelidL, eyelidR]
+  }
+
+  for (const [name, meshes] of Object.entries(g.userData.expressions)) {
+    for (const mesh of meshes) mesh.visible = name === 'neutral'
+  }
+
+  g.scale.setScalar(0.85)
+  return g
+}
+
 let _fridayCache = { at: 0, val: false }
 /** True on a Kansas City Friday, cached to the minute — Pickle's cricket day. */
 function isFridayKC() {
@@ -295,7 +471,17 @@ const KINDS = {
     intro: "I'm Carti, Kai's leopard gecko. I amble the colony and store my snacks in my tail.",
     reminder: () => (isFridayKC() ? { badge: '🦗', note: "Crickets today — Kai's gecko needs feeding." } : null),
   },
+  // The family: South Park-style people who walk the colony, swing their arms, and change
+  // their faces with the mood of the map. Test of one before the rest of the family lands.
+  blake: {
+    build: createBlake,
+    name: 'Blake',
+    intro: 'I could do the chore… or spend six hours automating it.',
+  },
 }
+
+/** Characters built to the people contract (arms, legs, swappable faces) walk and emote. */
+const isPerson = (m) => Boolean(m.mesh.userData.arms || m.mesh.userData.legs)
 
 /** A little name that floats over a pet's head, always facing the camera. */
 function makeNameplate(text) {
@@ -343,6 +529,7 @@ export class Mascots {
     this.spawn('dog')
     this.spawn('lobster')
     this.spawn('gecko')
+    this.spawn('blake')
   }
 
   spawn(kind) {
@@ -368,7 +555,14 @@ export class Mascots {
       speed: WALK * (0.85 + Math.random() * 0.3),
       pause: 1 + Math.random() * 2,
       phase: Math.random() * Math.PI * 2,
+      // People walk (arms/legs swing eased by `gait`) and cycle a face (`expr`).
+      gait: 0,
+      expr: 'neutral',
+      exprUntil: 0,
     }
+    // Float the name just above whatever was built, so a tall person and a low gecko both clear.
+    const box = new THREE.Box3().setFromObject(mesh)
+    m.nameOffset = Math.max(1.15, (box.max.y - box.min.y) + 0.25)
     this._pickTarget(m)
     m.pos.copy(m.target) // start already somewhere on the map
     this._pickTarget(m)
@@ -433,13 +627,60 @@ ${r.note}` : m.baseIntro
       m.mesh.position.set(m.pos.x, ground + (walking ? Math.abs(Math.sin(elapsed * 8 + m.phase)) * 0.04 : 0), m.pos.z)
       m.mesh.rotation.y = m.yaw
       this._applyReminder(m)
-      if (m.nameplate) m.nameplate.position.set(m.pos.x, m.mesh.position.y + 1.15, m.pos.z)
+      if (m.nameplate) m.nameplate.position.set(m.pos.x, m.mesh.position.y + m.nameOffset, m.pos.z)
       // Character: the dog wags, the lobster works its claws.
       if (m.kind === 'dog' && m.mesh.userData.tail) m.mesh.userData.tail.rotation.y = Math.sin(elapsed * 9 + m.phase) * 0.6
       if (m.kind === 'lobster' && m.mesh.userData.claws) {
         const open = (Math.sin(elapsed * 3 + m.phase) * 0.5 + 0.5) * 0.5
         for (const claw of m.mesh.userData.claws) claw.userData.jaw.rotation.x = -open
       }
+      // People: swing arms and legs while walking (opposite each other), a slow look-around
+      // when standing, and a face that changes with the mood of the map.
+      if (isPerson(m)) {
+        m.gait += ((walking ? 1 : 0) - m.gait) * Math.min(1, dt * 6)
+        const swing = Math.sin(elapsed * 7 + m.phase) * m.gait
+        const legs = m.mesh.userData.legs
+        if (legs) {
+          if (legs[0]) legs[0].rotation.x = swing * 0.5
+          if (legs[1]) legs[1].rotation.x = -swing * 0.5
+        }
+        const arms = m.mesh.userData.arms
+        if (arms) {
+          if (arms[0]) arms[0].rotation.x = -swing * 0.4
+          if (arms[1]) arms[1].rotation.x = swing * 0.4
+        }
+        if (m.mesh.userData.head) m.mesh.userData.head.rotation.y = Math.sin(elapsed * 0.6 + m.phase) * 0.22 * (1 - m.gait)
+        if (m.mesh.userData.expressions && elapsed >= m.exprUntil) {
+          const name = this._pickExpression()
+          this._setExpression(m, name)
+          m.exprUntil = elapsed + (name === 'sleepy' ? 8 : name === 'neutral' ? 4 + Math.random() * 3 : 2 + Math.random() * 2)
+        }
+      }
+    }
+  }
+
+  /** Pick a face from the mood of the map: sleepy after dark, a bit annoyed when things want you. */
+  _pickExpression() {
+    const night = this.colony?.sky?.nightFactor ?? 0
+    if (night > 0.6) return 'sleepy'
+    const s = this.colony?.stats
+    const wants = s ? (s.waiting || 0) + (s.blocked || 0) + (s.mail || 0) + (s.door || 0) + (s.visitor || 0) : 0
+    const r = Math.random()
+    if (wants > 0 && r < 0.35) return 'annoyed'
+    if (r < 0.45) return 'happy'
+    if (r < 0.55) return 'surprised'
+    return 'neutral'
+  }
+
+  /** Show one named face, hide the rest. Meshes were all built up front, one set per expression. */
+  _setExpression(m, name) {
+    const ex = m.mesh.userData.expressions
+    if (!ex || m.expr === name) return
+    if (!ex[name]) name = 'neutral'
+    m.expr = name
+    for (const [k, meshes] of Object.entries(ex)) {
+      const on = k === name
+      for (const mesh of meshes) mesh.visible = on
     }
   }
 
