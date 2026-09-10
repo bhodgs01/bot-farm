@@ -1590,9 +1590,15 @@ kbd {
 .thread-pop .details { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 12px; max-height: 190px; overflow: auto; }
 .thread-pop .details[hidden], .thread-pop .stage[hidden], .thread-pop .intro[hidden] { display: none; }
 .thread-pop .intro { display: grid; gap: 8px; }
-.pet-card { position: fixed; z-index: 55; max-width: 260px; padding: 10px 13px; border-radius: 12px; background: rgba(10, 12, 20, 0.92); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 8px 30px rgba(0,0,0,0.5); pointer-events: none; display: grid; gap: 5px; }
+.pet-card { position: fixed; z-index: 55; max-width: 260px; padding: 10px 13px; border-radius: 12px; background: rgba(10, 12, 20, 0.92); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 8px 30px rgba(0,0,0,0.5); pointer-events: auto; display: grid; gap: 6px; }
+.pet-card header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .pet-card b { font-size: 14px; color: #fff; }
 .pet-card span { font-size: 12px; line-height: 1.45; color: #cdd6ef; }
+.pet-card .px { background: none; border: 0; color: #98a2c0; font-size: 14px; line-height: 1; cursor: pointer; padding: 2px 5px; border-radius: 6px; }
+.pet-card .px:hover { color: #fff; background: rgba(255,255,255,0.08); }
+.pet-card .pet-say { font-size: 12.5px; line-height: 1.45; color: #ffe6a1; background: rgba(255,214,102,0.10); border-left: 2px solid #ffd166; padding: 6px 9px; border-radius: 8px; }
+.pet-card .pet-dismiss { margin-top: 2px; padding: 7px 10px; border: 0; border-radius: 9px; background: #ffd166; color: #221c08; font-weight: 600; font-size: 12.5px; cursor: pointer; }
+.pet-card .pet-dismiss:hover { background: #ffdb85; }
 
 .johnny-card[hidden] { display: none !important; }
 .johnny-card { position: fixed; z-index: 60; right: 18px; bottom: 18px; width: min(92vw, 350px); max-height: min(68vh, 500px); display: flex; flex-direction: column; background: rgba(12, 15, 24, 0.96); border: 1px solid rgba(255,255,255,0.14); border-radius: 16px; box-shadow: 0 18px 50px rgba(0,0,0,0.55); overflow: hidden; }

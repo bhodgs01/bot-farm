@@ -123,6 +123,21 @@ const petCard = document.createElement('div')
 petCard.className = 'pet-card'
 petCard.hidden = true
 document.body.appendChild(petCard)
+// One handler for the card, since its body is rebuilt on every open: the ✕ closes it, and a
+// kid's "Got it" clears their note before closing.
+petCard.addEventListener('click', (ev) => {
+  const dis = ev.target.closest('.pet-dismiss')
+  if (dis) {
+    clearKidNote(dis.dataset.kid)
+    petCard.hidden = true
+    return
+  }
+  if (ev.target.closest('.px')) petCard.hidden = true
+})
+// Escape closes the card too — a moving mascot made it hard to click bare ground to dismiss.
+window.addEventListener('keydown', (ev) => {
+  if (ev.key === 'Escape' && !petCard.hidden) petCard.hidden = true
+})
 
 const PETS = new Set(['dog', 'lobster', 'gecko'])
 const KIDS = new Set(['kai', 'maya', 'ema'])
@@ -170,12 +185,40 @@ function petBody(m) {
   return m.intro || ''
 }
 
-function showPetCard(m, e) {
-  petCard.innerHTML = `<b>${esc(m.name)}</b><span>${esc(petBody(m)).replace(/\n/g, '<br>')}</span>`
+/**
+ * The mascot card. `at` is where to anchor it: {x, y} places its top-left near that point,
+ * or {x, y, left:true} hangs it to the LEFT of x (used when it opens from the crew tile in the
+ * top-right, so it doesn't run off the edge). A kid's Chore-Quest note shows up top with a
+ * button to clear it — the same "Got it" the Needs-you card uses.
+ */
+function showPetCard(m, at) {
+  const kidSay = KIDS.has(m.kind) ? (familySays[m.kind] || '').trim() : ''
+  petCard.innerHTML =
+    `<header><b>${esc(m.name)}</b><button class="px" title="Close" aria-label="Close">✕</button></header>` +
+    (kidSay ? `<div class="pet-say">💬 ${esc(kidSay)}</div>` : '') +
+    `<span>${esc(petBody(m)).replace(/\n/g, '<br>')}</span>` +
+    (kidSay ? `<button class="pet-dismiss" data-kid="${esc(m.kind)}">Got it — clear this note</button>` : '')
   petCard.hidden = false
   const w = petCard.offsetWidth
-  petCard.style.left = `${Math.min(e.clientX + 16, window.innerWidth - w - 8)}px`
-  petCard.style.top = `${Math.min(e.clientY + 16, window.innerHeight - petCard.offsetHeight - 8)}px`
+  const h = petCard.offsetHeight
+  let left = at.left ? at.x - w - 8 : at.x + 16
+  left = Math.max(8, Math.min(left, window.innerWidth - w - 8))
+  let top = Math.max(8, Math.min(at.y + (at.left ? 0 : 16), window.innerHeight - h - 8))
+  petCard.style.left = `${left}px`
+  petCard.style.top = `${top}px`
+}
+/** Clear a kid's Chore-Quest note off the map (server + bubble), the same as the Needs-you "Got it". */
+async function clearKidNote(kid) {
+  if (!kid) return
+  try {
+    await actSay(kid)
+  } catch {
+    /* the next scan still says the same thing; the bubble just clears a beat later */
+  }
+  familySays = { ...familySays, [kid]: '' }
+  colony.mascots?.setSays(familySays)
+  hud.toast('Note cleared')
+  setTimeout(poll, 1200)
 }
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
 
@@ -691,7 +734,19 @@ function renderCrew() {
         ? `<img src="${faceSrc}" alt="" draggable="false" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'crew-emoji',textContent:'${CREW_EMOJI[m.kind] || '🙂'}'}))">`
         : emoji
       b.innerHTML = `${face}<i class="crew-dot" hidden></i>`
+      // Single click flies over to them. Double click opens their card right here — easier
+      // than chasing a moving mascot on the map: Johnny 5 gets his chat, everyone else the
+      // card (a kid's note included, so it can be cleared without the fly-and-click hunt).
       b.addEventListener('click', () => flyToMascot(m))
+      b.addEventListener('dblclick', (ev) => {
+        ev.preventDefault()
+        if (m.kind === 'johnny5') {
+          showJohnnyCard()
+          return
+        }
+        const r = b.getBoundingClientRect()
+        showPetCard(m, { x: r.left, y: r.top, left: true })
+      })
       crewFaces.appendChild(b)
     }
   }
@@ -977,7 +1032,7 @@ engine.canvas.addEventListener('pointerup', (e) => {
   const pet = colony.mascots ? colony.mascots.pick(engine.camera, p.x, p.y, p.aspect) : null
   if (pet) {
     if (pet.kind === 'johnny5') showJohnnyCard()
-    else showPetCard(pet, e)
+    else showPetCard(pet, { x: e.clientX, y: e.clientY })
     return
   }
   petCard.hidden = true
