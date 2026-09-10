@@ -349,7 +349,7 @@ const actions = {
       }
       if (status === 'ticket') {
         const r = await actTicket(thread.id)
-        hud.toast(`Ticket #${r.task?.id ?? ''} filed: ${thread.title}`)
+        hud.toast(`Ticket #${r.task?.id ?? ''} filed${r.acked ? ' — flag snoozed' : ''}: ${thread.title}`)
         setTimeout(poll, 1500)
         return
       }

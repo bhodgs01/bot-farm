@@ -640,7 +640,15 @@ export async function apiMiddleware(req, res, next) {
       if (!thread) return send(res, 404, { error: 'That worker has walked off the map' })
       try {
         const task = await createTicket({ thread, who })
-        return send(res, 200, { ok: true, task: { id: task.id, title: task.title, project: task.project_id } })
+        // Filing a ticket means Blake is tracking it elsewhere now, so snooze the worker's red
+        // flag. The ack is pinned to the current failure, so a *different* failure later still
+        // raises a fresh hand.
+        let acked = false
+        if (thread.hasError) {
+          await ack(thread, who).catch(() => {})
+          acked = true
+        }
+        return send(res, 200, { ok: true, acked, task: { id: task.id, title: task.title, project: task.project_id } })
       } catch (err) {
         return send(res, 409, { ok: false, error: String(err?.message || err) })
       }
