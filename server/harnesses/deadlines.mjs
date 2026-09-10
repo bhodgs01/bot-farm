@@ -43,7 +43,7 @@ async function fetchThreads() {
   const now = Date.now()
   const out = []
   const live = list
-    .filter((d) => d && d.date && /^\d{4}-\d{2}-\d{2}$/.test(d.date))
+    .filter((d) => d && d.date && !d.done && /^\d{4}-\d{2}-\d{2}$/.test(d.date))
     .map((d) => ({ ...d, left: dayNumber(d.date) - today }))
     .filter((d) => d.left >= -1) // yesterday's still shows once, beamed away after
     .sort((a, b) => a.left - b.left)
@@ -115,7 +115,7 @@ async function fetchThreads() {
       sizeBytes: 1500,
       source: 'deadlines',
       canOpen: Boolean(d.url),
-      canArchive: false,
+      canArchive: true,
       exit: 'beam',
       ref: { id: d.id || d.title, url: d.url || '' },
     })
@@ -152,7 +152,7 @@ async function fetchThreads() {
       sizeBytes: 1200,
       source: 'deadlines',
       canOpen: Boolean(d.url),
-      canArchive: false,
+      canArchive: true,
       ref: { id: d.id || d.title, url: d.url || '' },
     })
   }
@@ -185,5 +185,33 @@ export default {
   scanThreads,
   openThread: (ref) => (ref?.url ? { ok: true, browser: true, url: ref.url } : { ok: false, error: 'No link on this one' }),
   newSession: () => ({ ok: false, error: `Add a line to ${FILE}` }),
-  setArchived: async () => ({ ok: false, error: 'It leaves on its own once the day has passed' }),
+  // Archive from the card marks the item done, which is what the button always looked
+  // like it did. Soft, so the record survives and it can be brought back by clearing
+  // `done`. Previously this refused and canArchive:false made the API swallow the click,
+  // so the button sat there doing nothing.
+  setArchived: async (ref, archived) => {
+    const id = ref?.id
+    if (!id) return { ok: false, error: 'No id on this one' }
+    try {
+      let list = []
+      try {
+        list = JSON.parse(await fsp.readFile(FILE, 'utf8'))
+      } catch {
+        return { ok: false, error: 'No list to edit yet' }
+      }
+      let hit = false
+      const next = list.map((d) => {
+        if ((d.id || d.title) !== id) return d
+        hit = true
+        return { ...d, done: archived !== false }
+      })
+      if (!hit) return { ok: false, error: `Nothing on the Countdown called ${id}` }
+      await fsp.writeFile(`${FILE}.tmp`, JSON.stringify(next, null, 2))
+      await fsp.rename(`${FILE}.tmp`, FILE)
+      cache = { at: 0, data: null, inflight: null }
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err.message }
+    }
+  },
 }

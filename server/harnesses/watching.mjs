@@ -181,7 +181,7 @@ async function fetchThreads() {
       sizeBytes: 1400,
       source: 'watching',
       canOpen: Boolean(w.url),
-      canArchive: false,
+      canArchive: true,
       ref: { id: w.id || w.title, url: w.url || '' },
     })
     first = false
@@ -215,5 +215,30 @@ export default {
   scanThreads,
   openThread: (ref) => (ref?.url ? { ok: true, browser: true, url: ref.url } : { ok: false, error: 'No link on this one' }),
   newSession: () => ({ ok: false, error: `Add one with /keeping-an-eye-on-it` }),
-  setArchived: async () => ({ ok: false, error: 'Clear it with /keeping-an-eye-on-it done <id>' }),
+  // Archiving a sentry stops the watch, the same thing /keeping-an-eye-on-it done <id> does.
+  setArchived: async (ref, archived) => {
+    const id = ref?.id
+    if (!id) return { ok: false, error: 'No id on this one' }
+    try {
+      let list = []
+      try {
+        list = JSON.parse(await fsp.readFile(FILE, 'utf8'))
+      } catch {
+        return { ok: false, error: 'Nothing is being watched yet' }
+      }
+      let hit = false
+      const next = list.map((x) => {
+        if ((x.id || x.title) !== id) return x
+        hit = true
+        return { ...x, done: archived !== false }
+      })
+      if (!hit) return { ok: false, error: `Not watching anything called ${id}` }
+      await fsp.writeFile(`${FILE}.tmp`, JSON.stringify(next, null, 2))
+      await fsp.rename(`${FILE}.tmp`, FILE)
+      cache = { at: 0, data: null, inflight: null }
+      return { ok: true }
+    } catch (err) {
+      return { ok: false, error: err.message }
+    }
+  },
 }
