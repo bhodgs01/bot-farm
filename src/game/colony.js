@@ -82,7 +82,7 @@ const ZONE_LANDMARK = {
   'Embassy Landscape': 'yard',
 }
 
-export const STATUS_ORDER = ['blocked', 'visitor', 'door', 'plant', 'mail', 'print', 'waiting', 'working', 'watching', 'printing', 'celebrating', 'info', 'watched', 'you', 'idle', 'sleeping']
+export const STATUS_ORDER = ['blocked', 'dada', 'visitor', 'door', 'plant', 'mail', 'print', 'waiting', 'working', 'watching', 'printing', 'celebrating', 'info', 'watched', 'you', 'idle', 'sleeping']
 
 export const STATUS_LABEL = {
   working: 'Working',
@@ -97,6 +97,7 @@ export const STATUS_LABEL = {
   visitor: 'Movement',
   watched: 'Starred',
   info: 'FYI',
+  dada: 'Message from Ema',
   blocked: 'Blocked',
   celebrating: 'Shipped',
   idle: 'Idle',
@@ -115,6 +116,8 @@ export function statusFor(thread, now = Date.now()) {
   if (thread.kind === 'door') return 'door'
   if (thread.kind === 'plant') return 'plant'
   if (thread.kind === 'visitor') return 'visitor'
+  // Family on the Dada chat: a heart when she messaged and is waiting on you, calm otherwise.
+  if (thread.kind === 'dada') return thread.unread ? 'dada' : 'idle'
   if (thread.kind === 'person') return thread.running ? 'working' : 'idle'
   // You are always just 'you' — waving so Blake can spot himself, never a flag.
   if (thread.kind === 'you') return 'you'
@@ -148,6 +151,7 @@ const BADGE_FOR = {
   visitor: BADGE.visitor,
   watched: BADGE.watched,
   info: BADGE.info,
+  dada: BADGE.heart,
   blocked: BADGE.blocked,
   working: BADGE.working,
   celebrating: BADGE.done,
@@ -419,7 +423,7 @@ export class Colony {
       list.forEach((thread, i) => {
         const status = statusFor(thread, now)
         if (stats[status] !== undefined) stats[status]++
-        const wantsYou = ['waiting', 'blocked', 'mail', 'print', 'door', 'plant', 'visitor'].includes(status)
+        const wantsYou = ['waiting', 'blocked', 'mail', 'print', 'door', 'plant', 'visitor', 'dada'].includes(status)
         if (wantsYou) urgent.add(plot.id)
         if (wantsYou || status === 'working' || status === 'watching' || status === 'printing') active.add(plot.id)
         stats.agents++

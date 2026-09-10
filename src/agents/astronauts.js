@@ -525,7 +525,7 @@ export class Astronauts {
     const start = new THREE.Vector3(door.x + jitter(), 0, door.z + jitter())
     // A mid-session arrival that wants Blake hustles out of the ship so he catches it walking,
     // instead of a lone figure strolling in unnoticed. The opening parade already hustles.
-    const wantsYou = ['waiting', 'blocked', 'mail', 'print', 'door', 'plant', 'visitor'].includes(entry.status)
+    const wantsYou = ['waiting', 'blocked', 'mail', 'print', 'door', 'plant', 'visitor', 'dada'].includes(entry.status)
     const hustle = settled || wantsYou
 
     const agent = {

@@ -16,6 +16,7 @@ import {
   mdiAccountAlert,
   mdiStar,
   mdiInformation,
+  mdiHeart,
 } from '@mdi/js'
 
 /**
@@ -53,6 +54,7 @@ export const BADGE = {
   visitor: 14, // motion at the house right now
   watched: 15, // a star Blake put there himself
   info: 16, // something to know, nothing to do: a feed that landed, a position that is up
+  heart: 17, // a message from family (Ema on the Dada chat) waiting for a reply
 }
 
 /** Badge tint. Pushed past 1.0 so the bloom pass gives them a soft halo. */
@@ -76,6 +78,7 @@ const BADGE_COLOR = {
   14: [2.8, 0.9, 0.7],
   15: [2.7, 2.2, 0.6],
   16: [0.7, 1.7, 2.8],
+  17: [2.9, 0.7, 1.15], // heart — warm pink
 }
 
 /**
@@ -98,6 +101,7 @@ const FADE_BY_BADGE = {
   [BADGE.visitor]: 0,
   [BADGE.watched]: 0,
   [BADGE.info]: 0.15,
+  [BADGE.heart]: 0, // family never fades out
   [BADGE.paused]: 0.6,
   [BADGE.sleeping]: 1,
 }
@@ -313,7 +317,7 @@ export class Indicators {
 // One entry per BADGE cell, in order. `printing` (11) is a ring the shader draws and has no
 // glyph, so it holds a null: without the placeholder every glyph after it landed one cell
 // early (the door badge wore the water drop, the star never drew).
-const ICON_PATHS = [mdiHelpCircle, mdiAlert, mdiHammer, mdiCheckBold, mdiPause, mdiSleep, mdiCreation, mdiLogout, mdiEmail, mdiPrinter3d, mdiPlay, null, mdiDoorOpen, mdiWaterOff, mdiAccountAlert, mdiStar, mdiInformation]
+const ICON_PATHS = [mdiHelpCircle, mdiAlert, mdiHammer, mdiCheckBold, mdiPause, mdiSleep, mdiCreation, mdiLogout, mdiEmail, mdiPrinter3d, mdiPlay, null, mdiDoorOpen, mdiWaterOff, mdiAccountAlert, mdiStar, mdiInformation, mdiHeart]
 
 /**
  * The badge atlas. Red channel = the glyph, green channel = the plate's alpha — packing two
