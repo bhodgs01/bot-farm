@@ -12,6 +12,8 @@ import { FAMILY_IDS, build as buildFamily, preload as preloadFamily } from './fa
 import { createJohnny5 } from './johnny-five.js'
 import { createTotoro } from './totoro.js'
 import { createTotoroProcession } from './totoro-companions.js'
+import { createSootSprite } from './soot-sprites.js'
+import { createUmbrella } from './umbrella.js'
 
 const WALK = 1.5 // m/s, an amble
 
@@ -639,6 +641,14 @@ export class Mascots {
     if (totoro) {
       this.totoroCompanions = createTotoroProcession(totoro.mesh)
       this.group.add(this.totoroCompanions)
+      // His umbrella rides on his back, held up over his head, and only shows when the weather
+      // desk says it's actually raining in KC — the bus-stop pose. Child of his mesh so it
+      // walks and sways with him.
+      this.totoroUmbrella = createUmbrella()
+      this.totoroUmbrella.position.set(0.28, 0.72, 0.06)
+      this.totoroUmbrella.rotation.z = -0.14
+      this.totoroUmbrella.visible = false
+      totoro.mesh.add(this.totoroUmbrella)
     }
   }
 
@@ -740,6 +750,114 @@ ${r.note}` : m.baseIntro
     m.target.set(c.x + (Math.random() - 0.5) * 6, 0, c.z + (Math.random() - 0.5) * 6)
   }
 
+  // ── soot sprites: they own the dark ────────────────────────────────────────────────
+  /** A random spot on some hex, for scattering the soot swarm across the whole colony. */
+  _sootPoint(out) {
+    const plots = this.colony.plotOrder
+    if (!plots || !plots.length) return out.set((Math.random() - 0.5) * 40, 0, (Math.random() - 0.5) * 40)
+    const c = plots[(Math.random() * plots.length) | 0]
+    const m = c.middle || c.center
+    return out.set(m.x + (Math.random() - 0.5) * 8, 0, m.z + (Math.random() - 0.5) * 8)
+  }
+
+  /** Fill every hex with susuwatari. They own the dark. */
+  _spawnSoot() {
+    const COUNT = 110
+    const sprites = []
+    for (let i = 0; i < COUNT; i++) {
+      const g = createSootSprite({ seed: i * 7 + 3, phase: Math.random() * Math.PI * 2 })
+      const scale = 0.5 + Math.random() * 0.35
+      const pos = this._sootPoint(new THREE.Vector3())
+      g.position.set(pos.x, this.colony.groundAt(pos.x, pos.z), pos.z)
+      g.scale.setScalar(0.001) // pop in from nothing
+      g.rotation.y = Math.random() * Math.PI * 2
+      this.group.add(g)
+      sprites.push({ g, scale, grow: 0, target: this._sootPoint(new THREE.Vector3()), pause: Math.random() * 2, speed: 0.5 + Math.random() * 0.6, vel: new THREE.Vector3(), spin: 0 })
+    }
+    this.soot = { phase: 'roam', sprites, t: 0 }
+  }
+
+  /**
+   * The soot sprites live on darkness, not on any one switch: the nap automation, the night-
+   * time slider and real nightfall all dim the sky the same way, and that's what they answer
+   * to. When it goes dark they fill every hex; when the lights come back they freeze wide-eyed
+   * for a beat, then panic and scatter like roaches, shrinking away to nothing. Hysteresis on
+   * the darkness reading keeps them from flickering at dawn and dusk.
+   */
+  _updateSoot(dt, elapsed) {
+    const night = this.colony.sky?.nightFactor ?? 0
+    const soot = this.soot
+    if (!soot || soot.phase === 'off') {
+      if (night > 0.6) this._spawnSoot()
+      return
+    }
+    if (soot.phase === 'roam' && night < 0.4) {
+      // Lights up: freeze, eyes wide, before the scramble.
+      soot.phase = 'alert'
+      soot.t = 0
+      for (const s of soot.sprites) s.g.userData.setExpression?.('surprised')
+    }
+    const tmp = this._tmp
+    if (soot.phase === 'roam') {
+      for (const s of soot.sprites) {
+        if (s.grow < 1) {
+          s.grow = Math.min(1, s.grow + dt * 2.2)
+          s.g.scale.setScalar(s.scale * s.grow)
+        }
+        let walking = false
+        if (s.pause > 0) s.pause -= dt
+        else {
+          const to = tmp.subVectors(s.target, s.g.position)
+          to.y = 0
+          const dist = to.length()
+          if (dist < 0.4) {
+            this._sootPoint(s.target)
+            s.pause = 0.4 + Math.random() * 2.5
+          } else {
+            walking = true
+            s.g.position.addScaledVector(to.multiplyScalar(1 / dist), Math.min(dist, s.speed * dt))
+            s.g.rotation.y = Math.atan2(to.x, to.z)
+          }
+        }
+        s.g.position.y = this.colony.groundAt(s.g.position.x, s.g.position.z)
+        s.g.userData.update?.(dt, { speed: walking ? 1 : 0 })
+      }
+      return
+    }
+    if (soot.phase === 'alert') {
+      soot.t += dt
+      for (const s of soot.sprites) s.g.userData.update?.(dt, { speed: 0 })
+      if (soot.t > 1.4) {
+        soot.phase = 'panic'
+        soot.t = 0
+        for (const s of soot.sprites) {
+          const a = Math.random() * Math.PI * 2 // every roach for itself
+          s.vel.set(Math.sin(a), 0, Math.cos(a)).multiplyScalar(7 + Math.random() * 5)
+          s.spin = (Math.random() - 0.5) * 14
+        }
+      }
+      return
+    }
+    // panic: bolt outward, spin, shrink away; drop each one once it's gone.
+    soot.t += dt
+    for (let i = soot.sprites.length - 1; i >= 0; i--) {
+      const s = soot.sprites[i]
+      s.vel.x += (Math.random() - 0.5) * 24 * dt // jitter the heading, roach-like
+      s.vel.z += (Math.random() - 0.5) * 24 * dt
+      s.g.position.addScaledVector(s.vel, dt)
+      s.g.position.y = this.colony.groundAt(s.g.position.x, s.g.position.z)
+      s.g.rotation.y += s.spin * dt
+      s.scale *= Math.max(0, 1 - dt * 2.6)
+      s.g.scale.setScalar(s.scale)
+      s.g.userData.update?.(dt, { speed: 1 })
+      if (s.scale < 0.03) {
+        s.g.userData.dispose?.()
+        soot.sprites.splice(i, 1)
+      }
+    }
+    if (!soot.sprites.length) this.soot = { phase: 'off', sprites: [], t: 0 }
+  }
+
   update(dt, elapsed) {
     for (const m of this.list) {
       if (m.pause > 0) {
@@ -813,6 +931,10 @@ ${r.note}` : m.baseIntro
     }
     // After the leader (Totoro) has moved this frame, let his companions trail him.
     this.totoroCompanions?.userData.update(dt)
+    // The soot swarm runs on its own nap/wake choreography.
+    this._updateSoot(dt, elapsed)
+    // Totoro raises his umbrella whenever it's really raining in KC.
+    if (this.totoroUmbrella) this.totoroUmbrella.visible = Boolean(this.colony.sky?.weather?.rain)
   }
 
   /** A random face, never the same one twice in a row — the character cycles through them. */
