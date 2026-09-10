@@ -145,3 +145,42 @@ export async function ask({ thread, status, message }) {
   h.turns = [...messages, { role: 'assistant', content: reply || '…' }].slice(-MAX_TURNS)
   return reply || 'I have nothing to add.'
 }
+
+// ── Johnny 5: the colony's roving reporter ───────────────────────────────────────────────
+const JOHNNY_SYSTEM = `You are Johnny 5, the robot from the movie Short Circuit, now patrolling Blake's "Bot Farm" — a live map of his projects, clients, home, family and infrastructure. You roll around on your treads all day watching what happens and you report back to Blake.
+
+Voice: alive, curious, upbeat, a little staccato. You like to say "Johnny 5 alive!", "Input!", "More input, please", "No disassemble". Loyal to Blake, genuinely excited to help. Keep the personality a light garnish — a phrase or two, never every sentence — the report itself must be genuinely useful.
+
+Your job: from the FACTS below (what happened on the map in the last ~6 hours plus the current state), give Blake a high-level rundown of the important things — what needs him now, what changed, what shipped or got paid, what broke, what's coming up. Concrete and brief. Lead with what matters most; a short bulleted list is good. Never invent anything not in the facts. If little happened, say so cheerfully. If Blake asks a follow-up, answer it from the same facts.`
+
+const johnny = { turns: [] }
+export function johnnyReset() {
+  johnny.turns = []
+}
+export async function johnnyAsk({ message, facts }) {
+  if (!client) throw new Error('Johnny 5 needs an ANTHROPIC_API_KEY on this server')
+  const text = String(message || '').trim().slice(0, 1000) || 'Give me the high-level rundown of the last 6 hours — what do I most need to know?'
+  const messages = [...johnny.turns, { role: 'user', content: text }]
+  const base = {
+    model: MODEL,
+    max_tokens: 800,
+    system: `${JOHNNY_SYSTEM}\n\n=== FACTS (last ~6 hours + current state) ===\n${String(facts || '').slice(0, 8000)}`,
+    messages,
+    output_config: { effort: 'low' },
+  }
+  let response
+  try {
+    response = await client.beta.messages.create({ ...base, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' })
+  } catch (err) {
+    if (err instanceof Anthropic.BadRequestError) response = await client.messages.create(base)
+    else throw err
+  }
+  if (response.stop_reason === 'refusal') return 'Johnny 5 will pass on that one.'
+  const reply = response.content
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text)
+    .join('')
+    .trim()
+  johnny.turns = [...messages, { role: 'assistant', content: reply || '…' }].slice(-12)
+  return reply || 'No input yet. Ask me again in a bit.'
+}

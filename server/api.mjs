@@ -11,7 +11,7 @@ import {
   scanThreads,
   setThreadArchived,
 } from './scan.mjs'
-import { ask, chatEnabled } from './ask.mjs'
+import { ask, chatEnabled, johnnyAsk } from './ask.mjs'
 import { setProjectStatus, closeTask, completeChores, createTicket, janineDraftAction, nudgeClient, clearSay } from './act.mjs'
 import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
 import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGenerate, update as newsUpdate, topicById, todayKC, newsEnabled } from './news.mjs'
@@ -83,6 +83,31 @@ async function timelineToday() {
     .sort((a, b) => a.at - b.at)
     .slice(-16)
     .map((e) => `${fmt.format(new Date(e.at))} ${e.text}`)
+}
+
+/** A compact fact sheet for Johnny 5: what needs Blake, what changed, what's due, spend. */
+async function johnnyFacts() {
+  const threads = (await scanThreads()).filter((t) => !t.archived)
+  const nl = String.fromCharCode(10)
+  const line = (t) => `• ${String(t.title || '').replace(/\s+/g, ' ')} (${t.project})${t.preview ? ` — ${String(t.preview).split(nl)[0].slice(0, 120)}` : ''}`
+  const needs = threads.filter((t) => t.unread || t.hasError)
+  const errors = needs.filter((t) => t.hasError)
+  const waiting = needs.filter((t) => !t.hasError)
+  const deadlines = threads.filter((t) => t.id.startsWith('deadline:') && t.id !== 'deadline:post')
+  const paid = threads.filter((t) => t.project === 'Pay me mother fucker')
+  const spend = threads.find((t) => t.id === 'keys:spend')?.details?.Today || ''
+  const recent = (await timelineToday().catch(() => [])).slice(-14)
+  return [
+    `NEEDS BLAKE NOW (${needs.length}):`,
+    errors.length ? `Broken/errored:${nl}${errors.map(line).join(nl)}` : 'Nothing broken right now.',
+    waiting.length ? `Waiting on him:${nl}${waiting.map(line).join(nl)}` : '',
+    `${nl}RECENT ACTIVITY today (▲ went up / ▼ cleared / ✅ shipped / 🖨 print):${nl}${recent.length ? recent.join(nl) : 'quiet so far'}`,
+    deadlines.length ? `${nl}UPCOMING:${nl}${deadlines.map((t) => `• ${t.title.replace(/^[^\w]+\s*/, '')} — ${t.plate || t.preview}`).join(nl)}` : '',
+    paid.length ? `${nl}TO GET PAID / SHIPPED:${nl}${paid.map((t) => `• ${t.title.replace(/^[^\w]+\s*/, '')} ${t.plate || ''}`).join(nl)}` : '',
+    spend ? `${nl}API SPEND TODAY: ${spend}` : '',
+  ]
+    .filter(Boolean)
+    .join(nl)
 }
 
 // ── the ledger: money on the map, added up ───────────────────────────────────────────────
@@ -717,6 +742,18 @@ export async function apiMiddleware(req, res, next) {
       const thread = threads.find((t) => t.id === id)
       if (!thread) return send(res, 404, { error: 'That worker has walked off the map' })
       const reply = await ask({ thread, status: statusWord(thread), message })
+      return send(res, 200, { reply })
+    }
+
+    // Johnny 5's rundown: a 6-hour, high-level report in his voice, plus follow-up questions.
+    if (url.pathname === '/api/johnny' && req.method === 'POST') {
+      if (!chatEnabled()) return send(res, 503, { error: 'Johnny 5 is offline (no chat key)' })
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to talk to Johnny 5', signIn: '/api/ask/auth' })
+      if (!chatAllowed(`johnny:${who}`)) return send(res, 429, { error: 'Give Johnny 5 a minute' })
+      const { message } = await readJsonBody(req, 16 * 1024)
+      const facts = await johnnyFacts()
+      const reply = await johnnyAsk({ message, facts })
       return send(res, 200, { reply })
     }
 

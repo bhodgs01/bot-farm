@@ -178,6 +178,59 @@ function showPetCard(m, e) {
   petCard.style.top = `${Math.min(e.clientY + 16, window.innerHeight - petCard.offsetHeight - 8)}px`
 }
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
+
+// Johnny 5's report card: on first open he gives a 6-hour rundown; then Blake can ask him more.
+const johnnyCard = document.createElement('div')
+johnnyCard.className = 'johnny-card'
+johnnyCard.hidden = true
+johnnyCard.innerHTML =
+  '<header><b>🤖 Johnny 5 — the rounds</b><button class="jx" title="Close" aria-label="Close">✕</button></header>' +
+  '<div class="jlog"></div>' +
+  '<form class="jform"><input placeholder="Ask Johnny 5 more…" autocomplete="off" maxlength="500"><button type="submit">Ask</button></form>'
+document.body.appendChild(johnnyCard)
+const jlog = johnnyCard.querySelector('.jlog')
+const jform = johnnyCard.querySelector('.jform')
+const jinput = jform.querySelector('input')
+johnnyCard.querySelector('.jx').addEventListener('click', () => {
+  johnnyCard.hidden = true
+})
+function jbubble(who, text, cls) {
+  const d = document.createElement('div')
+  d.className = `jmsg ${cls}`
+  d.innerHTML = `<span class="jwho">${esc(who)}</span><span class="jtext">${esc(text).replace(/\n/g, '<br>')}</span>`
+  jlog.appendChild(d)
+  jlog.scrollTop = jlog.scrollHeight
+  return d
+}
+async function johnnyAskServer(message) {
+  const thinking = jbubble('Johnny 5', '…rolling the colony, checking…', 'j5 thinking')
+  try {
+    const r = await fetch('/api/johnny', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message }) })
+    const d = await r.json().catch(() => ({}))
+    thinking.remove()
+    jbubble('Johnny 5', r.ok ? d.reply || 'No input yet.' : d.error || 'Malfunction. Try again.', 'j5')
+  } catch {
+    thinking.remove()
+    jbubble('Johnny 5', 'Could not reach the server.', 'j5')
+  }
+}
+jform.addEventListener('submit', (ev) => {
+  ev.preventDefault()
+  const q = jinput.value.trim()
+  if (!q) return
+  jbubble('You', q, 'me')
+  jinput.value = ''
+  johnnyAskServer(q)
+})
+let johnnyReported = false
+function showJohnnyCard() {
+  johnnyCard.hidden = false
+  jinput.focus()
+  if (!johnnyReported) {
+    johnnyReported = true
+    johnnyAskServer('') // first open: the six-hour rundown
+  }
+}
 function showHoverTip(agent, e) {
   const t = agent?.thread
   if (!t) {
@@ -822,7 +875,8 @@ engine.canvas.addEventListener('pointerup', (e) => {
   }
   const pet = colony.mascots ? colony.mascots.pick(engine.camera, p.x, p.y, p.aspect) : null
   if (pet) {
-    showPetCard(pet, e)
+    if (pet.kind === 'johnny5') showJohnnyCard()
+    else showPetCard(pet, e)
     return
   }
   petCard.hidden = true

@@ -9,6 +9,7 @@
  */
 import * as THREE from 'three'
 import { FAMILY_IDS, build as buildFamily, preload as preloadFamily } from './family-builders.js'
+import { createJohnny5 } from './johnny-five.js'
 
 const WALK = 1.5 // m/s, an amble
 
@@ -479,6 +480,10 @@ const KINDS = {
 // built group's userData, so these entries only need the builder.
 for (const id of FAMILY_IDS) KINDS[id] = { build: () => buildFamily(id) }
 
+// Johnny 5: a tracked robot who patrols the colony and reports what he's seen. He drives his
+// own treads and arms; the click card is special (a 6-hour rundown), handled in main.js.
+KINDS.johnny5 = { build: createJohnny5, name: 'Johnny 5', intro: 'Johnny 5 is alive! I roll the colony and log what I see. Input, please.' }
+
 /** Characters built to the people contract (arms, legs, swappable faces) walk and emote. */
 const isPerson = (m) => Boolean(m.mesh.userData.arms || m.mesh.userData.legs)
 
@@ -618,6 +623,7 @@ export class Mascots {
     // The whole family walks the colony. Warm their face textures, then spawn each one.
     preloadFamily()
     for (const id of FAMILY_IDS) this.spawn(id)
+    this.spawn('johnny5')
   }
 
   spawn(kind) {
@@ -741,8 +747,10 @@ ${r.note}` : m.baseIntro
         }
       }
       const walking = m.pause <= 0
+      const tracked = m.mesh.userData.locomotion === 'tracks'
       const ground = this.colony.groundAt(m.pos.x, m.pos.z)
-      m.mesh.position.set(m.pos.x, ground + (walking ? Math.abs(Math.sin(elapsed * 8 + m.phase)) * 0.04 : 0), m.pos.z)
+      // A tracked robot rolls flat; only legged mascots get the little walking bob.
+      m.mesh.position.set(m.pos.x, ground + (walking && !tracked ? Math.abs(Math.sin(elapsed * 8 + m.phase)) * 0.04 : 0), m.pos.z)
       m.mesh.rotation.y = m.yaw
       this._applyReminder(m)
       if (m.nameplate) m.nameplate.position.set(m.pos.x, m.mesh.position.y + m.nameOffset, m.pos.z)
@@ -756,9 +764,10 @@ ${r.note}` : m.baseIntro
         const open = (Math.sin(elapsed * 3 + m.phase) * 0.5 + 0.5) * 0.5
         for (const claw of m.mesh.userData.claws) claw.userData.jaw.rotation.x = -open
       }
-      // People: swing arms and legs while walking (opposite each other), a slow look-around
-      // when standing, and a face that changes with the mood of the map.
-      if (isPerson(m)) {
+      // Johnny 5 drives his own treads, head scan, and arms; a person swings their limbs.
+      if (tracked) {
+        m.mesh.userData.update?.(dt, { speed: walking ? 1.1 : 0, turn: 0 })
+      } else if (isPerson(m)) {
         m.gait += ((walking ? 1 : 0) - m.gait) * Math.min(1, dt * 6)
         const swing = Math.sin(elapsed * 7 + m.phase) * m.gait
         const legs = m.mesh.userData.legs
@@ -772,10 +781,11 @@ ${r.note}` : m.baseIntro
           if (arms[1]) arms[1].rotation.x = swing * 0.4
         }
         if (m.mesh.userData.head) m.mesh.userData.head.rotation.y = Math.sin(elapsed * 0.6 + m.phase) * 0.22 * (1 - m.gait)
-        if (m.mesh.userData.expressions && elapsed >= m.exprUntil) {
-          this._setExpression(m, this._pickExpression(m))
-          m.exprUntil = elapsed + 2 + Math.random() // a fresh face every 2-3 seconds
-        }
+      }
+      // A fresh random face every 2-3 seconds for anyone who has expressions (family + Johnny 5).
+      if (m.mesh.userData.expressions && elapsed >= m.exprUntil) {
+        this._setExpression(m, this._pickExpression(m))
+        m.exprUntil = elapsed + 2 + Math.random()
       }
     }
   }
@@ -795,6 +805,12 @@ ${r.note}` : m.baseIntro
     if (!ex || m.expr === name) return
     if (!ex[name]) name = 'neutral'
     m.expr = name
+    // Prefer the model's own switcher (Johnny 5 and the family both expose one) so poses tied to
+    // an expression — Johnny 5's surprised arm-raise — fire; otherwise fall back to visibility.
+    if (typeof m.mesh.userData.setExpression === 'function') {
+      m.mesh.userData.setExpression(name)
+      return
+    }
     for (const [k, meshes] of Object.entries(ex)) {
       const on = k === name
       for (const mesh of meshes) mesh.visible = on
