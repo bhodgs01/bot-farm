@@ -25,6 +25,7 @@ import {
   actProject,
   actTask,
   actChore,
+  actSay,
   actTicket,
   actJanine,
   actNudge,
@@ -359,6 +360,17 @@ const actions = {
         setTimeout(poll, 3200)
         return
       }
+      if (status === 'seen') {
+        const kid = thread.ref?.kid
+        await actSay(kid)
+        hud.toast(`Got it — ${thread.title.replace(/^\S+\s*/, '')}'s note is cleared`)
+        // Drop the bubble and the raised hand now; the next scan says the same thing.
+        rig.follow(null)
+        colony.mascots?.setSays({ ...(familySays = { ...familySays, [kid]: '' }) })
+        colony.beamUp(thread.id)
+        setTimeout(poll, 1200)
+        return
+      }
       if (thread.harness === 'chores' && status === 'chore') {
         await actChore(thread.ref?.ids || [])
         hud.toast(`Done: ${thread.title}`)
@@ -557,7 +569,16 @@ function select(id, { fly = false, mode } = {}) {
   if (thread?.project && colony.plots.has(thread.project)) selectedProject = thread.project
   syncProject()
   if (fly) {
-    rig.focus(new THREE.Vector3(agent.pos.x, 0, agent.pos.z), { distance: Math.min(rig.desiredDistance, 26) })
+    const kid = thread?.ref?.kid
+    const m = kid && colony.mascots ? colony.mascots.list.find((x) => x.kind === kid) : null
+    if (m) {
+      // They walk. Follow them, the way the F key follows an astronaut, so the bubble
+      // stays on screen instead of sliding out of frame two seconds after landing.
+      rig.follow(() => ({ x: m.pos.x, z: m.pos.z }))
+      rig.desiredDistance = Math.min(rig.desiredDistance, 14)
+    } else {
+      rig.focus(new THREE.Vector3(agent.pos.x, 0, agent.pos.z), { distance: Math.min(rig.desiredDistance, 26) })
+    }
   }
 }
 

@@ -672,7 +672,7 @@ export class Hud {
     if (intro) introBox.querySelector('p').textContent = thread.intro
     // Stage buttons: what this thread can be moved to next.
     const stage = this.$('.thread-pop .stage')
-    const STAGE_LABEL = { active: 'Make active', in_process: 'Start work', completed: 'Mark complete', paid: 'Paid ✓', done: 'Close ticket ✓', chore: 'Done ✓', read: 'Read ✓', ticket: '🎫 Make it a ticket', join: '📹 Join', record: '🎙️ Record', nudge: '💌 Nudge (draft)', approve: 'Send it ✓', skip: 'Skip', ack: 'Remove flag', unack: 'Flag again', star: '★ Star', unstar: 'Unstar' }
+    const STAGE_LABEL = { active: 'Make active', in_process: 'Start work', completed: 'Mark complete', paid: 'Paid ✓', done: 'Close ticket ✓', chore: 'Done ✓', seen: 'Got it ✓', read: 'Read ✓', ticket: '🎫 Make it a ticket', join: '📹 Join', record: '🎙️ Record', nudge: '💌 Nudge (draft)', approve: 'Send it ✓', skip: 'Skip', ack: 'Remove flag', unack: 'Flag again', star: '★ Star', unstar: 'Unstar' }
     // A flagged worker offers to have the flag removed; an acknowledged one offers it back.
     this.renderReader(thread)
     if (intro) this.$('.thread-pop .reader').hidden = true
@@ -681,7 +681,7 @@ export class Hud {
     // A finished job with a client address can be nudged: a reminder drafted into Gmail, never sent from here.
     const nudgeable = thread.project === 'Completed' && thread.details?.Email
     const acts = (Array.isArray(thread.actions) ? thread.actions : []).filter((a) => !(hasStories && a === 'read')).concat(nudgeable ? ['nudge'] : []).concat(ticketable ? ['ticket'] : []).concat(thread.hasError ? ['ack'] : thread.acked ? ['unack'] : []).concat(thread.watched ? ['unstar'] : ['star'])
-    stage.innerHTML = acts.map((a) => `<button class="btn ${a === 'paid' || a === 'done' || a === 'chore' || a === 'approve' ? 'primary' : ''}" data-stage="${escapeHtml(a)}">${escapeHtml(STAGE_LABEL[a] || a)}</button>`).join('')
+    stage.innerHTML = acts.map((a) => `<button class="btn ${a === 'paid' || a === 'done' || a === 'chore' || a === 'seen' || a === 'approve' ? 'primary' : ''}" data-stage="${escapeHtml(a)}">${escapeHtml(STAGE_LABEL[a] || a)}</button>`).join('')
     stage.hidden = intro || acts.length === 0
     for (const b of stage.querySelectorAll('button')) b.addEventListener('click', () => this.actions.stageThread?.(b.dataset.stage))
 

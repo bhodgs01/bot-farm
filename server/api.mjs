@@ -12,7 +12,7 @@ import {
   setThreadArchived,
 } from './scan.mjs'
 import { ask, chatEnabled } from './ask.mjs'
-import { setProjectStatus, closeTask, completeChores, createTicket, janineDraftAction, nudgeClient } from './act.mjs'
+import { setProjectStatus, closeTask, completeChores, createTicket, janineDraftAction, nudgeClient, clearSay } from './act.mjs'
 import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
 import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGenerate, update as newsUpdate, topicById, todayKC, newsEnabled } from './news.mjs'
 import { refreshNews } from './harnesses/news.mjs'
@@ -583,6 +583,20 @@ export async function apiMiddleware(req, res, next) {
       const a = await ack(thread, who)
       console.log(`act: ${who} removed the flag on ${id} (${a.key.slice(0, 80)})`)
       return send(res, 200, { ok: true, acked: true })
+    }
+
+    // Blake read a kid's note. Acknowledging clears it, here and in Chore Quest.
+    if (url.pathname === '/api/act/say' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to answer the kids', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      const { kid } = await readJsonBody(req, 4 * 1024)
+      if (typeof kid !== 'string' || !kid) return send(res, 400, { error: 'Bad kid' })
+      try {
+        return send(res, 200, { ok: true, ...(await clearSay({ kid, who })) })
+      } catch (err) {
+        return send(res, 502, { error: String(err.message || err) })
+      }
     }
 
     if (url.pathname === '/api/act/task' && req.method === 'POST') {

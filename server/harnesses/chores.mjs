@@ -16,6 +16,7 @@ const URL = process.env.CHORES_URL || 'http://chore-quest.chore-quest.svc.cluste
 const OPEN_URL = process.env.CHORES_OPEN_URL || 'https://chores.kcproto.com'
 const TTL_MS = 30 * 1000
 const ZONE = 'Chores'
+const SAY_ZONE = 'Home'
 const NL = String.fromCharCode(10)
 
 /** The chore's first line, without the photo link Chore Quest tacks on. */
@@ -72,6 +73,61 @@ export async function familyChores() {
       .filter((h) => (seen.has(h) ? false : (seen.add(h), true)))
   }
   return out
+}
+
+/**
+ * One raised hand per kid with a note today. It is a plain `unread` thread, so statusFor()
+ * lands it on 'waiting' — "Waiting on you" — and it joins the Needs-you queue with
+ * everything else asking for a human. Clearing it is the whole point of the action: Blake
+ * reads it, hits Got it, and the note goes away in Chore Quest and off the map together.
+ */
+async function sayThreads() {
+  const says = await familySays().catch(() => ({}))
+  if (!Object.keys(says).length) return []
+  const now = Date.now()
+  const state = await familyState().catch(() => ({}))
+  const raw = state.says || {}
+  return Object.entries(says).map(([kid, text]) => {
+    const at = Number(raw[kid] && raw[kid].ts) || now
+    const name = kid.charAt(0).toUpperCase() + kid.slice(1)
+    return {
+      id: `say:${kid}`,
+      kind: 'say',
+      title: `\u{1F4AC} ${name}`,
+      preview: text,
+      details: {
+        From: name,
+        Said: text,
+        When: new Date(at).toLocaleString('en-US', { timeZone: 'America/Chicago' }),
+        Where: 'Typed on their own card in Chore Quest',
+      },
+      project: SAY_ZONE,
+      projectPath: 'home://chore-quest',
+      worktree: '',
+      cwd: 'chore-quest',
+      gitBranch: 'wants you to know',
+      model: '',
+      effort: '',
+      createdAt: at,
+      lastActivityAt: at,
+      lastFocusedAt: 0,
+      running: false,
+      unread: true,
+      hasError: false,
+      starred: false,
+      routine: '',
+      prState: '',
+      archived: false,
+      hasTranscript: false,
+      count: 0,
+      sizeBytes: 2000,
+      source: 'chore-quest',
+      canOpen: true,
+      canArchive: false,
+      actions: ['seen'],
+      ref: { kid },
+    }
+  })
 }
 
 async function fetchThreads() {
@@ -184,7 +240,8 @@ async function scanThreads() {
   const age = Date.now() - cache.at
   if (cache.data && age < TTL_MS) return cache.data
   if (!cache.inflight) {
-    cache.inflight = fetchThreads()
+    cache.inflight = Promise.all([sayThreads(), fetchThreads()])
+      .then(([says, chores]) => [...says, ...chores])
       .then((data) => {
         cache = { at: Date.now(), data, inflight: null }
         return data

@@ -79,6 +79,37 @@ export async function completeChores({ ids, who }) {
   return changed
 }
 
+/**
+ * Blake read a kid's note: clear it. Same read-modify-write-verify as completeChores,
+ * against the same Chore Quest state document. Clearing is the acknowledgement — the note
+ * leaves the kid's card in Chore Quest and the speech bubble leaves their head on the map,
+ * together, so the two can never disagree about whether it still stands.
+ */
+export async function clearSay({ kid, who }) {
+  const id = String(kid || '').toLowerCase()
+  if (!['kai', 'maya', 'ema'].includes(id)) throw new Error(`Not a kid: ${kid}`)
+  const get = async () => {
+    const r = await fetch(`${CHORES}/api/state`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) })
+    if (!r.ok) throw new Error(`chores read → ${r.status}`)
+    return r.json()
+  }
+  const state = await get()
+  const said = state.says && state.says[id] ? String(state.says[id].text || '') : ''
+  if (!said) {
+    refreshChores()
+    return { cleared: false, text: '' }
+  }
+  state.says = { ...state.says }
+  delete state.says[id]
+  const r = await fetch(`${CHORES}/api/state`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state), signal: AbortSignal.timeout(10000) })
+  if (!r.ok) throw new Error(`chores write → ${r.status}`)
+  const after = await get()
+  if (after.says && after.says[id]) throw new Error('Chore Quest did not keep the change')
+  console.log(`act: ${who} acknowledged ${id}'s note (${said.slice(0, 60)})`)
+  refreshChores()
+  return { cleared: true, text: said }
+}
+
 /** Move one project to a new status. Returns the updated entry. */
 export async function setProjectStatus({ id, status, who }) {
   if (!ALLOWED.has(status)) throw new Error(`Not a board status: ${status}`)
