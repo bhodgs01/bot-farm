@@ -1509,6 +1509,8 @@ function applyThreads(list) {
   }
   // Keep the crew tile's alert dots (Ema's unread heart) honest on the same beat as threads.
   renderCrew()
+  // And float a heart over the Ema mascot herself when she's texted on the Dada chat.
+  colony.mascots?.setAlert('ema', threads.some((t) => t.id === 'dada:ema' && t.unread))
 }
 
 let polling = false

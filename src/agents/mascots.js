@@ -535,6 +535,23 @@ function makeNameplate(text) {
  * tail pointing down at them, wrapped to at most three lines. Same canvas-sprite trick as
  * the nameplate, so it always faces the camera and costs one draw call.
  */
+/** A little pink heart to float over a family member — Ema wears one when she's texted. */
+function makeHeart() {
+  const s = 128
+  const c = document.createElement('canvas')
+  c.width = c.height = s
+  const ctx = c.getContext('2d')
+  ctx.font = '96px system-ui, -apple-system, "Segoe UI Emoji", sans-serif'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText('💗', s / 2, s / 2 + 6)
+  const t = new THREE.CanvasTexture(c)
+  t.colorSpace = THREE.SRGBColorSpace
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false }))
+  sp.scale.set(0.72, 0.72, 1)
+  return sp
+}
+
 function makeSpeechBubble(text) {
   const cw = 512
   const pad = 26
@@ -720,6 +737,21 @@ export class Mascots {
     }
   }
 
+  /** Float a heart over a family member (Ema when she's texted on the Dada chat), or clear it. */
+  setAlert(kind, on) {
+    const m = this.list.find((x) => x.kind === kind)
+    if (!m) return
+    if (on && !m.alert) {
+      m.alert = makeHeart()
+      this.group.add(m.alert)
+    } else if (!on && m.alert) {
+      this.group.remove(m.alert)
+      m.alert.material.map?.dispose?.()
+      m.alert.material.dispose?.()
+      m.alert = null
+    }
+  }
+
   /** A pet with a reminder (Pickle on Fridays) wears a 🦗 on its name and adds a line to its card. */
   _applyReminder(m) {
     if (!m.reminderFn) return
@@ -895,6 +927,13 @@ ${r.note}` : m.baseIntro
       if (m.bubble) {
         const lift = m.mesh.position.y + m.nameOffset + 0.32 + (m.bubble.userData.worldH || 0.6) / 2
         m.bubble.position.set(m.pos.x, lift + Math.sin(elapsed * 1.6 + m.phase) * 0.03, m.pos.z)
+      }
+      if (m.alert) {
+        // A heartbeat bob just over the head; sits above a speech bubble if she has one too.
+        const base = m.mesh.position.y + m.nameOffset + 0.5 + (m.bubble ? 0.7 : 0)
+        m.alert.position.set(m.pos.x, base + Math.sin(elapsed * 2.4 + m.phase) * 0.05, m.pos.z)
+        const beat = 1 + Math.max(0, Math.sin(elapsed * 3 + m.phase)) * 0.12
+        m.alert.scale.set(0.72 * beat, 0.72 * beat, 1)
       }
       // Character: the dog wags, the lobster works its claws.
       if (m.kind === 'dog' && m.mesh.userData.tail) m.mesh.userData.tail.rotation.y = Math.sin(elapsed * 9 + m.phase) * 0.6
