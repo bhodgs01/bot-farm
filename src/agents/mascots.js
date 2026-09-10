@@ -11,6 +11,7 @@ import * as THREE from 'three'
 import { FAMILY_IDS, build as buildFamily, preload as preloadFamily } from './family-builders.js'
 import { createJohnny5 } from './johnny-five.js'
 import { createTotoro } from './totoro.js'
+import { createTotoroProcession } from './totoro-companions.js'
 
 const WALK = 1.5 // m/s, an amble
 
@@ -631,6 +632,14 @@ export class Mascots {
     for (const id of FAMILY_IDS) this.spawn(id)
     this.spawn('johnny5')
     this.spawn('totoro')
+    // Totoro's little ones — Chu (blue) and Chibi (white) — hop along behind him. They're not
+    // wanderers with cards of their own; a procession controller trails the main Totoro, so
+    // they stay out of this.list (no pick, no crew tile, no card) and just follow and hop.
+    const totoro = this.list.find((m) => m.kind === 'totoro')
+    if (totoro) {
+      this.totoroCompanions = createTotoroProcession(totoro.mesh)
+      this.group.add(this.totoroCompanions)
+    }
   }
 
   spawn(kind) {
@@ -802,6 +811,8 @@ ${r.note}` : m.baseIntro
         m.exprUntil = elapsed + 2 + Math.random()
       }
     }
+    // After the leader (Totoro) has moved this frame, let his companions trail him.
+    this.totoroCompanions?.userData.update(dt)
   }
 
   /** A random face, never the same one twice in a row — the character cycles through them. */
