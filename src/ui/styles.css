@@ -668,24 +668,45 @@ body {
 }
 .side.collapsed { flex: 0 0 auto; }
 
-/* Crew tile: round faces of the wandering characters, tucked under the Bot Farm panel. */
+/* Crew tile: round faces of the wandering characters, between Bot Farm and Needs you. */
 .crew-tile {
-  flex: none;
-  padding: 10px 12px 12px;
+  flex: 0 0 auto;
 }
-.crew-head {
-  font-size: 11px;
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+.crew-tile .brandbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 8px 8px 15px;
+  flex: none;
+}
+.crew-tile .brand {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+}
+.crew-tile .brand .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent);
+  flex: none;
+}
+.crew-tile .crew-collapse {
+  font-size: 13px;
+  line-height: 1;
   color: var(--muted);
-  margin-bottom: 8px;
 }
 .crew-faces {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  padding: 2px 12px 12px;
 }
+.crew-tile.collapsed .crew-faces { display: none; }
 .crew-face {
   position: relative;
   width: 40px;
@@ -1574,7 +1595,14 @@ kbd {
 .pet-card span { font-size: 12px; line-height: 1.45; color: #cdd6ef; }
 
 .johnny-card[hidden] { display: none !important; }
-.johnny-card { position: fixed; z-index: 60; right: 18px; bottom: 18px; width: min(94vw, 380px); max-height: min(72vh, 560px); display: flex; flex-direction: column; background: rgba(12, 15, 24, 0.96); border: 1px solid rgba(255,255,255,0.14); border-radius: 16px; box-shadow: 0 18px 50px rgba(0,0,0,0.55); overflow: hidden; }
+.johnny-card { position: fixed; z-index: 60; right: 18px; bottom: 18px; width: min(92vw, 350px); max-height: min(68vh, 500px); display: flex; flex-direction: column; background: rgba(12, 15, 24, 0.96); border: 1px solid rgba(255,255,255,0.14); border-radius: 16px; box-shadow: 0 18px 50px rgba(0,0,0,0.55); overflow: hidden; }
+
+/* The closed state: a small chat-bubble circle wearing Johnny 5's face, bottom-right. */
+.johnny-launch { position: fixed; z-index: 59; right: 18px; bottom: 18px; width: 56px; height: 56px; padding: 0; border-radius: 50%; border: 1px solid rgba(255, 209, 102, 0.55); background: radial-gradient(circle at 42% 32%, #2a2f3e, #12141c); color: #fff; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,0.45); display: grid; place-items: center; overflow: hidden; transition: transform 120ms ease, box-shadow 120ms ease; }
+.johnny-launch:hover { transform: translateY(-2px) scale(1.05); box-shadow: 0 12px 30px rgba(0,0,0,0.55); }
+.johnny-launch[hidden] { display: none !important; }
+.johnny-launch img { width: 100%; height: 100%; object-fit: cover; object-position: top center; }
+.johnny-launch .j5-ico { font-size: 27px; line-height: 1; }
 .johnny-card header { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); }
 .johnny-card header b { font-size: 14px; color: #fff; }
 .johnny-card .jx { background: none; border: 0; color: #98a2c0; font-size: 15px; cursor: pointer; padding: 2px 6px; border-radius: 6px; }

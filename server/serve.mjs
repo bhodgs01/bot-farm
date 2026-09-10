@@ -46,6 +46,13 @@ const server = http.createServer(async (req, res) => {
 
   // Same-origin password gate for the public map host. News and localhost are never gated.
   if (needsAuth(req.headers.host)) {
+    // The PWA shell assets — the web manifest and its icons — are fetched by the browser
+    // WITHOUT credentials (a manifest link sends no cookie unless it's use-credentials), so
+    // they must pass the gate or the browser gets the login HTML where it expects the icon
+    // or the manifest JSON ("Manifest: Syntax error"). They carry no data, so this is safe.
+    const publicAsset =
+      url.pathname === '/manifest.webmanifest' ||
+      /^\/(icon-(192|512|maskable-192|maskable-512)\.png|apple-touch-icon\.png|favicon\.ico)$/.test(url.pathname)
     if (url.pathname === '/api/login' && req.method === 'POST') {
       let body = ''
       req.on('data', (c) => {
@@ -67,7 +74,7 @@ const server = http.createServer(async (req, res) => {
       })
       return
     }
-    if (!hasValidAuth(req)) {
+    if (!publicAsset && !hasValidAuth(req)) {
       if (url.pathname.startsWith('/api/')) {
         res.writeHead(401, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }).end('{"error":"auth required"}')
         return

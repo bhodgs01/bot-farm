@@ -191,8 +191,21 @@ document.body.appendChild(johnnyCard)
 const jlog = johnnyCard.querySelector('.jlog')
 const jform = johnnyCard.querySelector('.jform')
 const jinput = jform.querySelector('input')
+
+// The chat launcher: a standard little circle in the corner wearing Johnny 5's face. It sits
+// there closed by default; click it and the card above expands. Closing the card brings the
+// circle back — the same open/close a support-chat widget uses.
+const johnnyLaunch = document.createElement('button')
+johnnyLaunch.className = 'johnny-launch'
+johnnyLaunch.title = 'Johnny 5 — the rounds'
+johnnyLaunch.setAttribute('aria-label', 'Open Johnny 5')
+johnnyLaunch.innerHTML = '<img src="/johnny5-face.png" alt="" draggable="false" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{className:\'j5-ico\',textContent:\'🤖\'}))">'
+document.body.appendChild(johnnyLaunch)
+johnnyLaunch.addEventListener('click', () => showJohnnyCard())
+
 johnnyCard.querySelector('.jx').addEventListener('click', () => {
   johnnyCard.hidden = true
+  johnnyLaunch.hidden = false
 })
 function jbubble(who, text, cls) {
   const d = document.createElement('div')
@@ -225,6 +238,7 @@ jform.addEventListener('submit', (ev) => {
 let johnnyReported = false
 function showJohnnyCard() {
   johnnyCard.hidden = false
+  johnnyLaunch.hidden = true
   jinput.focus()
   if (!johnnyReported) {
     johnnyReported = true
@@ -610,9 +624,34 @@ const CREW_EMOJI = { dog: '🐕', lobster: '🦞', gecko: '🦎', johnny5: '🤖
 const crewTile = document.createElement('div')
 crewTile.className = 'crew-tile panel'
 crewTile.hidden = true
-crewTile.innerHTML = '<div class="crew-head">Crew</div><div class="crew-faces"></div>'
+crewTile.innerHTML =
+  '<header class="brandbar"><div class="brand"><i class="dot"></i>Crew</div>' +
+  '<button class="btn icon ghost crew-collapse" title="Collapse the crew" aria-label="Collapse the crew">▾</button></header>' +
+  '<div class="crew-faces"></div>'
 const crewFaces = crewTile.querySelector('.crew-faces')
-document.querySelector('.stack')?.appendChild(crewTile)
+const crewCollapseBtn = crewTile.querySelector('.crew-collapse')
+// Sit directly under the Bot Farm panel and above Needs you, not at the very bottom.
+const stackEl = document.querySelector('.stack')
+if (stackEl) stackEl.insertBefore(crewTile, stackEl.querySelector('.queue-card') || null)
+
+// Fold down to just the header, remembered per browser — same as the Needs-you card.
+let crewCollapsed = false
+try {
+  crewCollapsed = localStorage.getItem('botfarm.crew.collapsed') === '1'
+} catch {}
+function applyCrewCollapse() {
+  crewTile.classList.toggle('collapsed', crewCollapsed)
+  crewCollapseBtn.textContent = crewCollapsed ? '▸' : '▾'
+  crewCollapseBtn.title = crewCollapsed ? 'Expand the crew' : 'Collapse the crew'
+}
+crewCollapseBtn.addEventListener('click', () => {
+  crewCollapsed = !crewCollapsed
+  try {
+    localStorage.setItem('botfarm.crew.collapsed', crewCollapsed ? '1' : '0')
+  } catch {}
+  applyCrewCollapse()
+})
+applyCrewCollapse()
 
 function flyToMascot(m) {
   // Follow them the way the F key follows an astronaut, so they don't stroll back out of
@@ -644,9 +683,13 @@ function renderCrew() {
       b.className = 'crew-face'
       b.title = `Fly to ${m.name}`
       b.dataset.kind = m.kind
-      const face = FAMILY.has(m.kind)
-        ? `<img src="/family/${m.kind}-neutral.png" alt="" draggable="false">`
-        : `<span class="crew-emoji">${CREW_EMOJI[m.kind] || '🙂'}</span>`
+      // Family wear their photo; Johnny 5 his rendered face; the pets an emoji. A face image
+      // that 404s (no Johnny 5 art yet) quietly falls back to the emoji.
+      const emoji = `<span class="crew-emoji">${CREW_EMOJI[m.kind] || '🙂'}</span>`
+      const faceSrc = FAMILY.has(m.kind) ? `/family/${m.kind}-neutral.png` : m.kind === 'johnny5' ? '/johnny5-face.png' : ''
+      const face = faceSrc
+        ? `<img src="${faceSrc}" alt="" draggable="false" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'crew-emoji',textContent:'${CREW_EMOJI[m.kind] || '🙂'}'}))">`
+        : emoji
       b.innerHTML = `${face}<i class="crew-dot" hidden></i>`
       b.addEventListener('click', () => flyToMascot(m))
       crewFaces.appendChild(b)

@@ -198,7 +198,10 @@ async function fetchThreads() {
       sizeBytes: meta.size,
       source: 'gmail',
       canOpen: true,
-      canArchive: false,
+      // A mail is a to-do, not a live health check: Blake can archive one off the map once
+      // he's handled it (an answered print inquiry, a read notice). It stays gone until it
+      // drops out of the inbox window on its own.
+      canArchive: true,
       ref: { threadId: meta.threadId, id: meta.id },
     })
   }
