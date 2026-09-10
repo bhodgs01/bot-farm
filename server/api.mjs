@@ -17,7 +17,7 @@ import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
 import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGenerate, update as newsUpdate, topicById, todayKC, newsEnabled } from './news.mjs'
 import { refreshNews } from './harnesses/news.mjs'
 import { napMode, fetchNap } from './harnesses/home.mjs'
-import { familyChores } from './harnesses/chores.mjs'
+import { familyChores, familySays } from './harnesses/chores.mjs'
 import { hasValidAuth } from './auth.mjs'
 import { plexArt } from './harnesses/plex.mjs'
 import { withIntros } from './intro.mjs'
@@ -768,6 +768,15 @@ export async function apiMiddleware(req, res, next) {
     if (url.pathname === '/api/family-chores' && req.method === 'GET') {
       try {
         return send(res, 200, await familyChores())
+      } catch {
+        return send(res, 200, {})
+      }
+    }
+
+    // What each kid typed in Chore Quest today, for the speech bubble over their character.
+    if (url.pathname === '/api/family-says' && req.method === 'GET') {
+      try {
+        return send(res, 200, await familySays())
       } catch {
         return send(res, 200, {})
       }

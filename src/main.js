@@ -137,6 +137,20 @@ async function loadFamilyChores() {
 loadFamilyChores()
 setInterval(loadFamilyChores, 60000)
 
+// What each kid typed into Chore Quest today. It rides over their character's head as a
+// speech bubble, so a note left on the fridge app shows up on the map.
+let familySays = {}
+async function loadFamilySays() {
+  try {
+    familySays = (await (await fetch('/api/family-says')).json()) || {}
+  } catch {
+    return // keep the last good copy
+  }
+  colony.mascots?.setSays(familySays)
+}
+loadFamilySays()
+setInterval(loadFamilySays, 30000)
+
 /** The one-line subtitle under a mascot's name on hover. People are not "wandering pets". */
 function petSubtitle(m) {
   if (PETS.has(m.kind)) return 'a wandering pet'

@@ -516,6 +516,93 @@ function makeNameplate(text) {
   return sp
 }
 
+/**
+ * A comic speech bubble that floats over a character's head: rounded white panel with a
+ * tail pointing down at them, wrapped to at most three lines. Same canvas-sprite trick as
+ * the nameplate, so it always faces the camera and costs one draw call.
+ */
+function makeSpeechBubble(text) {
+  const cw = 512
+  const pad = 26
+  const lh = 44
+  const tail = 22
+  const font = "600 34px system-ui, -apple-system, 'Segoe UI', sans-serif"
+  const measure = document.createElement('canvas').getContext('2d')
+  measure.font = font
+
+  // Wrap to the panel width, at most three lines, ellipsis on the last if it overruns.
+  const maxText = cw - pad * 2 - 20
+  const lines = []
+  let line = ''
+  let truncated = false
+  const words = String(text).split(/\s+/).filter(Boolean)
+  for (let i = 0; i < words.length; i++) {
+    const next = line ? `${line} ${words[i]}` : words[i]
+    if (measure.measureText(next).width <= maxText || !line) {
+      line = next
+      continue
+    }
+    if (lines.length === 2) {
+      // No room for a fourth line: this word and everything after it is dropped.
+      truncated = true
+      break
+    }
+    lines.push(line)
+    line = words[i]
+  }
+  if (line) lines.push(line)
+  if (truncated && lines.length) {
+    let last = lines[lines.length - 1]
+    while (last.length > 1 && measure.measureText(`${last}…`).width > maxText) last = last.slice(0, -1)
+    lines[lines.length - 1] = `${last}…`
+  }
+  if (!lines.length) lines.push('…')
+
+  const boxW = Math.min(cw - 8, Math.max(...lines.map((l) => measure.measureText(l).width)) + pad * 2)
+  const boxH = lines.length * lh + pad * 2 - 12
+  const ch = boxH + tail + 12
+  const cv = document.createElement('canvas')
+  cv.width = cw
+  cv.height = ch
+  const ctx = cv.getContext('2d')
+  const x = (cw - boxW) / 2
+  const r = 22
+
+  ctx.font = font
+  ctx.textBaseline = 'middle'
+  ctx.shadowColor = 'rgba(0,0,0,0.45)'
+  ctx.shadowBlur = 14
+  ctx.shadowOffsetY = 3
+  ctx.fillStyle = 'rgba(255,255,255,0.97)'
+  ctx.beginPath()
+  ctx.moveTo(x + r, 4)
+  ctx.arcTo(x + boxW, 4, x + boxW, boxH, r)
+  ctx.arcTo(x + boxW, boxH, x, boxH, r)
+  // the tail, drawn as part of the same path so the shadow wraps it too
+  ctx.lineTo(cw / 2 + 20, boxH)
+  ctx.lineTo(cw / 2 - 4, boxH + tail)
+  ctx.lineTo(cw / 2 - 14, boxH)
+  ctx.arcTo(x, boxH, x, 4, r)
+  ctx.arcTo(x, 4, x + boxW, 4, r)
+  ctx.closePath()
+  ctx.fill()
+
+  ctx.shadowColor = 'transparent'
+  ctx.fillStyle = '#0e1626'
+  ctx.textAlign = 'center'
+  lines.forEach((l, i) => ctx.fillText(l, cw / 2, pad + 6 + i * lh))
+
+  const tex = new THREE.CanvasTexture(cv)
+  tex.colorSpace = THREE.SRGBColorSpace
+  tex.anisotropy = 4
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false }))
+  const worldW = 2.05
+  sp.scale.set(worldW, worldW * ch / cw, 1)
+  sp.renderOrder = 13
+  sp.userData.worldH = worldW * ch / cw
+  return sp
+}
+
 export class Mascots {
   constructor(scene, colony) {
     this.scene = scene
@@ -553,6 +640,9 @@ export class Mascots {
       reminderFn: spec.reminder || null,
       reminderKey: '',
       nameplate,
+      // Set from Chore Quest via setSays(); '' means no bubble.
+      say: '',
+      bubble: null,
       mesh,
       pos: new THREE.Vector3(0, 0, 0),
       target: new THREE.Vector3(),
@@ -573,6 +663,29 @@ export class Mascots {
     this._pickTarget(m)
     this.list.push(m)
     this._applyReminder(m)
+  }
+
+  /**
+   * What each character is saying right now, keyed by mascot kind ({kai: 'hi', ...}).
+   * A kind that is missing or empty loses its bubble.
+   */
+  setSays(map) {
+    const says = map || {}
+    for (const m of this.list) {
+      const want = typeof says[m.kind] === 'string' ? says[m.kind].trim() : ''
+      if (want === m.say) continue
+      m.say = want
+      if (m.bubble) {
+        this.group.remove(m.bubble)
+        m.bubble.material.map?.dispose?.()
+        m.bubble.material.dispose?.()
+        m.bubble = null
+      }
+      if (want) {
+        m.bubble = makeSpeechBubble(want)
+        this.group.add(m.bubble)
+      }
+    }
   }
 
   /** A pet with a reminder (Pickle on Fridays) wears a 🦗 on its name and adds a line to its card. */
@@ -633,6 +746,10 @@ ${r.note}` : m.baseIntro
       m.mesh.rotation.y = m.yaw
       this._applyReminder(m)
       if (m.nameplate) m.nameplate.position.set(m.pos.x, m.mesh.position.y + m.nameOffset, m.pos.z)
+      if (m.bubble) {
+        const lift = m.mesh.position.y + m.nameOffset + 0.32 + (m.bubble.userData.worldH || 0.6) / 2
+        m.bubble.position.set(m.pos.x, lift + Math.sin(elapsed * 1.6 + m.phase) * 0.03, m.pos.z)
+      }
       // Character: the dog wags, the lobster works its claws.
       if (m.kind === 'dog' && m.mesh.userData.tail) m.mesh.userData.tail.rotation.y = Math.sin(elapsed * 9 + m.phase) * 0.6
       if (m.kind === 'lobster' && m.mesh.userData.claws) {

@@ -28,12 +28,39 @@ const link = (c) => (String(c.task || '').match(/https?:\/\/\S+/) || [''])[0]
  * Undone chore headlines per family member, for the map's family captions. Blake's own list
  * stays the Chores hex; this is just so a kid's character can say what they owe today.
  */
-let _famCache = { at: 0, data: null }
-export async function familyChores() {
-  if (_famCache.data && Date.now() - _famCache.at < TTL_MS) return _famCache.data
+let _famCache = { at: 0, state: null }
+async function familyState() {
+  if (_famCache.state && Date.now() - _famCache.at < TTL_MS) return _famCache.state
   const res = await fetch(`${URL}/api/state`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) })
   if (!res.ok) throw new Error(`chore-quest → ${res.status}`)
   const state = await res.json()
+  _famCache = { at: Date.now(), state }
+  return state
+}
+
+/**
+ * What each kid typed into Chore Quest today, for the speech bubble over their character.
+ * A note is a today thing: Chore Quest stops showing it after 24h and so does the map, so
+ * a forgotten line does not hang over a kid's head all week.
+ */
+const SAY_TTL_MS = 24 * 60 * 60 * 1000
+const SAY_MAX = 120
+export async function familySays() {
+  const state = await familyState()
+  const says = state.says || {}
+  const out = {}
+  for (const who of ['kai', 'maya', 'ema']) {
+    const v = says[who]
+    const text = typeof v?.text === 'string' ? v.text.trim() : ''
+    if (!text) continue
+    if (!(Date.now() - Number(v.ts || 0) < SAY_TTL_MS)) continue
+    out[who] = text.slice(0, SAY_MAX)
+  }
+  return out
+}
+
+export async function familyChores() {
+  const state = await familyState()
   const done = state.done || {}
   const out = {}
   for (const who of ['kai', 'maya', 'ema', 'misa', 'blake']) {
@@ -44,7 +71,6 @@ export async function familyChores() {
       .map(headline)
       .filter((h) => (seen.has(h) ? false : (seen.add(h), true)))
   }
-  _famCache = { at: Date.now(), data: out }
   return out
 }
 
