@@ -663,7 +663,9 @@ window.addEventListener('resize', () => hud.setSideWidth(sideWidth()))
 // fly the camera over to wherever they've wandered off to. A dot lights when they want
 // Blake's eyes: Ema messaged on the Dada chat, or a kid changed something in Chore Quest.
 const FAMILY = new Set(['blake', 'misa', 'kai', 'maya', 'ema'])
-const CREW_EMOJI = { dog: '🐕', lobster: '🦞', gecko: '🦎', johnny5: '🤖' }
+const CREW_EMOJI = { dog: '🐕', lobster: '🦞', gecko: '🦎', johnny5: '🤖', totoro: '🌳' }
+// Non-family crew who still have a rendered round face rather than an emoji.
+const CREW_FACE = { johnny5: '/johnny5-face.png', totoro: '/totoro-face.png' }
 const crewTile = document.createElement('div')
 crewTile.className = 'crew-tile panel'
 crewTile.hidden = true
@@ -729,7 +731,7 @@ function renderCrew() {
       // Family wear their photo; Johnny 5 his rendered face; the pets an emoji. A face image
       // that 404s (no Johnny 5 art yet) quietly falls back to the emoji.
       const emoji = `<span class="crew-emoji">${CREW_EMOJI[m.kind] || '🙂'}</span>`
-      const faceSrc = FAMILY.has(m.kind) ? `/family/${m.kind}-neutral.png` : m.kind === 'johnny5' ? '/johnny5-face.png' : ''
+      const faceSrc = FAMILY.has(m.kind) ? `/family/${m.kind}-neutral.png` : CREW_FACE[m.kind] || ''
       const face = faceSrc
         ? `<img src="${faceSrc}" alt="" draggable="false" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'crew-emoji',textContent:'${CREW_EMOJI[m.kind] || '🙂'}'}))">`
         : emoji

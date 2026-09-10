@@ -10,6 +10,7 @@
 import * as THREE from 'three'
 import { FAMILY_IDS, build as buildFamily, preload as preloadFamily } from './family-builders.js'
 import { createJohnny5 } from './johnny-five.js'
+import { createTotoro } from './totoro.js'
 
 const WALK = 1.5 // m/s, an amble
 
@@ -484,6 +485,11 @@ for (const id of FAMILY_IDS) KINDS[id] = { build: () => buildFamily(id) }
 // own treads and arms; the click card is special (a 6-hour rundown), handled in main.js.
 KINDS.johnny5 = { build: createJohnny5, name: 'Johnny 5', intro: 'Johnny 5 is alive! I roll the colony and log what I see. Input, please.' }
 
+// Totoro: a big, quiet forest guardian who ambles the colony. Like Johnny 5 he drives his own
+// limbs (paws, ears, tail, breathing) from userData.update, so the walk loop feeds him a speed
+// and leaves the posing to him. No job, no hand up — he's here so the place feels looked after.
+KINDS.totoro = { build: createTotoro, name: 'Totoro', intro: 'A quiet guardian of the colony. An enormous appetite, and a knack for turning up right when the rain starts.' }
+
 /** Characters built to the people contract (arms, legs, swappable faces) walk and emote. */
 const isPerson = (m) => Boolean(m.mesh.userData.arms || m.mesh.userData.legs)
 
@@ -624,6 +630,7 @@ export class Mascots {
     preloadFamily()
     for (const id of FAMILY_IDS) this.spawn(id)
     this.spawn('johnny5')
+    this.spawn('totoro')
   }
 
   spawn(kind) {
@@ -748,9 +755,13 @@ ${r.note}` : m.baseIntro
       }
       const walking = m.pause <= 0
       const tracked = m.mesh.userData.locomotion === 'tracks'
+      // Totoro (and Johnny 5) pose their own limbs and vertical motion from userData.update, so
+      // they skip both the generic arm/leg swing and the whole-body walking bob.
+      const selfDriven = !tracked && typeof m.mesh.userData.update === 'function'
       const ground = this.colony.groundAt(m.pos.x, m.pos.z)
-      // A tracked robot rolls flat; only legged mascots get the little walking bob.
-      m.mesh.position.set(m.pos.x, ground + (walking && !tracked ? Math.abs(Math.sin(elapsed * 8 + m.phase)) * 0.04 : 0), m.pos.z)
+      // A tracked robot rolls flat; a self-animated body handles its own bob; a plain legged
+      // mascot gets the little walking bob here.
+      m.mesh.position.set(m.pos.x, ground + (walking && !tracked && !selfDriven ? Math.abs(Math.sin(elapsed * 8 + m.phase)) * 0.04 : 0), m.pos.z)
       m.mesh.rotation.y = m.yaw
       this._applyReminder(m)
       if (m.nameplate) m.nameplate.position.set(m.pos.x, m.mesh.position.y + m.nameOffset, m.pos.z)
@@ -764,9 +775,12 @@ ${r.note}` : m.baseIntro
         const open = (Math.sin(elapsed * 3 + m.phase) * 0.5 + 0.5) * 0.5
         for (const claw of m.mesh.userData.claws) claw.userData.jaw.rotation.x = -open
       }
-      // Johnny 5 drives his own treads, head scan, and arms; a person swings their limbs.
+      // Johnny 5 drives his own treads, head scan, and arms; Totoro his paws, ears and tail;
+      // a person swings their limbs the generic way.
       if (tracked) {
         m.mesh.userData.update?.(dt, { speed: walking ? 1.1 : 0, turn: 0 })
+      } else if (selfDriven) {
+        m.mesh.userData.update?.(dt, { speed: walking ? 1 : 0 })
       } else if (isPerson(m)) {
         m.gait += ((walking ? 1 : 0) - m.gait) * Math.min(1, dt * 6)
         const swing = Math.sin(elapsed * 7 + m.phase) * m.gait
