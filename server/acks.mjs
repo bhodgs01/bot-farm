@@ -1,10 +1,10 @@
 /**
  * Acknowledged flags.
  *
- * Blake can remove a `!` he already knows about. The ack is pinned to a fingerprint of the
- * failure (`alertKey`: the failed backup's name, the pods that are down, the error text),
- * so it silences that failure and nothing else. The next scan that reports a different
- * failure for the same worker drops the ack and the flag comes back on its own.
+ * Blake can remove a `!` he already knows about, and it stays removed for good: a dismissal is
+ * a permanent mute on that worker, so a flapping CronJob that keeps rewording its error can't
+ * un-mute itself. It comes back only when Blake flags it again (unack). The `alertKey` a mute
+ * records is kept for reference, not for matching.
  *
  * Stored in DATA_DIR/acks.json so it survives a restart. One writer: this module.
  */
@@ -46,21 +46,17 @@ export const alertKeyOf = (t) => String(t.alertKey || t.preview || '').slice(0, 
  */
 export async function applyAcks(threads) {
   const map = await load()
-  let dirty = false
   for (const t of threads) {
     const ack = map[t.id]
     if (!ack) continue
-    if (!t.hasError) continue // nothing to silence; keep the ack in case it comes back the same
-    if (alertKeyOf(t) === ack.key) {
-      t.hasError = false
-      t.acked = true
-      t.ackedAt = ack.at
-    } else {
-      delete map[t.id]
-      dirty = true
-    }
+    if (!t.hasError) continue // nothing to silence right now; the mute waits for it to return
+    // A dismissal is a permanent mute: it silences this worker no matter how its failure text
+    // changes over time (a flapping CronJob like Rusty reworded its error and used to un-mute
+    // itself). Only Blake's "Flag again" (unack) brings the flag back.
+    t.hasError = false
+    t.acked = true
+    t.ackedAt = ack.at
   }
-  if (dirty) await save().catch(() => {})
   return threads
 }
 

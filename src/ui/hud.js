@@ -650,7 +650,7 @@ export class Hud {
     if (thread.worktree) bits.push(`<span class="tag">⑂ ${escapeHtml(thread.worktree)}</span>`)
     if (thread.gitBranch) bits.push(`<span class="tag">${escapeHtml(thread.gitBranch)}</span>`)
     if (thread.model) bits.push(`<span class="tag">${escapeHtml(shortModel(thread.model))}</span>`)
-    if (thread.acked) bits.push(`<span class="tag" title="You removed this flag; it returns if the failure changes">flag removed</span>`)
+    if (thread.acked) bits.push(`<span class="tag" title="Dismissed for good. It only comes back if you Flag it again.">flag removed</span>`)
     if (thread.watched) bits.push(`<span class="tag">★ starred</span>`)
     bits.push(`<span>${ago(thread.lastActivityAt)}</span>`)
     meta.innerHTML = bits.join('')
