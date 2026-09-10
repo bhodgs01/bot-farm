@@ -1359,23 +1359,10 @@ export class Colony {
   }
 
   _updateScaffolds() {
-    const sites = []
-    for (const [id, entry] of this.buildings) {
-      // Scaffolding says a thread is running here — the README's own promise. It used to be
-      // gated on the building being unfinished as well, which was fine while "unfinished"
-      // was most of them and useless the moment buildings stopped standing in a hole.
-      if (entry.progress <= 0.03) continue
-      if (!this._isActive(id)) continue
-      const p = entry.mesh.position
-      sites.push({
-        x: p.x,
-        z: p.z,
-        y: p.y,
-        radius: (entry.mesh.userData.footprint || 1.4) + 0.35,
-        height: Math.max(0.6, entry.mesh.userData.height * entry.progress + 0.5),
-      })
-    }
-    this.scaffolds.update(sites)
+    // Scaffolding removed — the tan poles it raised around every active/alerted building read
+    // as clutter (Blake: "wooden posts"), and they popped up whenever a red alert appeared.
+    // The machinery stays wired in case it comes back; it just never gets any sites.
+    this.scaffolds.update([])
   }
 
   // ── interaction ─────────────────────────────────────────────────────────────────────
