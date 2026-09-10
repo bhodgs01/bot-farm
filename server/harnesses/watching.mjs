@@ -134,55 +134,18 @@ async function fetchThreads() {
     live.map(async (w) => ({ ...w, status: await runCheck(w) }))
   )
 
-  const bad = checked.filter((w) => w.status.ok === false)
   const out = []
 
-  // The hex itself: one keeper who summarizes the watch list.
-  out.push({
-    id: 'watching:post',
-    kind: 'keeper',
-    landmark: 'tower',
-    roof: checked.length ? `${checked.length} watched${bad.length ? ` · ${bad.length}⚠` : ''}` : 'all quiet',
-    title: '👁 Keeping an eye on',
-    preview: checked.length
-      ? checked.map((w) => `• ${w.title}: ${w.status.line}`).join(NL)
-      : 'Nothing on the watch list. Add one with /keeping-an-eye-on-it.',
-    details: {
-      Watching: checked.map((w) => w.title).join(', ') || 'nothing',
-      Trouble: bad.map((w) => w.title).join(', ') || 'none',
-      Add: '/keeping-an-eye-on-it <thing>',
-      Edit: FILE,
-    },
-    project: ZONE,
-    projectPath: 'watching://post',
-    worktree: '',
-    cwd: 'watching',
-    gitBranch: bad.length ? `${bad.length} acting up` : 'all quiet',
-    model: '',
-    effort: '',
-    createdAt: BORN,
-    lastActivityAt: now,
-    lastFocusedAt: 0,
-    running: false,
-    unread: false,
-    hasError: bad.length > 0,
-    starred: false,
-    routine: '',
-    prState: '',
-    archived: false,
-    hasTranscript: false,
-    sizeBytes: 2000,
-    source: 'watching',
-    canOpen: false,
-    canArchive: false,
-    ref: { post: true },
-  })
-
   // One sentry per watched thing.
+  let first = true
   for (const w of checked) {
     const okMark = w.status.ok === false ? '⚠' : w.status.ok === true ? '👁' : '👁'
     out.push({
       id: `watching:${w.id || w.title}`,
+      // The earliest sentry carries the landmark, so the zone gets exactly one
+      // watchtower and the rest of the watch stands around it rather than each
+      // spawning its own figure and building.
+      ...(first ? { landmark: 'tower' } : {}),
       plate: w.status.ok === false ? 'trouble' : w.status.line.split(' ').slice(0, 2).join(' '),
       title: `${okMark} ${w.title}`,
       preview: [`Keeping an eye on ${w.subject || w.title} — ${w.status.line}`, w.note || ''].filter(Boolean).join(NL),
@@ -221,6 +184,7 @@ async function fetchThreads() {
       canArchive: false,
       ref: { id: w.id || w.title, url: w.url || '' },
     })
+    first = false
   }
   return out
 }
