@@ -601,6 +601,64 @@ const sideWidth = () => (window.innerWidth <= 820 ? 0 : 334)
 hud.setSideWidth(sideWidth())
 window.addEventListener('resize', () => hud.setSideWidth(sideWidth()))
 
+// ── crew tile: the wandering characters, in the top-right rail under Bot Farm ─────────
+// Round faces for the family (their photo), emoji for the pets and Johnny 5. Click one to
+// fly the camera over to wherever they've wandered off to. A dot lights when they want
+// Blake's eyes: Ema messaged on the Dada chat, or a kid changed something in Chore Quest.
+const FAMILY = new Set(['blake', 'misa', 'kai', 'maya', 'ema'])
+const CREW_EMOJI = { dog: '🐕', lobster: '🦞', gecko: '🦎', johnny5: '🤖' }
+const crewTile = document.createElement('div')
+crewTile.className = 'crew-tile panel'
+crewTile.hidden = true
+crewTile.innerHTML = '<div class="crew-head">Crew</div><div class="crew-faces"></div>'
+const crewFaces = crewTile.querySelector('.crew-faces')
+document.querySelector('.stack')?.appendChild(crewTile)
+
+function flyToMascot(m) {
+  // Follow them the way the F key follows an astronaut, so they don't stroll back out of
+  // frame a couple seconds after the camera lands.
+  rig.follow(() => ({ x: m.pos.x, z: m.pos.z }))
+  rig.desiredDistance = Math.min(rig.desiredDistance, 14)
+}
+/** Does this crew member want Blake's eyes right now? */
+function crewAlert(m) {
+  if (m.kind === 'ema' && threads.some((t) => t.id === 'dada:ema' && t.unread)) return true
+  if (KIDS.has(m.kind) && (familySays[m.kind] || '').trim()) return true
+  return false
+}
+let crewKey = ''
+function renderCrew() {
+  const list = colony.mascots?.list || []
+  if (!list.length) {
+    crewTile.hidden = true
+    return
+  }
+  crewTile.hidden = false
+  // Rebuild the row only when the roster changes; every call just refreshes the dots.
+  const key = list.map((m) => m.kind).join(',')
+  if (key !== crewKey) {
+    crewKey = key
+    crewFaces.innerHTML = ''
+    for (const m of list) {
+      const b = document.createElement('button')
+      b.className = 'crew-face'
+      b.title = `Fly to ${m.name}`
+      b.dataset.kind = m.kind
+      const face = FAMILY.has(m.kind)
+        ? `<img src="/family/${m.kind}-neutral.png" alt="" draggable="false">`
+        : `<span class="crew-emoji">${CREW_EMOJI[m.kind] || '🙂'}</span>`
+      b.innerHTML = `${face}<i class="crew-dot" hidden></i>`
+      b.addEventListener('click', () => flyToMascot(m))
+      crewFaces.appendChild(b)
+    }
+  }
+  for (const b of crewFaces.children) {
+    const m = list.find((x) => x.kind === b.dataset.kind)
+    b.querySelector('.crew-dot').hidden = !(m && crewAlert(m))
+  }
+}
+setInterval(renderCrew, 2000)
+
 // ── selection ─────────────────────────────────────────────────────────────────────────
 
 function select(id, { fly = false, mode } = {}) {
@@ -1316,6 +1374,8 @@ function applyThreads(list) {
     state.plots = layout
     queueSave()
   }
+  // Keep the crew tile's alert dots (Ema's unread heart) honest on the same beat as threads.
+  renderCrew()
 }
 
 let polling = false

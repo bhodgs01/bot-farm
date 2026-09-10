@@ -668,6 +668,68 @@ body {
 }
 .side.collapsed { flex: 0 0 auto; }
 
+/* Crew tile: round faces of the wandering characters, tucked under the Bot Farm panel. */
+.crew-tile {
+  flex: none;
+  padding: 10px 12px 12px;
+}
+.crew-head {
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.crew-faces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.crew-face {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  background: var(--panel-solid);
+  color: inherit;
+  cursor: pointer;
+  overflow: visible;
+  display: grid;
+  place-items: center;
+  transition: transform 120ms ease, border-color 120ms ease;
+}
+.crew-face:hover {
+  transform: translateY(-1px) scale(1.06);
+  border-color: var(--accent);
+}
+.crew-face img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: top center;
+  pointer-events: none;
+}
+.crew-emoji {
+  font-size: 20px;
+  line-height: 1;
+}
+.crew-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: #ff5470;
+  border: 2px solid var(--panel-solid);
+  box-shadow: 0 0 8px #ff5470;
+}
+.crew-dot[hidden] { display: none; }
+
 .side .brandbar {
   display: flex;
   align-items: center;
@@ -1511,6 +1573,7 @@ kbd {
 .pet-card b { font-size: 14px; color: #fff; }
 .pet-card span { font-size: 12px; line-height: 1.45; color: #cdd6ef; }
 
+.johnny-card[hidden] { display: none !important; }
 .johnny-card { position: fixed; z-index: 60; right: 18px; bottom: 18px; width: min(94vw, 380px); max-height: min(72vh, 560px); display: flex; flex-direction: column; background: rgba(12, 15, 24, 0.96); border: 1px solid rgba(255,255,255,0.14); border-radius: 16px; box-shadow: 0 18px 50px rgba(0,0,0,0.55); overflow: hidden; }
 .johnny-card header { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); }
 .johnny-card header b { font-size: 14px; color: #fff; }
