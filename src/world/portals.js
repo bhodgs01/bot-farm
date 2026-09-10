@@ -48,7 +48,8 @@ function labelSprite(text) {
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false }))
-  s.scale.set((c.width / c.height) * 0.8, 0.8, 1)
+  const h = 0.6
+  s.scale.set((c.width / c.height) * h, h, 1)
   return s
 }
 
