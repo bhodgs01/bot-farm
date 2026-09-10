@@ -40,17 +40,19 @@ async function familyState() {
 }
 
 /**
- * What each kid typed into Chore Quest today, for the speech bubble over their character.
+ * What each person typed into Chore Quest today, for the speech bubble over their character.
  * A note is a today thing: Chore Quest stops showing it after 24h and so does the map, so
  * a forgotten line does not hang over a kid's head all week.
  */
+// Everyone on the map can leave a note; the whole family carries a bubble.
+export const SAY_PEOPLE = ['kai', 'maya', 'ema', 'misa', 'blake']
 const SAY_TTL_MS = 24 * 60 * 60 * 1000
 const SAY_MAX = 120
 export async function familySays() {
   const state = await familyState()
   const says = state.says || {}
   const out = {}
-  for (const who of ['kai', 'maya', 'ema']) {
+  for (const who of SAY_PEOPLE) {
     const v = says[who]
     const text = typeof v?.text === 'string' ? v.text.trim() : ''
     if (!text) continue
@@ -87,7 +89,7 @@ async function sayThreads() {
   const now = Date.now()
   const state = await familyState().catch(() => ({}))
   const raw = state.says || {}
-  return Object.entries(says).map(([kid, text]) => {
+  return Object.entries(says).filter(([kid]) => kid !== 'blake').map(([kid, text]) => {
     const at = Number(raw[kid] && raw[kid].ts) || now
     const name = kid.charAt(0).toUpperCase() + kid.slice(1)
     return {

@@ -10,7 +10,7 @@
  */
 import { refreshProjects } from './harnesses/projects.mjs'
 import { refreshTasks } from './harnesses/tasks.mjs'
-import { refreshChores } from './harnesses/chores.mjs'
+import { refreshChores, SAY_PEOPLE } from './harnesses/chores.mjs'
 import { refreshJanine } from './harnesses/janine.mjs'
 
 const VIKUNJA = (process.env.VIKUNJA_URL || 'http://vikunja.vikunja.svc.cluster.local:3456').replace(/\/$/, '') + '/api/v1'
@@ -87,7 +87,7 @@ export async function completeChores({ ids, who }) {
  */
 export async function clearSay({ kid, who }) {
   const id = String(kid || '').toLowerCase()
-  if (!['kai', 'maya', 'ema'].includes(id)) throw new Error(`Not a kid: ${kid}`)
+  if (!SAY_PEOPLE.includes(id)) throw new Error(`Not on the board: ${kid}`)
   const get = async () => {
     const r = await fetch(`${CHORES}/api/state`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) })
     if (!r.ok) throw new Error(`chores read → ${r.status}`)
