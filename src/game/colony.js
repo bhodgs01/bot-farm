@@ -152,7 +152,7 @@ const BADGE_FOR = {
   visitor: BADGE.visitor,
   watched: BADGE.watched,
   info: BADGE.info,
-  dada: BADGE.heart,
+  dada: BADGE.none, // the heart lives over the Ema mascot now, not on this thread's astronaut
   blocked: BADGE.blocked,
   working: BADGE.working,
   celebrating: BADGE.done,

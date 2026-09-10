@@ -192,6 +192,8 @@ function petBody(m) {
  * button to clear it — the same "Got it" the Needs-you card uses.
  */
 function showPetCard(m, at) {
+  // Opening Ema's own card counts as looking at her: clear her waiting heart.
+  if (m.kind === 'ema') markEmaSeen()
   const kidSay = KIDS.has(m.kind) ? (familySays[m.kind] || '').trim() : ''
   petCard.innerHTML =
     `<header><b>${esc(m.name)}</b><button class="px" title="Close" aria-label="Close">✕</button></header>` +
@@ -724,9 +726,28 @@ function flyToMascot(m) {
   rig.follow(() => ({ x: m.pos.x, z: m.pos.z }))
   rig.desiredDistance = Math.min(rig.desiredDistance, 14)
 }
+/**
+ * Is Ema waiting on a reply — and has Blake not already looked at this one? Her heart and crew
+ * dot both key off it. Seeing the message (opening its card) marks that message read locally,
+ * so the heart clears until she sends a new one, even before Blake replies in the Dada app.
+ */
+function emaWantsYou() {
+  const d = threads.find((t) => t.id === 'dada:ema')
+  return Boolean(d && d.unread && (d.preview || '') !== (state.emaSeen || ''))
+}
+/** Mark Ema's current message seen: clears her heart and dot until the next one. */
+function markEmaSeen() {
+  const d = threads.find((t) => t.id === 'dada:ema')
+  const sig = d?.preview || ''
+  if (state.emaSeen === sig) return
+  state.emaSeen = sig
+  queueSave()
+  colony.mascots?.setAlert('ema', false)
+  renderCrew()
+}
 /** Does this crew member want Blake's eyes right now? */
 function crewAlert(m) {
-  if (m.kind === 'ema' && threads.some((t) => t.id === 'dada:ema' && t.unread)) return true
+  if (m.kind === 'ema') return emaWantsYou()
   if (KIDS.has(m.kind) && (familySays[m.kind] || '').trim()) return true
   return false
 }
@@ -796,6 +817,8 @@ function select(id, { fly = false, mode } = {}) {
   if (id === 'garage:fj40') colony.revFj40()
   const thread = threads.find((t) => t.id === id) || agent.thread
   hud.setSelection(agent, thread, { mode })
+  // Opening Ema's chat is reading it: her heart and dot clear for this message.
+  if (thread?.id === 'dada:ema') markEmaSeen()
   // Picking somebody is also picking the zone they are standing on: the sidebar follows.
   if (thread?.project && colony.plots.has(thread.project)) selectedProject = thread.project
   syncProject()
@@ -1510,7 +1533,7 @@ function applyThreads(list) {
   // Keep the crew tile's alert dots (Ema's unread heart) honest on the same beat as threads.
   renderCrew()
   // And float a heart over the Ema mascot herself when she's texted on the Dada chat.
-  colony.mascots?.setAlert('ema', threads.some((t) => t.id === 'dada:ema' && t.unread))
+  colony.mascots?.setAlert('ema', emaWantsYou())
 }
 
 let polling = false
