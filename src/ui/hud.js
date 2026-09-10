@@ -667,6 +667,13 @@ export class Hud {
         : ''
     details.innerHTML = picture + entries.map(([k, v]) => `<div class="k">${escapeHtml(k)}</div><div class="v">${escapeHtml(String(v))}</div>`).join('')
     details.hidden = intro || (entries.length === 0 && !picture)
+    // When a thread has no detail table of its own (a door sensor, a kid's note), show its
+    // preview as the card body so the card actually says what's going on — which door is open,
+    // what was said — instead of coming up blank.
+    const note = this.$('.thread-pop .note')
+    const showNote = !intro && !hasStories && entries.length === 0 && Boolean(thread.preview)
+    note.hidden = !showNote
+    if (showNote) note.innerHTML = escapeHtml(String(thread.preview)).replace(/\n/g, '<br>')
     const introBox = this.$('.thread-pop .intro')
     introBox.hidden = !intro
     if (intro) introBox.querySelector('p').textContent = thread.intro
@@ -725,7 +732,7 @@ export class Hud {
    * The queue: everyone who wants a human, most urgent first. Click a row to fly there.
    */
   setQueue(items) {
-    const key = items.map((i) => `${i.id}:${i.status}:${i.count || 0}`).join('|')
+    const key = items.map((i) => `${i.id}:${i.status}:${i.count || 0}:${i.need || ''}`).join('|')
     if (this._last.queue === key) return
     this._last.queue = key
     this.$('.q-count').textContent = String(items.length)
@@ -735,10 +742,17 @@ export class Hud {
     wrap.innerHTML =
       shown
         .map(
-          (i) =>
-            `<button class="row ${statusClass(i.status)}" data-status="${escapeHtml(i.status)}" data-id="${escapeHtml(i.id)}" title="${escapeHtml(i.need || '')}">` +
-            `<i class="dot"></i><span class="t">${escapeHtml(i.title)}${i.count ? ` <b>${i.count}</b>` : ''}</span>` +
-            `<span class="w">${escapeHtml(i.label)}</span><span class="p">${escapeHtml(i.project)}</span></button>`
+          (i) => {
+            // The one-line "what's wrong" under the title: which door is open, what a kid
+            // said — so the row answers itself without a click. Hidden when it just echoes the title.
+            const need = i.need && i.need !== i.title ? `<span class="n">${escapeHtml(i.need)}</span>` : ''
+            return (
+              `<button class="row ${statusClass(i.status)}" data-status="${escapeHtml(i.status)}" data-id="${escapeHtml(i.id)}" title="${escapeHtml(i.need || '')}">` +
+              `<i class="dot"></i><span class="t">${escapeHtml(i.title)}${i.count ? ` <b>${i.count}</b>` : ''}</span>` +
+              need +
+              `<span class="w">${escapeHtml(i.label)}</span><span class="p">${escapeHtml(i.project)}</span></button>`
+            )
+          }
         )
         .join('') + (items.length > shown.length ? `<div class="more">… and ${items.length - shown.length} more</div>` : '')
     for (const row of wrap.querySelectorAll('.row')) {
@@ -1170,6 +1184,7 @@ const TEMPLATE = `
   <div class="progress"><i></i></div>
   <div class="intro" hidden><p></p><button class="btn" id="btn-intro-card" title="Everything this worker knows">Show the card ›</button></div>
   <div class="details"></div>
+  <div class="note" hidden></div>
   <div class="reader" hidden></div>
   <div class="stage"></div>
   <div class="pair">

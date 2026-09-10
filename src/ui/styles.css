@@ -1557,7 +1557,7 @@ kbd {
 .queue { overflow: auto; display: flex; flex-direction: column; gap: 3px; padding: 0 8px 8px; }
 .queue .row {
   appearance: none; -webkit-appearance: none;
-  display: grid; grid-template-columns: 1fr auto; grid-template-areas: "t w" "p w";
+  display: grid; grid-template-columns: 1fr auto; grid-template-areas: "t w" "n w" "p w";
   column-gap: 10px; align-items: center; text-align: left;
   padding: 6px 10px 6px 11px; border-radius: 9px; border: 0; border-left: 3px solid var(--q, #8fb4ee);
   background: rgba(255,255,255,0.025); color: inherit; cursor: pointer; font: inherit;
@@ -1566,6 +1566,7 @@ kbd {
 .queue .row .dot { display: none; }
 .queue .row .t { grid-area: t; font-size: 12.5px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .queue .row .t b { font-weight: 600; color: var(--q, #8fb4ee); }
+.queue .row .n { grid-area: n; font-size: 11px; line-height: 1.3; color: var(--q, #8fb4ee); opacity: 0.92; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .queue .row .p { grid-area: p; font-size: 11px; opacity: 0.5; }
 .queue .row .w { grid-area: w; font-size: 11px; color: var(--q, #8fb4ee); white-space: nowrap; }
 .queue .row[data-status="blocked"] { --q: #f08a8a; }
@@ -1588,7 +1589,8 @@ kbd {
 
 /* Details table and stage buttons on a card. */
 .thread-pop .details { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 12px; max-height: 190px; overflow: auto; }
-.thread-pop .details[hidden], .thread-pop .stage[hidden], .thread-pop .intro[hidden] { display: none; }
+.thread-pop .note { font-size: 12.5px; line-height: 1.5; color: #cdd6ef; max-height: 200px; overflow: auto; }
+.thread-pop .details[hidden], .thread-pop .stage[hidden], .thread-pop .intro[hidden], .thread-pop .note[hidden] { display: none; }
 .thread-pop .intro { display: grid; gap: 8px; }
 .pet-card { position: fixed; z-index: 55; max-width: 260px; padding: 10px 13px; border-radius: 12px; background: rgba(10, 12, 20, 0.92); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 8px 30px rgba(0,0,0,0.5); pointer-events: auto; display: grid; gap: 6px; }
 .pet-card header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
