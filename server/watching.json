@@ -1,0 +1,12 @@
+[
+  {
+    "id": "hp3-power",
+    "title": "hp3 power stability",
+    "subject": "jarvishp3",
+    "check": "node",
+    "note": "Silent power-cut reboots, 7 in one day. A new 90W brick did not fix it; stock CPU limits (PL1 65W / PL2 122W) overcommitted the adapter. Capped to 45W/65W with a persistent systemd unit on 2026-09-09. If it cuts again while capped and idle, power delivery is not the cause and the next suspects are the board VRM, the non-ECC RAM, or the wall circuit.",
+    "since": "2026-09-10T00:55:00Z",
+    "goal": "24 h clean",
+    "url": ""
+  }
+]
