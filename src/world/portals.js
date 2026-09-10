@@ -6,15 +6,17 @@ import * as THREE from 'three'
  * are ours. Edit this list to change where the portals go — it's the whole configuration.
  */
 export const BRAIN_BASE = 'https://brain.kcproto.com/'
+// The eight departments of the School of Brain. Each portal beams straight to that category
+// (the ?dept= deep link focuses the school on its island). Colors match the school's own.
 export const BRAIN_PORTALS = [
-  { label: 'Galaxy', slug: '', color: 0x8b5cc9 },
-  { label: 'Planets', slug: 'planets', color: 0x5c8cff },
-  { label: 'Space', slug: 'space', color: 0x3fb6ff },
-  { label: 'School of Brain', slug: 'school', color: 0x66d08a },
-  { label: 'Armada', slug: 'armada', color: 0xff8a5c },
-  { label: 'Da Vinci', slug: 'davinci', color: 0xc9a24a },
-  { label: 'Renaissance', slug: 'renaissance', color: 0xe06a9a },
-  { label: 'Engines', slug: 'engines', color: 0xff5470 },
+  { label: '⚗️ Science', slug: 'school?dept=science', color: 0x4f7ec9 },
+  { label: '⚙️ Machines', slug: 'school?dept=machines', color: 0xc97f4f },
+  { label: '🏛️ History', slug: 'school?dept=history', color: 0xb8942a },
+  { label: '🌿 Life', slug: 'school?dept=life', color: 0x4f9a63 },
+  { label: '🍳 Kitchen', slug: 'school?dept=kitchen', color: 0xc96442 },
+  { label: '📚 Letters', slug: 'school?dept=letters', color: 0x8b5cc9 },
+  { label: '🛠️ Ops', slug: 'school?dept=ops', color: 0x3fa8a0 },
+  { label: '🔒 Restricted', slug: 'school?dept=restricted', color: 0xb8493f },
 ]
 
 function roundRect(ctx, x, y, w, h, r) {
