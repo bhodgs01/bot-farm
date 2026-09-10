@@ -65,8 +65,13 @@ async function fetchThreads() {
   const events = []
   for (const { cal, items } of lists) {
     for (const e of items) {
-      if (e.status === 'cancelled' || seen.has(e.id)) continue
-      seen.add(e.id)
+      // The same meeting sitting on two calendars Blake can see (his invite + the team
+      // calendar it was created on) comes back as two events with different `id`s but the
+      // same `iCalUID` — dedup on that so it's one hex, not two. Fall back to id, then to a
+      // title+time signature for the odd event that carries neither.
+      const key = e.iCalUID || e.id || `${e.summary}|${e.start?.dateTime || e.start?.date}`
+      if (e.status === 'cancelled' || seen.has(key)) continue
+      seen.add(key)
       const allDay = Boolean(e.start?.date)
       const start = Date.parse(e.start?.dateTime || `${e.start?.date}T00:00:00-05:00`) || 0
       const end = Date.parse(e.end?.dateTime || `${e.end?.date}T00:00:00-05:00`) || start

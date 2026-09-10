@@ -217,6 +217,9 @@ async function clearKidNote(kid) {
   }
   familySays = { ...familySays, [kid]: '' }
   colony.mascots?.setSays(familySays)
+  // Opening the card from the crew tile flew-and-followed the kid; once the note's cleared,
+  // let go of the camera so the map isn't glued to them.
+  rig.follow(null)
   hud.toast('Note cleared')
   setTimeout(poll, 1200)
 }

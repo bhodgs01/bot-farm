@@ -1593,6 +1593,7 @@ kbd {
 .thread-pop .details[hidden], .thread-pop .stage[hidden], .thread-pop .intro[hidden], .thread-pop .note[hidden] { display: none; }
 .thread-pop .intro { display: grid; gap: 8px; }
 .pet-card { position: fixed; z-index: 55; max-width: 260px; padding: 10px 13px; border-radius: 12px; background: rgba(10, 12, 20, 0.92); border: 1px solid rgba(255,255,255,0.14); box-shadow: 0 8px 30px rgba(0,0,0,0.5); pointer-events: auto; display: grid; gap: 6px; }
+.pet-card[hidden] { display: none !important; }
 .pet-card header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .pet-card b { font-size: 14px; color: #fff; }
 .pet-card span { font-size: 12px; line-height: 1.45; color: #cdd6ef; }
