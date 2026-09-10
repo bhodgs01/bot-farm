@@ -79,11 +79,23 @@ async function fetchThreads() {
       events.push({ id: e.id, title: e.summary || '(untitled)', start, end, allDay, where: e.location || '', link: e.htmlLink || '', cal: cal.summary || '', who: (e.attendees || []).filter((a) => !a.self).map((a) => a.displayName || a.email).slice(0, 6), notes: String(e.description || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 400), meet: e.hangoutLink || '' })
     }
   }
-  events.sort((a, b) => a.start - b.start)
+  // A meeting can land on two calendars Blake can see — his own invite plus an auto-created
+  // copy on a team calendar (Google stamps those "automatically created events"). Those copies
+  // carry a different iCalUID, so the id/iCalUID dedup above misses them. Collapse anything with
+  // the same title and start time, keeping the richest copy — the one with attendees, a meet
+  // link or a real description — so the useful invite wins over the bare auto-created stub.
+  const bySig = new Map()
+  for (const e of events) {
+    const sig = `${e.title.trim().toLowerCase()}|${e.start}`
+    const score = (e.who?.length || 0) + (e.meet ? 2 : 0) + (e.notes ? 1 : 0)
+    const prev = bySig.get(sig)
+    if (!prev || score > prev.score) bySig.set(sig, { e, score })
+  }
+  const collapsed = [...bySig.values()].map((x) => x.e).sort((a, b) => a.start - b.start)
 
   const out = []
   const line = (e) => `${fmtDay.format(e.start)} ${e.allDay ? 'all day' : fmtTime.format(e.start)} - ${e.title}${e.where ? ` @ ${e.where}` : ''}`
-  const upcoming = events.filter((e) => e.end > now)
+  const upcoming = collapsed.filter((e) => e.end > now)
   const next = upcoming.find((e) => !e.allDay) || upcoming[0]
   out.push({
     id: 'cal:week',
