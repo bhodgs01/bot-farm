@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { PLANETS, createTerrain, createScatter, terrainHeight } from '../world/planet.js'
 import { Sky } from '../world/sky.js'
+import { BrainPortals } from '../world/portals.js'
 import {
   Plot,
   allocateCells,
@@ -241,6 +242,8 @@ export class Colony {
     this.particles = new Particles(scene, settings)
     this.mascots = new Mascots(scene, this)
     this.scaffolds = new Scaffolds(scene, 320)
+    // The Brain hex's gateway ring — eight portals that beam out to the JARVIS Brain's worlds.
+    this.portals = new BrainPortals(scene)
     this.nav = new Navigation()
     this.astronauts.setNavigation(this.nav)
 
@@ -1214,6 +1217,10 @@ export class Colony {
     this.indicators.update(this.astronauts.agents, elapsed, (a) => this._badgeFor(a))
     this._emit(dt, elapsed)
     this.mascots.update(dt, elapsed)
+    // Keep the portal ring sitting on the Brain hex (following it if the hex is moved).
+    const brainPlot = this.plots.get('Brain')
+    this.portals.layout(brainPlot ? brainPlot.middle || brainPlot.center : null)
+    this.portals.update(dt, elapsed, (x, z) => this.groundAt(x, z))
     this.particles.ambient(dt, this.camera, this.planet)
     this.particles.weather(dt, this.camera, this.sky.weather)
     this._drainCelebrations()
@@ -1388,6 +1395,7 @@ export class Colony {
   dispose() {
     this.sky.dispose()
     this.ship.dispose()
+    this.portals.dispose()
     this.astronauts.dispose()
     this.indicators.dispose()
     this.particles.dispose()

@@ -1612,6 +1612,24 @@ kbd {
 .johnny-launch[hidden] { display: none !important; }
 .johnny-launch img { width: 100%; height: 100%; object-fit: cover; object-position: top center; }
 .johnny-launch .j5-ico { font-size: 27px; line-height: 1; }
+
+/* Beam-out: a Star-Trek shimmer in the portal's colour that sweeps the screen and brightens
+   to a flash just before the page travels to that world of the Brain. */
+.beam {
+  position: fixed; inset: 0; z-index: 200; pointer-events: none; opacity: 0;
+  background:
+    repeating-linear-gradient(to bottom, transparent 0 7px, var(--beam, #8b5cc9) 7px 9px),
+    radial-gradient(circle at 50% 55%, var(--beam, #8b5cc9), transparent 72%);
+  background-size: 100% 18px, 100% 100%;
+  mix-blend-mode: screen;
+  animation: beam 1.15s ease-in forwards;
+}
+@keyframes beam {
+  0% { opacity: 0; background-position: 0 0, 0 0; }
+  25% { opacity: 0.55; }
+  75% { opacity: 0.9; background-position: 0 260px, 0 0; }
+  100% { opacity: 1; filter: brightness(2.6) saturate(1.2); }
+}
 .johnny-card header { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; border-bottom: 1px solid rgba(255,255,255,0.08); }
 .johnny-card header b { font-size: 14px; color: #fff; }
 .johnny-card .jx { background: none; border: 0; color: #98a2c0; font-size: 15px; cursor: pointer; padding: 2px 6px; border-radius: 6px; }

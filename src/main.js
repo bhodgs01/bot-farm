@@ -225,6 +225,23 @@ async function clearKidNote(kid) {
 }
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
 
+// Beam out to a world of the Brain: a Star-Trek shimmer washes the screen in the portal's
+// colour, then the page travels there. One beam at a time.
+let beaming = false
+function beamToBrain(portal) {
+  if (beaming) return
+  beaming = true
+  const hex = `#${portal.def.color.toString(16).padStart(6, '0')}`
+  hud.toast(`Beaming to ${portal.def.label}…`)
+  const beam = document.createElement('div')
+  beam.className = 'beam'
+  beam.style.setProperty('--beam', hex)
+  document.body.appendChild(beam)
+  setTimeout(() => {
+    window.location.href = portal.url
+  }, 1150)
+}
+
 // Johnny 5's report card: on first open he gives a 6-hour rundown; then Blake can ask him more.
 const johnnyCard = document.createElement('div')
 johnnyCard.className = 'johnny-card'
@@ -995,11 +1012,19 @@ engine.canvas.addEventListener('pointermove', (e) => {
   hoverId = agent?.id ?? null
   colony.astronauts.setHover(agent)
   const pet = !agent && colony.mascots ? colony.mascots.pick(engine.camera, p.x, p.y, p.aspect) : null
+  const portal = !agent && !pet && colony.portals ? colony.portals.pick(engine.camera, p.x, p.y, p.aspect) : null
   if (pet) {
     hoverTip.innerHTML = `<b>${esc(pet.name)}</b>${((s) => (s ? `<i>${esc(s)}</i>` : ''))(petSubtitle(pet))}`
     hoverTip.hidden = false
     hoverTip.style.left = `${Math.min(e.clientX + 16, window.innerWidth - hoverTip.offsetWidth - 8)}px`
     hoverTip.style.top = `${Math.min(e.clientY + 18, window.innerHeight - hoverTip.offsetHeight - 8)}px`
+    engine.canvas.style.cursor = 'default'
+  } else if (portal) {
+    hoverTip.innerHTML = `<b>🌀 ${esc(portal.def.label)}</b><i>Click to beam to the Brain</i>`
+    hoverTip.hidden = false
+    hoverTip.style.left = `${Math.min(e.clientX + 16, window.innerWidth - hoverTip.offsetWidth - 8)}px`
+    hoverTip.style.top = `${Math.min(e.clientY + 18, window.innerHeight - hoverTip.offsetHeight - 8)}px`
+    engine.canvas.style.cursor = 'pointer'
   } else showHoverTip(agent, e)
   // Pointing at a quiet plot is what makes its name appear.
   const plot = plotUnder(e, p)
@@ -1038,6 +1063,11 @@ engine.canvas.addEventListener('pointerup', (e) => {
   if (pet) {
     if (pet.kind === 'johnny5') showJohnnyCard()
     else showPetCard(pet, { x: e.clientX, y: e.clientY })
+    return
+  }
+  const portal = colony.portals ? colony.portals.pick(engine.camera, p.x, p.y, p.aspect) : null
+  if (portal) {
+    beamToBrain(portal)
     return
   }
   petCard.hidden = true
