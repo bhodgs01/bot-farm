@@ -60,13 +60,18 @@ const DECK_HEIGHT = DECK_TOP + DECK_SKIRT
  * slots that exist is how a zone ends up owning a hex nobody stands on.
  */
 const SLOTS_PER_CELL = 7
+const MAX_CELLS = 9
 /**
- * One hex per project, always. A map where a busy client sprawls across nine tiles is harder
- * to read at a glance than one where every project is a single place you can point at, and
- * Blake would rather see a crowded tile than hunt for which blob belongs to whom. Crew past
- * the seven slots simply stand closer together. Raise this if sprawl is ever wanted back.
+ * Named client projects stay one hex each, however busy they get. A client that sprawls across
+ * nine tiles is harder to point at than a single crowded one, and crew past the seven slots
+ * just stand closer together. The machine-generated zones (Cluster, Inbox, Home, Backups) are
+ * exempt: their whole point is that the tile grows with the fleet.
  */
-const MAX_CELLS = 1
+const SINGLE_CELL_ZONES = new Set([
+  'CorrosionDC', 'KC AI Club', 'Embassy Landscape', 'NGV Talent', 'CyberGrade', 'Frances',
+  'NED Builds', 'Print Service', 'Trade Floor', 'KC Proto', 'Collectorz', 'Franky',
+  'Roast Bot', 'Clayton', 'Atlas',
+])
 /** The lattice cell the ship owns. Nothing else may be placed there. */
 export const SHIP_CELL = { q: -2, r: 1 }
 
@@ -134,8 +139,10 @@ function hexRing(radius) {
   return out
 }
 
-const cellsNeeded = (threadCount) =>
-  Math.max(1, Math.min(MAX_CELLS, Math.ceil(threadCount / SLOTS_PER_CELL)))
+const cellsNeeded = (threadCount, zone) =>
+  SINGLE_CELL_ZONES.has(zone)
+    ? 1
+    : Math.max(1, Math.min(MAX_CELLS, Math.ceil(threadCount / SLOTS_PER_CELL)))
 
 /** Hex distance in axial coordinates: the cube distance, halved. */
 function hexDistance(a, b) {
@@ -170,7 +177,7 @@ function hexDistance(a, b) {
  */
 export function allocateCells(projects, previous = new Map()) {
   const reserved = key(SHIP_CELL.q, SHIP_CELL.r)
-  const wanted = projects.map((p) => ({ id: p.id, want: cellsNeeded(p.size) }))
+  const wanted = projects.map((p) => ({ id: p.id, want: cellsNeeded(p.size, p.id) }))
   const total = wanted.reduce((n, w) => n + w.want, 0)
 
   // Spiral order decides where a *new* project settles. The pool runs past what is needed
