@@ -57,6 +57,7 @@ const KIND_SCALE = {
   hq: 0.95, clubhouse: 0.95, house: 0.95, tradingfloor: 0.9, shield: 0.95, launchpad: 0.95,
   recruitdesk: 0.85, grill: 0.85, vault: 0.9, controltower: 0.95, garage: 0.95, outpost: 0.9, coins: 0.8, chiefOfStaff: 0.92, reception: 0.92, orderCounter: 0.92,
   apartment: 0.9, theater: 0.9, kennel: 0.9, fj40: 0.95, dish: 1, pumpjack: 1, deck: 0.95, gazebo: 0.95,
+  comicshop: 0.85,
   // small fixtures that stand alone
   signpost: 0.7, tvwall: 0.7, keyrack: 0.7, meter: 0.7, countdown: 0.7, mailbox: 0.7,
   // rebuilt kit pieces, used mostly as fillers (fillers are halved again on top of this)
@@ -131,6 +132,8 @@ class Composer {
     // about and how fast, which is what lets one building hold several of them.
     const rate = o.spin || 0
     const spin = new Float32Array(count).fill(rate)
+    // Which way it turns: 0 = about Z (a rotor facing the camera), 1 = about Y (a carousel).
+    const axis = new Float32Array(count).fill(o.spinAxis === 'y' ? 1 : 0)
     const pivot = new Float32Array(count * 3)
     if (rate) {
       for (let i = 0; i < count; i++) {
@@ -140,6 +143,7 @@ class Composer {
       }
     }
     geo.setAttribute('aSpin', new THREE.BufferAttribute(spin, 1))
+    geo.setAttribute('aSpinAxis', new THREE.BufferAttribute(axis, 1))
     geo.setAttribute('aPivot', new THREE.BufferAttribute(pivot, 3))
 
     this.parts.push(geo)
@@ -173,6 +177,8 @@ class Composer {
     geo.setAttribute('aEmissive', new THREE.BufferAttribute(new Float32Array(count).fill(o.emissive || 0), 1))
     const rate = o.spin || 0
     const spin = new Float32Array(count).fill(rate)
+    // Which way it turns: 0 = about Z (a rotor facing the camera), 1 = about Y (a carousel).
+    const axis = new Float32Array(count).fill(o.spinAxis === 'y' ? 1 : 0)
     const pivot = new Float32Array(count * 3)
     if (rate) {
       for (let i = 0; i < count; i++) {
@@ -182,6 +188,7 @@ class Composer {
       }
     }
     geo.setAttribute('aSpin', new THREE.BufferAttribute(spin, 1))
+    geo.setAttribute('aSpinAxis', new THREE.BufferAttribute(axis, 1))
     geo.setAttribute('aPivot', new THREE.BufferAttribute(pivot, 3))
     this.parts.push(geo)
     return this
@@ -2341,7 +2348,7 @@ const KINDS = {
     const spinning = (geometry, cell) => {
       geometry.rotateY(yaw)
       c.geom(geometry, cell, {
-        x: -1.0, y: 1.0, z: -0.64, spin: speed
+        x: -1.0, y: 1.0, z: -0.64, spin: speed, spinAxis: 'y'
       })
     }
     for (const tierY of [-0.45, 0.24]) {
@@ -2599,6 +2606,7 @@ function decorate(material, uniforms) {
         `#include <common>
          attribute float aEmissive;
          attribute float aSpin;
+         attribute float aSpinAxis;
          attribute vec3 aPivot;
          varying float vEmissive;
          varying vec2 vAtlasUv;
@@ -2615,12 +2623,19 @@ function decorate(material, uniforms) {
            float s = sin( angle );
            float c = cos( angle );
            return hub + vec3( r.x * c - r.y * s, r.x * s + r.y * c, r.z );
+         }
+         // The same turn about the upright axis, for anything that spins like a lazy Susan.
+         vec3 botSpinY( vec3 p, vec3 hub, float angle ) {
+           vec3 r = p - hub;
+           float s = sin( angle );
+           float c = cos( angle );
+           return hub + vec3( r.x * c + r.z * s, r.y, -r.x * s + r.z * c );
          }`
       )
       .replace(
         '#include <beginnormal_vertex>',
         `#include <beginnormal_vertex>
-         if ( aSpin > 0.0 ) objectNormal = botSpin( objectNormal, vec3( 0.0 ), uTime * aSpin );`
+         if ( aSpin > 0.0 ) objectNormal = aSpinAxis > 0.5 ? botSpinY( objectNormal, vec3( 0.0 ), uTime * aSpin ) : botSpin( objectNormal, vec3( 0.0 ), uTime * aSpin );`
       )
       .replace(
         '#include <begin_vertex>',
@@ -2629,7 +2644,7 @@ function decorate(material, uniforms) {
          // Our own copy of the UV: three renames its map varying between versions, and the
          // cell lookup below has to survive that.
          vAtlasUv = uv;
-         if ( aSpin > 0.0 ) transformed = botSpin( transformed, aPivot, uTime * aSpin );
+         if ( aSpin > 0.0 ) transformed = aSpinAxis > 0.5 ? botSpinY( transformed, aPivot, uTime * aSpin ) : botSpin( transformed, aPivot, uTime * aSpin );
          // Measured *after* the rotor has turned, so a blade sweeping past the ground line
          // is revealed and hidden by the same rule as everything else.
          vLocalY = transformed.y;
@@ -2717,6 +2732,7 @@ function depthMaterial(uniforms) {
         '#include <common>',
         `#include <common>
          attribute float aSpin;
+         attribute float aSpinAxis;
          attribute vec3 aPivot;
          varying float vLocalY;
          uniform float uProgress;
@@ -2729,12 +2745,19 @@ function depthMaterial(uniforms) {
            float s = sin( angle );
            float c = cos( angle );
            return hub + vec3( r.x * c - r.y * s, r.x * s + r.y * c, r.z );
+         }
+         // The same turn about the upright axis, for anything that spins like a lazy Susan.
+         vec3 botSpinY( vec3 p, vec3 hub, float angle ) {
+           vec3 r = p - hub;
+           float s = sin( angle );
+           float c = cos( angle );
+           return hub + vec3( r.x * c + r.z * s, r.y, -r.x * s + r.z * c );
          }`
       )
       .replace(
         '#include <begin_vertex>',
         `#include <begin_vertex>
-         if ( aSpin > 0.0 ) transformed = botSpin( transformed, aPivot, uTime * aSpin );
+         if ( aSpin > 0.0 ) transformed = aSpinAxis > 0.5 ? botSpinY( transformed, aPivot, uTime * aSpin ) : botSpin( transformed, aPivot, uTime * aSpin );
          vLocalY = transformed.y;
          transformed.y -= ( 1.0 - uProgress ) * ( uMaxY - uMinY );`
       )

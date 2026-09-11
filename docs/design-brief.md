@@ -29,8 +29,13 @@ tiny helper API below. Return only the function. I will drop it straight into th
 //              ry            yaw in radians                    default 0
 //              s             uniform scale                     default 1
 //              emissive      0..1, the part glows in the dark  default 0
-//              spin          radians per second, the part rotates about its own {x,y,z}
-//                            (use for a fan, a crank, a sprinkler head, a radar dish)
+//              spin          radians per second, the part turns about the {x,y,z} you gave it
+//              spinAxis      'z' (default) or 'y'. THIS MATTERS AND IS EASY TO GET WRONG:
+//                            the default turns about the **Z** axis, i.e. a wheel facing the
+//                            camera (a fan, a crank, a turbine, a clock hand). Anything that
+//                            turns flat like a lazy Susan (a carousel, a spinner rack, a
+//                            revolving door, a radar sweep) MUST pass spinAxis: 'y', or it
+//                            cartwheels sideways instead of turning.
 //
 // c.add(kitPartName, opts)  place a ready-made KayKit part (same opts, no CELL). Available:
 //   'lights' (a light pole), 'structure_tall' (a lattice tower), 'solarpanel',

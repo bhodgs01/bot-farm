@@ -394,8 +394,11 @@ export class Colony {
     // others (a client's mail, the house's doors, the floor's positions) gather round it
     // rather than each raising a hut of their own. Zones with no landmark keep their props.
     for (const [key, list] of byProject) {
-      const owns = (t) => Boolean(t.landmark || ZONE_LANDMARK[key])
-      const host = list.filter(owns).sort((a, b) => a.createdAt - b.createdAt)[0]
+      const zoneLandmark = ZONE_LANDMARK[key]
+      const owns = (t) => Boolean(t.landmark)
+      const host = list
+        .filter((t) => owns(t) || zoneLandmark)
+        .sort((a, b) => a.createdAt - b.createdAt)[0]
       if (!host) continue
       byProject.set(key, list.map((t) => (t.attachTo || owns(t) || t.id === host.id ? t : { ...t, attachTo: host.id })))
     }
