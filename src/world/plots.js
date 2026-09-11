@@ -60,7 +60,13 @@ const DECK_HEIGHT = DECK_TOP + DECK_SKIRT
  * slots that exist is how a zone ends up owning a hex nobody stands on.
  */
 const SLOTS_PER_CELL = 7
-const MAX_CELLS = 9
+/**
+ * One hex per project, always. A map where a busy client sprawls across nine tiles is harder
+ * to read at a glance than one where every project is a single place you can point at, and
+ * Blake would rather see a crowded tile than hunt for which blob belongs to whom. Crew past
+ * the seven slots simply stand closer together. Raise this if sprawl is ever wanted back.
+ */
+const MAX_CELLS = 1
 /** The lattice cell the ship owns. Nothing else may be placed there. */
 export const SHIP_CELL = { q: -2, r: 1 }
 

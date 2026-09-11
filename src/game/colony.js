@@ -82,7 +82,7 @@ const ZONE_LANDMARK = {
   Inbox: 'desk',
   'Embassy Landscape': 'yard',
   // Placeholder until the comic-shop set piece lands; a vault reads as "things worth money".
-  Collectorz: 'vault',
+  Collectorz: 'comicshop',
 }
 
 export const STATUS_ORDER = ['blocked', 'dada', 'visitor', 'door', 'plant', 'mail', 'print', 'waiting', 'working', 'watching', 'printing', 'celebrating', 'info', 'watched', 'you', 'idle', 'sleeping']
