@@ -475,7 +475,7 @@ const KINDS = {
     build: createPickle,
     name: 'Carti',
     intro: "I'm Carti, Kai's leopard gecko. I amble the colony and store my snacks in my tail.",
-    reminder: () => (isFridayKC() ? { badge: '🦗', note: "Crickets today — Kai's gecko needs feeding." } : null),
+    reminder: () => (isFridayKC() ? { badge: '🦗', say: "I'm hungry, buy me crickets", note: "Crickets today — Kai's gecko needs feeding." } : null),
   },
 }
 
@@ -768,6 +768,17 @@ ${r.note}` : m.baseIntro
     m.nameplate.material.dispose?.()
     m.nameplate = makeNameplate(m.name)
     this.group.add(m.nameplate)
+    // A reminder can also make the mascot say something out loud (Carti on Fridays).
+    if (m.reminderBubble) {
+      this.group.remove(m.reminderBubble)
+      m.reminderBubble.material.map?.dispose?.()
+      m.reminderBubble.material.dispose?.()
+      m.reminderBubble = null
+    }
+    if (r && r.say) {
+      m.reminderBubble = makeSpeechBubble(r.say)
+      this.group.add(m.reminderBubble)
+    }
   }
 
   /** Somewhere near a random hex, so the wanderers stay where they can be seen. */
@@ -927,6 +938,10 @@ ${r.note}` : m.baseIntro
       if (m.bubble) {
         const lift = m.mesh.position.y + m.nameOffset + 0.32 + (m.bubble.userData.worldH || 0.6) / 2
         m.bubble.position.set(m.pos.x, lift + Math.sin(elapsed * 1.6 + m.phase) * 0.03, m.pos.z)
+      }
+      if (m.reminderBubble) {
+        const lift = m.mesh.position.y + m.nameOffset + 0.32 + (m.reminderBubble.userData.worldH || 0.6) / 2
+        m.reminderBubble.position.set(m.pos.x, lift + Math.sin(elapsed * 1.6 + m.phase) * 0.03, m.pos.z)
       }
       if (m.alert) {
         // A heartbeat bob just over the head; sits above a speech bubble if she has one too.
