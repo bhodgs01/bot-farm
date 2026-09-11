@@ -64,13 +64,15 @@ const MAX_CELLS = 9
 /**
  * Named client projects stay one hex each, however busy they get. A client that sprawls across
  * nine tiles is harder to point at than a single crowded one, and crew past the seven slots
- * just stand closer together. The machine-generated zones (Cluster, Inbox, Home, Backups) are
- * exempt: their whole point is that the tile grows with the fleet.
+ * just stand closer together.
+ *
+ * Deliberately NOT in here: Active Projects, Cluster, Inbox and Print Service. Those tiles fill
+ * with one astronaut per real thing out in the world (a node, a message, a running print), so
+ * growing with the fleet is the whole point of them.
  */
 const SINGLE_CELL_ZONES = new Set([
   'CorrosionDC', 'KC AI Club', 'Embassy Landscape', 'NGV Talent', 'CyberGrade', 'Frances',
-  'NED Builds', 'Print Service', 'Trade Floor', 'KC Proto', 'Collectorz', 'Franky',
-  'Roast Bot', 'Clayton', 'Atlas',
+  'NED Builds', 'KC Proto', 'Collectorz', 'Franky', 'Roast Bot', 'Clayton', 'Atlas',
 ])
 /** The lattice cell the ship owns. Nothing else may be placed there. */
 export const SHIP_CELL = { q: -2, r: 1 }
