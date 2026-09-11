@@ -72,6 +72,31 @@ async function fetchThreads() {
       // A ticket on a client or FJ40 hex raises a hand so Blake can find it; only the generic
       // KC Proto bucket stays calm (those are captured in their own client projects).
       const calm = zone === 'KC Proto'
+      // A zone with nothing open would vanish, taking its landmark with it. One caretaker stays
+      // behind so the tile is still a place you can point at, and so a client that is simply
+      // up to date does not read as a client that was dropped.
+      const before = out.length
+      const keeper = () => {
+        if (out.length > before) return
+        out.push({
+          id: `task:keeper:${p.id}`,
+          kind: 'task',
+          title: `\u{1F4CB} ${zone}`,
+          preview: 'Nothing open. The board is clear.',
+          project: zone,
+          projectPath: `tasks://project/${p.id}`,
+          worktree: '',
+          cwd: zone,
+          gitBranch: 'all clear',
+          model: '',
+          createdAt: now,
+          updatedAt: now,
+          source: 'vikunja',
+          canOpen: true,
+          canArchive: false,
+          ref: { project: p.id },
+        })
+      }
       for (const t of Array.isArray(tasks) ? tasks : []) {
         if (t.done) continue
         const due = validDate(t.due_date)
@@ -123,6 +148,7 @@ async function fetchThreads() {
           ref: { task: t.id },
         })
       }
+      keeper()
     })
   )
   // One keeper on KC Proto carries the whole list: the count over his head, the titles
