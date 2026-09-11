@@ -753,9 +753,15 @@ export class Mascots {
   }
 
   /** A pet with a reminder (Pickle on Fridays) wears a 🦗 on its name and adds a line to its card. */
+  /** Blake dismissed a reminder (fed Carti): mute its badge/bubble until it's re-armed. */
+  muteReminder(kind, muted) {
+    const m = this.list.find((x) => x.kind === kind)
+    if (m) m.reminderMuted = Boolean(muted)
+  }
+
   _applyReminder(m) {
     if (!m.reminderFn) return
-    const r = m.reminderFn()
+    const r = m.reminderMuted ? null : m.reminderFn()
     const key = r ? r.badge : ''
     if (key === m.reminderKey) return
     m.reminderKey = key

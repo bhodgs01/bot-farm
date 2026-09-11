@@ -128,7 +128,8 @@ document.body.appendChild(petCard)
 petCard.addEventListener('click', (ev) => {
   const dis = ev.target.closest('.pet-dismiss')
   if (dis) {
-    clearKidNote(dis.dataset.kid)
+    if (dis.dataset.fed) feedCarti()
+    else clearKidNote(dis.dataset.kid)
     petCard.hidden = true
     return
   }
@@ -195,11 +196,14 @@ function showPetCard(m, at) {
   // Opening Ema's own card counts as looking at her: clear her waiting heart.
   if (m.kind === 'ema') markEmaSeen()
   const kidSay = KIDS.has(m.kind) ? (familySays[m.kind] || '').trim() : ''
+  const cartiSay = m.kind === 'gecko' && cartiHungry() ? "I'm hungry, buy me crickets" : ''
   petCard.innerHTML =
     `<header><b>${esc(m.name)}</b><button class="px" title="Close" aria-label="Close">✕</button></header>` +
     (kidSay ? `<div class="pet-say">💬 ${esc(kidSay)}</div>` : '') +
+    (cartiSay ? `<div class="pet-say">🦗 ${esc(cartiSay)}</div>` : '') +
     `<span>${esc(petBody(m)).replace(/\n/g, '<br>')}</span>` +
-    (kidSay ? `<button class="pet-dismiss" data-kid="${esc(m.kind)}">Got it — clear this note</button>` : '')
+    (kidSay ? `<button class="pet-dismiss" data-kid="${esc(m.kind)}">Got it — clear this note</button>` : '') +
+    (cartiSay ? `<button class="pet-dismiss" data-fed="1">🦗 Fed him — clear it</button>` : '')
   petCard.hidden = false
   const w = petCard.offsetWidth
   const h = petCard.offsetHeight
@@ -746,8 +750,23 @@ function markEmaSeen() {
   renderCrew()
 }
 /** Does this crew member want Blake's eyes right now? */
+/** KC's date as YYYY-MM-DD, and whether it's Friday there — for Carti's weekly cricket ask. */
+const todayKC = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago' }).format(new Date())
+const isFridayKC = () => new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'America/Chicago' }).format(new Date()) === 'Fri'
+/** Carti wants crickets on Fridays, until Blake marks him fed for the day. */
+function cartiHungry() {
+  return isFridayKC() && (state.cartiFedOn || '') !== todayKC()
+}
+/** Mark Carti fed for today: clears his dot and hushes his cricket bubble until next Friday. */
+function feedCarti() {
+  state.cartiFedOn = todayKC()
+  queueSave()
+  colony.mascots?.muteReminder('gecko', true)
+  renderCrew()
+}
 function crewAlert(m) {
   if (m.kind === 'ema') return emaWantsYou()
+  if (m.kind === 'gecko') return cartiHungry()
   if (KIDS.has(m.kind) && (familySays[m.kind] || '').trim()) return true
   return false
 }
@@ -1534,6 +1553,8 @@ function applyThreads(list) {
   renderCrew()
   // And float a heart over the Ema mascot herself when she's texted on the Dada chat.
   colony.mascots?.setAlert('ema', emaWantsYou())
+  // Hush Carti's cricket bubble once he's been fed for the day; re-arm it next Friday.
+  colony.mascots?.muteReminder('gecko', !cartiHungry())
 }
 
 let polling = false
