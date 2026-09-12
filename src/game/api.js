@@ -105,3 +105,9 @@ export const actNews = (topic, date, on) => post('/api/act/news', { topic, date,
 
 /** Star (or unstar) a worker: a gold star over his head until you take it off. */
 export const actStar = (threadId, on) => post('/api/act/star', { id: threadId, on })
+
+/** "I read it." Clears a waiting mark the source itself cannot tell has been read. */
+export const actRead = (threadId) => post('/api/act/read', { id: threadId })
+
+/** The hourly snapshots the day scrubber replays. */
+export const fetchHistory = (days = 2) => req(`/api/history?days=${days}`)

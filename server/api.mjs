@@ -14,6 +14,8 @@ import {
 import { ask, chatEnabled, johnnyAsk } from './ask.mjs'
 import { setProjectStatus, closeTask, completeChores, feedCartiDone, createTicket, janineDraftAction, nudgeClient, clearSay } from './act.mjs'
 import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
+import { applySeen, markSeen } from './seen.mjs'
+import { nightWatch } from './notify.mjs'
 import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGenerate, update as newsUpdate, topicById, todayKC, newsEnabled } from './news.mjs'
 import { refreshNews } from './harnesses/news.mjs'
 import { napMode, fetchNap } from './harnesses/home.mjs'
@@ -25,6 +27,12 @@ import { withIntros } from './intro.mjs'
 // ── history: who had a hand up, hour by hour ─────────────────────────────────────────────
 // Resolved on use: DATA_DIR is declared further down and this block loads with the module.
 const historyDir = () => path.join(DATA_DIR, 'history')
+/**
+ * How often a snapshot is kept. Hourly was enough for a timeline of the day in words; the
+ * scrubber replays the map, and an hour-wide step skips most of what happened, so this is
+ * finer. A day of snapshots is a few tens of kilobytes.
+ */
+const HISTORY_EVERY_MS = Number(process.env.HISTORY_EVERY_MIN || 20) * 60 * 1000
 let lastHistoryAt = 0
 async function readHistory(day) {
   try {
@@ -34,7 +42,7 @@ async function readHistory(day) {
   }
 }
 async function recordHistory(threads) {
-  if (Date.now() - lastHistoryAt < 60 * 60 * 1000) return
+  if (Date.now() - lastHistoryAt < HISTORY_EVERY_MS) return
   lastHistoryAt = Date.now()
   const day = todayKC()
   const hands = threads
@@ -46,7 +54,7 @@ async function recordHistory(threads) {
     .filter((t) => !t.archived && (t.project === 'Pay me mother fucker' || t.kind === 'printing'))
     .map((t) => ({ id: t.id, title: t.title, project: t.project, kind: t.kind === 'printing' ? 'print' : 'done', amount: t.project === 'Pay me mother fucker' ? t.plate || '' : '' }))
   const list = await readHistory(day)
-  list.push({ at: Date.now(), hands, marks })
+  list.push({ at: Date.now(), hands, marks, crew: threads.filter((t) => !t.archived).length })
   await fsp.mkdir(historyDir(), { recursive: true })
   await fsp.writeFile(path.join(historyDir(), `${day}.json`), JSON.stringify(list))
   // thirty days is plenty
@@ -181,8 +189,11 @@ function withLedger(threads) {
 let chiefTimeline = []
 // unref: this module is also loaded by the Vite config at build time, and a live timer there
 // would keep the build process from ever exiting.
-setInterval(() => timelineToday().then((l) => (chiefTimeline = l)).catch(() => {}), 5 * 60 * 1000).unref?.()
-timelineToday().then((l) => (chiefTimeline = l)).catch(() => {})
+const refreshTimeline = () => timelineToday().then((l) => (chiefTimeline = l)).catch(() => {})
+setInterval(refreshTimeline, 5 * 60 * 1000).unref?.()
+// Deferred for the same reason as the week: reading during module evaluation hits DATA_DIR
+// before it is initialised, and the error is swallowed, leaving the chief blank for 5 minutes.
+setTimeout(refreshTimeline, 2000).unref?.()
 function withChief(threads) {
   const by = new Map(threads.map((t) => [t.id, t]))
   const wants = threads.filter((t) => !t.archived && (t.unread || t.hasError) && !t.id.startsWith('chief:'))
@@ -241,6 +252,138 @@ function withChief(threads) {
     ref: {},
   }
   return [...threads, chief]
+}
+
+// ── the week, from the same history the scrubber replays ─────────────────────────────────
+/** The last `n` day keys in KC time, newest first. */
+function recentDays(n) {
+  const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago', year: 'numeric', month: '2-digit', day: '2-digit' })
+  return Array.from({ length: n }, (_, i) => fmt.format(new Date(Date.now() - i * 86400000)))
+}
+
+/**
+ * What the week actually looked like, counted off the snapshots rather than remembered.
+ * A hand going up and later not being there is something Blake dealt with, so "cleared" is
+ * the honest measure of a week's work on this map.
+ */
+async function weekStats() {
+  const days = recentDays(7)
+  let raised = 0
+  let cleared = 0
+  let delivered = 0
+  let deliveredAmount = 0
+  let prints = 0
+  let handSamples = 0
+  let handTotal = 0
+  let peak = 0
+  const perDay = []
+  for (const day of days) {
+    const list = await readHistory(day)
+    if (!list.length) continue
+    let up = 0
+    let down = 0
+    let prevHands = null
+    let prevMarks = new Map()
+    for (const snap of list) {
+      const hands = new Map((snap.hands || []).map((h) => [h.id, h]))
+      handSamples++
+      handTotal += hands.size
+      peak = Math.max(peak, hands.size)
+      if (prevHands) {
+        for (const id of hands.keys()) if (!prevHands.has(id)) up++
+        for (const id of prevHands.keys()) if (!hands.has(id)) down++
+      }
+      prevHands = hands
+      const marks = new Map((snap.marks || []).map((m) => [m.id, m]))
+      for (const [id, m] of marks) {
+        if (prevMarks.has(id)) continue
+        if (m.kind === 'print') prints++
+        else {
+          delivered++
+          deliveredAmount += Number(String(m.amount || '').replace(/[^0-9.]/g, '')) || 0
+        }
+      }
+      prevMarks = marks
+    }
+    raised += up
+    cleared += down
+    perDay.push({ day, cleared: down, raised: up })
+  }
+  const busiest = perDay.slice().sort((a, b) => b.cleared - a.cleared)[0]
+  return {
+    days: perDay.length,
+    raised,
+    cleared,
+    delivered,
+    deliveredAmount,
+    prints,
+    average: handSamples ? Math.round((handTotal / handSamples) * 10) / 10 : 0,
+    peak,
+    busiest,
+  }
+}
+
+let weekCache = null
+const refreshWeek = () => weekStats().then((w) => (weekCache = w)).catch(() => {})
+setInterval(refreshWeek, 15 * 60 * 1000).unref?.()
+// Not straight away: DATA_DIR is declared further down this module, so a read that starts
+// during module evaluation lands in its temporal dead zone and quietly returns nothing.
+setTimeout(refreshWeek, 2000).unref?.()
+
+/**
+ * The week in review, standing next to the chief of staff. No new source: it is the same
+ * hourly history the day scrubber replays, counted up. Calm by design — a report on how the
+ * week went is never something to act on right now.
+ */
+function withWeek(threads) {
+  const w = weekCache
+  if (!w || !w.days) return threads
+  const nl = String.fromCharCode(10)
+  const money = (n) => `$${Math.round(n).toLocaleString('en-US')}`
+  const week = {
+    id: 'chief:week',
+    kind: 'keeper',
+    landmark: 'meter',
+    title: '📈 The week',
+    plate: w.cleared ? String(w.cleared) : '',
+    preview: `${w.cleared} thing${w.cleared === 1 ? '' : 's'} cleared over ${w.days} day${w.days === 1 ? '' : 's'}, ${w.raised} raised a hand. Click me for the rest.`,
+    details: {
+      Cleared: `${w.cleared} in ${w.days} day${w.days === 1 ? '' : 's'}`,
+      Raised: String(w.raised),
+      Net: w.cleared === w.raised ? 'even' : w.cleared > w.raised ? `${w.cleared - w.raised} ahead` : `${w.raised - w.cleared} behind`,
+      Delivered: w.delivered ? `${w.delivered} job${w.delivered === 1 ? '' : 's'}${w.deliveredAmount ? ` worth ${money(w.deliveredAmount)}` : ''}` : 'none',
+      Prints: w.prints ? `${w.prints} run${w.prints === 1 ? '' : 's'} started` : 'none',
+      'Hands at any moment': `${w.average} on average, ${w.peak} at the worst`,
+      'Busiest day': w.busiest ? `${w.busiest.day}: ${w.busiest.cleared} cleared` : '',
+      Source: 'Counted off the map’s own history, not typed in anywhere.',
+    },
+    project: 'Countdown',
+    projectPath: 'chief://week',
+    worktree: '',
+    cwd: 'chief',
+    gitBranch: `${w.cleared} cleared`,
+    model: '',
+    effort: '',
+    createdAt: Date.parse('2026-09-05T12:00:00Z'),
+    lastActivityAt: Date.now(),
+    lastFocusedAt: 0,
+    running: false,
+    unread: false,
+    hasError: false,
+    starred: false,
+    routine: '',
+    prState: '',
+    archived: false,
+    hasTranscript: false,
+    sizeBytes: 4000,
+    source: 'bot-farm',
+    harness: 'deadlines',
+    harnessName: 'Countdown',
+    canOpen: false,
+    canArchive: false,
+    ref: {},
+  }
+  return [...threads, week]
 }
 
 /**
@@ -561,9 +704,12 @@ export async function apiMiddleware(req, res, next) {
 
   try {
     if (url.pathname === '/api/threads' && req.method === 'GET') {
-      const scanned = await applyStars(await applyAcks(await reconcileArchived(await scanThreads())))
+      const scanned = await applySeen(await applyStars(await applyAcks(await reconcileArchived(await scanThreads()))))
       recordHistory(scanned).catch(() => {})
-      const threads = withIntros(withChief(withLedger(scanned)))
+      // The night watch reads the same scan the map does, and rings for the few things that
+      // should not wait until morning. Fire and forget: the pager never delays the map.
+      nightWatch(scanned).catch(() => {})
+      const threads = withIntros(withWeek(withChief(withLedger(scanned))))
       return send(res, 200, { nap: napMode(), threads, scannedAt: Date.now() })
     }
 
@@ -724,11 +870,33 @@ export async function apiMiddleware(req, res, next) {
       }
     }
 
-    // The day so far: hourly snapshots of who had a hand up.
+    // The day so far: snapshots of who had a hand up. `days=N` walks back from today for
+    // the scrubber, which needs yesterday too when Blake looks at it before breakfast.
     if (url.pathname === '/api/history' && req.method === 'GET') {
+      const back = Math.min(14, Math.max(0, Number(url.searchParams.get('days')) || 0))
+      if (back) {
+        const wanted = recentDays(back)
+        const days = await Promise.all(wanted.map(async (day) => ({ day, snapshots: await readHistory(day) })))
+        return send(res, 200, { days: days.filter((d) => d.snapshots.length).reverse() })
+      }
       const day = url.searchParams.get('day') || todayKC()
       if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return send(res, 400, { error: 'Bad day' })
       return send(res, 200, { day, snapshots: await readHistory(day) })
+    }
+
+    // "I read it." For a source that can say a message arrived but not that Blake saw it —
+    // Ema's chat being the one that needs it. The mark is pinned to the message's own
+    // timestamp, so the next message she sends raises her hand again.
+    if (url.pathname === '/api/act/read' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to mark things read', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      const { id } = await readJsonBody(req, 16 * 1024)
+      if (typeof id !== 'string' || !id) return send(res, 400, { error: 'Bad id' })
+      const thread = (await scanThreads()).find((t) => t.id === id)
+      if (!thread) return send(res, 404, { error: 'That worker has walked off the map' })
+      const mark = await markSeen(id, thread.seenStamp || thread.lastActivityAt || Date.now(), who)
+      return send(res, 200, { ok: true, stamp: mark?.stamp || 0 })
     }
 
     if (url.pathname === '/api/act/project' && req.method === 'POST') {

@@ -1365,8 +1365,18 @@ export class Colony {
     }
   }
 
+  /**
+   * Light the hexes the way they were at some past moment instead of right now. Pass null
+   * to hand the map back to the live scan. Only the glow is replayed: the crew stay where
+   * they actually are, because pretending otherwise would be a simulation of the day rather
+   * than a recording of it.
+   */
+  setReplay(zones) {
+    this.replayUrgent = zones && zones.size !== undefined ? zones : zones ? new Set(zones) : null
+  }
+
   _updatePlots(night, elapsed) {
-    const urgent = this.urgentPlots
+    const urgent = this.replayUrgent || this.urgentPlots
     for (const plot of this.plotOrder) plot.setNight(night, urgent?.has(plot.id) ?? false, elapsed)
   }
 

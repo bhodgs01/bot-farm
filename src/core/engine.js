@@ -323,6 +323,34 @@ export class Engine {
    * to read the drawing buffer in the same task as the draw that filled it — the alternative
    * is `preserveDrawingBuffer`, which costs a full copy on every frame forever.
    */
+  /**
+   * One frame at a size of your choosing, returned as a PNG data URL — a poster-sized
+   * still rather than a screen grab. The drawing buffer and the post chain are resized,
+   * drawn once, read, and put straight back; the canvas element keeps its CSS size the
+   * whole time, so nothing on screen moves. The read has to happen before the restore,
+   * because resizing the buffer clears it.
+   */
+  renderAt(bw, bh) {
+    const prev = this.viewport
+    const apply = (w, h) => {
+      this.renderer.setSize(w, h, false)
+      this.composer?.setSize(w, h)
+      this.tiltShift?.setSize(w, h)
+    }
+    apply(bw, bh)
+    let url = ''
+    try {
+      this.renderFrame()
+      url = this.canvas.toDataURL('image/png')
+    } finally {
+      apply(prev.bw, prev.bh)
+      this.tiltShift?.setCamera(this.camera)
+      this.viewport = prev
+      this.renderFrame()
+    }
+    return url
+  }
+
   renderFrame() {
     this.renderer.info.reset()
     if (this.composer && (this.settings.get('bloom') || this.settings.get('antialias') || this.settings.get('tiltShift'))) {

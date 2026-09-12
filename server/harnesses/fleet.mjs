@@ -17,6 +17,11 @@ const PROM = (process.env.PROMETHEUS_URL || 'http://prometheus.monitoring.svc.cl
 const DR_URL = (process.env.DR_STATUS_URL || 'http://100.120.190.49:3200/').replace(/\/?$/, '/')
 const CANARIES = (process.env.FAILOVER_CANARIES || 'grafana.kcproto.com,homepage.kcproto.com,immich.kcproto.com').split(',').map((s) => s.trim()).filter(Boolean)
 const DISK_ALERT = Number(process.env.DISK_ALERT_PCT || 90)
+const KUMA_URL = (process.env.KUMA_URL || 'http://uptime-kuma.uptime-kuma.svc.cluster.local:3001').replace(/\/$/, '')
+const KUMA_OPEN_URL = (process.env.KUMA_OPEN_URL || 'https://uptime.kcproto.com').replace(/\/$/, '')
+const KUMA_KEY = process.env.KUMA_API_KEY || ''
+/** Which Kuma monitors count as guarding a backup. */
+const BACKUP_MONITORS = new RegExp(process.env.BACKUP_MONITORS || 'backup|kopia|velero|syncthing|offsite', 'i')
 const TTL_MS = 2 * 60 * 1000
 const BORN = Date.parse('2026-09-05T12:00:00Z')
 const NL = String.fromCharCode(10)
@@ -242,10 +247,77 @@ async function failoverThread(now) {
   }
 }
 
+/**
+ * The backup watch (Backups hex): every Uptime Kuma monitor that guards a backup, read
+ * straight off Kuma's Prometheus endpoint. Kuma is the thing that actually knows whether
+ * the desktop's Kopia run, the Velero store, the NAS mirror and the content check are
+ * alive; the colony just puts its verdict on the map. Any one of them down is a flag,
+ * because a backup you are not told about is not a backup.
+ */
+async function backupThread(now) {
+  const thread = {
+    ...base,
+    id: 'backup:watch',
+    kind: 'keeper',
+    title: '💾 Backup watch',
+    project: 'Backups',
+    projectPath: 'kuma://backups',
+    cwd: 'uptime-kuma',
+    model: '',
+    createdAt: BORN + 3,
+    lastActivityAt: now,
+    sizeBytes: 3000,
+    source: 'uptime-kuma',
+    ref: { url: KUMA_OPEN_URL },
+  }
+  if (!KUMA_KEY) {
+    return { ...thread, plate: '', preview: 'No Kuma API key on this server, so the backup monitors cannot be read.', details: { Fix: 'Mint a key in Uptime Kuma and put it in the bot-farm-kuma secret.' }, gitBranch: 'no key', hasError: false }
+  }
+  let monitors = []
+  try {
+    const r = await fetch(`${KUMA_URL}/metrics`, {
+      headers: { Authorization: `Basic ${Buffer.from(`:${KUMA_KEY}`).toString('base64')}` },
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!r.ok) throw new Error(`kuma → ${r.status}`)
+    const text = await r.text()
+    for (const line of text.split(String.fromCharCode(10))) {
+      if (!line.startsWith('monitor_status')) continue
+      const name = line.match(/monitor_name="([^"]*)"/)?.[1]
+      const value = Number(line.trim().split(/\s+/).pop())
+      // 1 up, 0 down, 2 pending, 3 maintenance. Only a hard down is a failure.
+      if (name && BACKUP_MONITORS.test(name)) monitors.push({ name, up: value === 1, value })
+    }
+  } catch (err) {
+    return { ...thread, preview: `Cannot read Uptime Kuma: ${err.message}`, details: { Error: err.message }, gitBranch: 'unreadable', hasError: false }
+  }
+  if (!monitors.length) {
+    return { ...thread, preview: 'Kuma answered, but no monitor looks like a backup.', details: { Note: 'Name a monitor so it matches backup, Kopia, Velero, Syncthing or offsite.' }, gitBranch: 'nothing watched', hasError: false }
+  }
+  monitors.sort((a, b) => a.name.localeCompare(b.name))
+  const down = monitors.filter((m) => !m.up)
+  const state = (m) => (m.value === 1 ? 'up' : m.value === 0 ? 'DOWN' : m.value === 2 ? 'pending' : m.value === 3 ? 'maintenance' : 'unknown')
+  return {
+    ...thread,
+    plate: down.length ? String(down.length) : '',
+    preview: down.length
+      ? `${down.length} of ${monitors.length} backup checks are down: ${down.map((m) => m.name).join(', ')}`
+      : `All ${monitors.length} backup checks are answering.`,
+    details: {
+      Down: down.length ? down.map((m) => `• ${m.name}`).join(NL) : 'none',
+      Watching: monitors.map((m) => `${m.name}: ${state(m)}`).join(NL),
+      Source: 'Uptime Kuma, read through its Prometheus endpoint',
+    },
+    gitBranch: down.length ? `${down.length} down` : `${monitors.length} green`,
+    hasError: down.length > 0,
+    alertKey: down.length ? `backup:${down.map((m) => m.name).sort().join(',')}` : '',
+  }
+}
+
 async function fetchThreads() {
   const now = Date.now()
-  const [flux, disks, fo] = await Promise.all([fluxThread(now), diskThreads(now), failoverThread(now)])
-  return [flux, ...disks, fo]
+  const [flux, disks, fo, backup] = await Promise.all([fluxThread(now), diskThreads(now), failoverThread(now), backupThread(now)])
+  return [flux, ...disks, fo, backup]
 }
 
 let cache = { at: 0, data: null, inflight: null }

@@ -38,6 +38,7 @@ const ICON = {
   tour: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18c4-9 6-9 8 0s4 9 8 0"/><circle cx="4" cy="18" r="1.6" fill="currentColor" stroke="none"/><circle cx="20" cy="18" r="1.6" fill="currentColor" stroke="none"/></svg>`,
   move: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20M8 6l4-4 4 4M8 18l4 4 4-4M6 8l-4 4 4 4M18 8l4 4-4 4"/></svg>`,
   orbit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="4"/><ellipse cx="12" cy="12" rx="10.2" ry="4.6" transform="rotate(-24 12 12)"/><circle cx="21" cy="8.2" r="1.5" fill="currentColor" stroke="none"/></svg>`,
+  history: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3.1 12a8.9 8.9 0 1 0 2.6-6.3"/><path d="M3 4.2V9h4.8"/><path d="M12 7.6V12l3 1.8"/></svg>`,
 }
 
 const STAT_DEFS = [
@@ -386,6 +387,7 @@ export class Hud {
     })
     on('#btn-planet', 'click', () => this.actions.cyclePlanet?.())
     on('#btn-vr', 'click', () => this.actions.toggleVr?.())
+    on('#btn-scrub', 'click', () => this.setScrubber(this.actions.toggleScrubber?.()))
     on('#btn-time', 'click', () => this.actions.cycleTime?.())
     on('#btn-open', 'click', () => this.actions.openThread?.())
     on('#btn-collapse', 'click', () => this.toggleCollapse())
@@ -933,6 +935,12 @@ export class Hud {
     this.$('#btn-tour').setAttribute('aria-pressed', String(Boolean(on)))
   }
 
+  /** Reflect the day scrubber on the rail. */
+  setScrubber(on) {
+    this.$('#btn-scrub').setAttribute('aria-pressed', String(Boolean(on)))
+    this.$('#btn-scrub').title = on ? 'Back to now (Y)' : 'Play the day back (Y)'
+  }
+
   /** The VR switch on the rail: shown only where a headset session is possible. */
   setVrAvailable(on) {
     this.$('#btn-vr').hidden = !on
@@ -1107,7 +1115,7 @@ const TEMPLATE = `
 <aside class="side panel">
   <header class="brandbar">
     <div class="brand"><i class="dot"></i>Bot Farm</div>
-    <button class="btn icon ghost" id="btn-shot" title="Screenshot (P)">${ICON.camera}</button>
+    <button class="btn icon ghost" id="btn-shot" title="Postcard — a poster-sized still (P)">${ICON.camera}</button>
     <button class="btn icon ghost" id="btn-help" title="Help (?)">${ICON.help}</button>
     <button class="btn icon ghost" id="btn-hide" title="Hide all UI (H)">${ICON.eye}</button>
     <button class="btn icon ghost" id="btn-settings" title="Settings (S)" aria-pressed="false">${ICON.settings}</button>
@@ -1162,6 +1170,7 @@ const TEMPLATE = `
   <button class="btn icon" id="btn-tour" title="Tour — visit every hex that needs you (T)" aria-pressed="false">${ICON.tour}</button>
   <button class="btn icon" id="btn-planet" title="Change planet (Tab)">${ICON.globe}</button>
   <button class="btn icon" id="btn-time" title="Change the time of day (L)">${ICON.sun}</button>
+  <button class="btn icon" id="btn-scrub" title="Play the day back (Y)" aria-pressed="false">${ICON.history}</button>
   <button class="btn icon" id="btn-vr" title="Walk the colony in VR (headset)" aria-pressed="false" hidden>${ICON.vr}</button>
 </div>
 
@@ -1221,7 +1230,7 @@ const TEMPLATE = `
         <div class="k"><span>Reset view</span><kbd>0</kbd></div>
         <div class="k"><span>Hide all UI</span><kbd>H</kbd> <kbd>⌘\\</kbd></div>
         <div class="k"><span>Settings</span><kbd>S</kbd></div>
-        <div class="k"><span>Screenshot</span><kbd>P</kbd></div>
+        <div class="k"><span>Postcard</span><kbd>P</kbd></div>
       </div>
       <div>
         <div class="k"><span>Next needing you</span><kbd>N</kbd></div>
@@ -1229,6 +1238,7 @@ const TEMPLATE = `
         <div class="k"><span>Archive</span><kbd>A</kbd></div>
         <div class="k"><span>New conversation</span><kbd>C</kbd></div>
         <div class="k"><span>Orbit mode</span><kbd>O</kbd></div>
+        <div class="k"><span>Play the day back</span><kbd>Y</kbd></div>
         <div class="k"><span>Change planet</span><kbd>Tab</kbd></div>
         <div class="k"><span>Time of day</span><kbd>L</kbd></div>
         <div class="k"><span>Deselect</span><kbd>Esc</kbd></div>

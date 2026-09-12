@@ -8,6 +8,8 @@
  * Read-only here except the reply, which goes through server/act.mjs. Auth to the chat is
  * Blake's own dada-chat user id (the `uid` cookie), kept in a secret.
  */
+import { seenStamp } from '../seen.mjs'
+
 const URL = process.env.DADA_URL || 'http://dada-chat.dada-chat.svc.cluster.local:3130'
 const UID = process.env.DADA_UID || ''
 const OPEN_URL = process.env.DADA_OPEN_URL || 'https://dada-chat.kcproto.com'
@@ -50,7 +52,13 @@ async function fetchThreads() {
     /* hud-status alone still tells us who spoke last */
   }
   const who = hud.from || 'Ema'
-  const unread = Boolean(hud.unread)
+  // dada-chat reports "unread" when the last word in the thread is hers, which is not the
+  // same as Blake not having read it: before this, her heart came back on every refresh
+  // until he actually typed a reply. The colony keeps its own read mark, pinned to the
+  // timestamp of her newest message, so reading clears it and the next message raises it.
+  const stamp = Number(hud.ts) || 0
+  const readTo = await seenStamp('dada:ema').catch(() => 0)
+  const unread = Boolean(hud.unread) && stamp > readTo
   const preview = unread ? (last ? `${who}: ${last}` : `${who} sent you a message`) : last ? `You: ${last}` : 'All caught up.'
 
   return [
@@ -59,6 +67,8 @@ async function fetchThreads() {
       kind: 'dada',
       title: `${hud.emoji ? `${hud.emoji} ` : '💗 '}${who}`,
       preview: preview.slice(0, 240),
+      // What "read" would mean if Blake presses it: everything up to her newest message.
+      seenStamp: stamp,
       details: {
         From: who,
         Latest: last || '(no messages yet)',
@@ -69,7 +79,7 @@ async function fetchThreads() {
       projectPath: 'dada://chat',
       worktree: '',
       cwd: 'dada-chat',
-      gitBranch: unread ? 'she messaged you' : 'up to date',
+      gitBranch: unread ? 'she messaged you' : hud.unread ? 'read, not answered' : 'up to date',
       model: '',
       effort: '',
       createdAt: Date.parse('2026-09-05T12:00:00Z') + 5,
@@ -87,7 +97,7 @@ async function fetchThreads() {
       source: 'dada-chat',
       canOpen: true,
       canArchive: false,
-      actions: ['reply'],
+      actions: unread ? ['reply', 'read'] : ['reply'],
       ref: {},
     },
   ]

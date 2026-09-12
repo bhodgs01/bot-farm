@@ -10,6 +10,7 @@ import { loadKit } from './world/kit.js'
 import { crewRig, loadCrew } from './agents/crew.js'
 import { TIMES } from './world/sky.js'
 import { installVr } from './vr.js'
+import { installScrubber } from './ui/scrubber.js'
 import {
   fetchThreads,
   fetchState,
@@ -33,6 +34,8 @@ import {
   actAck,
   actStar,
   actNews,
+  actRead,
+  fetchHistory,
 } from './game/api.js'
 
 /**
@@ -386,16 +389,76 @@ const actions = {
     hud.toast(`Saved as home for this ${kind}`)
   },
 
-  screenshot: () => {
-    // Render one more frame, then read the buffer before the compositor clears it — the
-    // alternative is preserveDrawingBuffer, which costs a copy on every single frame.
-    engine.renderFrame()
-    const url = engine.canvas.toDataURL('image/png')
+  /**
+   * A postcard, not a screen grab: the same view drawn at poster size with the date and the
+   * day's count printed along the bottom. Worth having because this map gets shown to people
+   * — on a slide, in a talk — and a browser-window screenshot of it looks like a screenshot.
+   */
+  screenshot: async () => {
+    const v = engine.viewport
+    const long = Math.max(v.w, v.h)
+    // Up to 4K on the long edge, and never more than 4x what is on screen: past that the
+    // scene is drawn at a resolution its own textures cannot fill.
+    const scale = Math.max(1, Math.min(4, Math.round((3840 / long) * 100) / 100))
+    const bw = Math.round(v.w * scale)
+    const bh = Math.round(v.h * scale)
+    hud.toast(bw > v.bw ? `Drawing a ${bw}×${bh} postcard…` : 'Taking the shot…')
+    let url
+    try {
+      url = engine.renderAt(bw, bh)
+    } catch {
+      engine.renderFrame()
+      url = engine.canvas.toDataURL('image/png')
+    }
+    const img = new Image()
+    await new Promise((done) => {
+      img.onload = done
+      img.onerror = done
+      img.src = url
+    })
+
+    const live = threads.filter((t) => !t.archived)
+    const needs = live.filter((t) => t.unread || t.hasError).length
+    const band = Math.max(64, Math.round(img.height * 0.058))
+    const out = document.createElement('canvas')
+    out.width = img.width
+    out.height = img.height + band
+    const g = out.getContext('2d')
+    g.drawImage(img, 0, 0)
+    g.fillStyle = '#0e111a'
+    g.fillRect(0, img.height, out.width, band)
+    g.fillStyle = 'rgba(255,255,255,0.12)'
+    g.fillRect(0, img.height, out.width, 2)
+    const pad = Math.round(band * 0.42)
+    const size = Math.round(band * 0.42)
+    g.textBaseline = 'middle'
+    g.font = `600 ${size}px ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif`
+    g.fillStyle = '#e6e8ef'
+    g.fillText('Bot Farm', pad, img.height + band / 2)
+    const title = g.measureText('Bot Farm').width
+    g.font = `400 ${Math.round(size * 0.82)}px ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif`
+    g.fillStyle = '#8d94a8'
+    const when = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago', weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+    g.fillText(when, pad + title + pad * 0.7, img.height + band / 2)
+    const right = `${live.length} on the map · ${needs} want you`
+    g.fillStyle = '#e6e8ef'
+    g.textAlign = 'right'
+    g.fillText(right, out.width - pad, img.height + band / 2)
+
     const a = document.createElement('a')
-    a.href = url
-    a.download = `bot-crossing-${colony.planet.id}-${stamp()}.png`
+    a.href = out.toDataURL('image/png')
+    a.download = `bot-farm-${stamp()}.png`
     a.click()
-    hud.toast('Screenshot saved')
+    hud.toast(`Postcard saved — ${out.width}×${out.height}`)
+  },
+
+  /** Play the day back: the hexes light the way they did, twenty minutes at a time. */
+  toggleScrubber: () => {
+    const on = !scrubber.open
+    scrubber.toggle(on)
+    hud.setScrubber(on)
+    hud.hint(on ? 'Replaying the day — drag the bar, or press Y to come back to now' : 'Back to now')
+    return on
   },
 
   /** Google Earth's auto-rotate: a slow sweep around whatever is centred. */
@@ -467,6 +530,20 @@ const actions = {
         Object.assign(thread, { unread: false, count: 0, actions: [], gitBranch: 'read', details: { ...(thread.details || {}), Status: 'read' } })
         applyThreads(threads.slice())
         setTimeout(poll, 1500)
+        return
+      }
+      // "Read ✓" on a worker whose source cannot tell reading from replying — Ema's chat.
+      // The mark is pinned to her newest message, so the next one raises her hand again.
+      if (status === 'read') {
+        await actRead(thread.id)
+        hud.toast(`Read: ${thread.title}. She'll raise her hand again when she writes.`)
+        Object.assign(thread, {
+          unread: false,
+          gitBranch: 'read, not answered',
+          actions: (thread.actions || []).filter((a) => a !== 'read'),
+        })
+        applyThreads(threads.slice())
+        setTimeout(poll, 1200)
         return
       }
       if (status === 'join') {
@@ -680,6 +757,8 @@ const actions = {
 const hud = new Hud(app, settings, actions)
 // VR sidecar: shows the rail switch when a headset session is possible.
 const vr = installVr({ engine, colony, rig, hud, settings })
+/** The day, played back: the same glow the live map uses, pointed at the recorded past. */
+const scrubber = installScrubber({ colony, hud, onFly: (zone) => actions.focusProject?.(zone) })
 // The sidebar is permanent, so the card beside an astronaut has a wall to stay clear of.
 const sideWidth = () => (window.innerWidth <= 820 ? 0 : 334)
 hud.setSideWidth(sideWidth())
@@ -1457,6 +1536,10 @@ window.addEventListener('keydown', (e) => {
     case 'O':
       hud.setOrbit(actions.toggleOrbit())
       break
+    case 'y':
+    case 'Y':
+      actions.toggleScrubber()
+      break
     case 'Tab':
       e.preventDefault()
       actions.cyclePlanet()
@@ -1566,6 +1649,7 @@ function applyThreads(list) {
 }
 
 let polling = false
+let greeted = false
 /**
  * Somebody else wrote the colony file (another tab, or the layout moved server-side):
  * take their zone layout and archive list rather than overwrite them on the next save.
@@ -1617,6 +1701,11 @@ async function poll() {
     await adoptRemoteState()
     applyThreads(res.threads || [])
     hud.removeBoot()
+    // Once, after the colony is actually on screen: what changed since he last looked.
+    if (!greeted) {
+      greeted = true
+      scrubber.greet().catch(() => {})
+    }
   } catch (err) {
     hud.toast(err.message || 'Could not reach the thread scanner', 'err')
     hud.removeBoot()

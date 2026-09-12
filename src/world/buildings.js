@@ -50,6 +50,19 @@ const BUILDING_SCALE = 1.45
  * printer or a workbench standing two astronauts tall reads as a monument, not a tool, and
  * several of them on one hex collide. These bring the furniture back to astronaut scale.
  */
+/**
+ * Which season it is where Blake lives. Buildings are built once and cached, so a set piece
+ * that reads this turns over on the next reload after the season does — which, four times a
+ * year, is soon enough.
+ */
+function seasonKC(now = new Date()) {
+  const month = Number(new Intl.DateTimeFormat('en-US', { month: 'numeric', timeZone: 'America/Chicago' }).format(now))
+  if (month === 12 || month <= 2) return 'winter'
+  if (month <= 5) return 'spring'
+  if (month <= 8) return 'summer'
+  return 'autumn'
+}
+
 const KIND_SCALE = {
   // many per hex: furniture-sized, so a row of them reads as a room, not a monument park
   printer: 0.55, bench: 0.5, yard: 0.55, desk: 0.75, newsstand: 0.6, planter: 0.8, crate: 0.8,
@@ -995,13 +1008,22 @@ const KINDS = {
    */
   yard(c, rand) {
     const box = (w, h, d, cell, o = {}) => c.geom(new THREE.BoxGeometry(w, h, d), cell, o)
+    // Embassy is a landscaping company, so its yard keeps the seasons. The atlas has no
+    // green or amber cell — foliage is the zone accent — so the turn is made with the two
+    // cells that do read at a glance: red leaves in autumn, white under snow.
+    const season = seasonKC()
+    const winter = season === 'winter'
+    const leaf = season === 'autumn' ? CELL.RED : winter ? CELL.WHITE : CELL.TRIM
+    const lawn = winter ? CELL.WHITE : CELL.TRIM
 
     // Lawn, clipped back hedge, and broad stepping stones.
     box(3.0, 0.12, 2.9, CELL.SLATE, { y: 0.06 })
-    box(2.8, 0.07, 2.7, CELL.TRIM, { y: 0.155 })
+    box(2.8, 0.07, 2.7, lawn, { y: 0.155 })
     for (const x of [-1.02, -0.34, 0.34, 1.02]) {
       const h = 0.5 + rand() * 0.1
-      box(0.62, h, 0.39, CELL.TRIM, { x, y: 0.19 + h / 2, z: -1.09 })
+      box(0.62, h, 0.39, winter ? CELL.TRIM : lawn, { x, y: 0.19 + h / 2, z: -1.09 })
+      // A cap of snow sits on the clipped top of each hedge section.
+      if (winter) box(0.64, 0.06, 0.41, CELL.WHITE, { x, y: 0.19 + h + 0.03, z: -1.09 })
     }
     for (let i = 0; i < 3; i++) {
       box(0.6, 0.09, 0.44, CELL.GREY, {
@@ -1017,17 +1039,17 @@ const KINDS = {
     c.geom(new THREE.CylinderGeometry(0.12, 0.18, 1.03, 8), CELL.ROCK, {
       x: -0.81, y: 0.845, z: -0.31
     })
-    c.geom(new THREE.SphereGeometry(0.57, 8, 6), CELL.TRIM, {
+    c.geom(new THREE.SphereGeometry(0.57, 8, 6), leaf, {
       x: -0.81, y: 1.64, z: -0.31
     })
-    c.geom(new THREE.SphereGeometry(0.38, 8, 6), CELL.TRIM, {
+    c.geom(new THREE.SphereGeometry(0.38, 8, 6), leaf, {
       x: -0.57, y: 1.92, z: -0.36
     })
 
     // Raised shrub bed on the opposite edge.
     box(0.65, 0.25, 1.12, CELL.ROCK, { x: 1.03, y: 0.315, z: -0.36 })
     for (const z of [-0.65, -0.08]) {
-      c.geom(new THREE.SphereGeometry(0.3, 8, 6), CELL.TRIM, {
+      c.geom(new THREE.SphereGeometry(0.3, 8, 6), leaf, {
         x: 1.03, y: 0.68, z
       })
     }
