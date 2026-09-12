@@ -7,9 +7,9 @@
  * resolve. Those are Blake's to chase with the fleet manager, so they stand on the Embassy
  * hex as one keeper with the figures on its card.
  *
- * A hand goes up only for something that happened recently: a violation or an
- * out-of-service today, or a unit filing under a number the roster does not know. The
- * long-standing gaps sit on the card as numbers, not as a nag.
+ * It never raises a hand. Blake's call: worth knowing, not worth interrupting a day over.
+ * The figures live on the card and the headline sits under the keeper's name, so the state
+ * of the roster is one click away and never in the Needs-you queue.
  *
  * Read-only: GET /api/compliance/daily, /api/unmatched-units, /api/crew-leads,
  * /api/divisions, /api/supervisors/unresolved, /api/queue.
@@ -64,7 +64,6 @@ async function fetchThreads() {
   const waitingDates = pending.map((q) => q.business_date).filter(Boolean).sort()
 
   const badToday = today ? (today.violation || 0) + (today.out_of_service || 0) : 0
-  const hasError = badToday > 0 || freshStrangers.length > 0
 
   // The headline is whichever thing is actually wrong today; otherwise the compliance figure.
   const headline = badToday
@@ -111,9 +110,10 @@ async function fetchThreads() {
     lastActivityAt: now,
     lastFocusedAt: 0,
     running: false,
+    // Never flags, by Blake's instruction. Everything it knows is on the card.
     unread: false,
-    hasError,
-    alertKey: hasError ? `dot:${today?.business_date || ''}:${badToday}:${freshStrangers.map((u) => u.raw_value).sort().join(',')}` : '',
+    hasError: false,
+    alertKey: '',
     starred: false,
     routine: '',
     prState: '',
