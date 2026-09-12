@@ -132,7 +132,35 @@ async function sayThreads() {
   })
 }
 
+/** Kai's standing Friday job: feed Carti his crickets. No XP, no allowance — it's a pet duty. */
+const CARTI_CHORE = { id: 'feed-carti', task: 'Feed Carti crickets 🦗', xp: 0, pay: 0, icon: '🦗', cat: 'pets' }
+const isFridayKC = () => new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'America/Chicago' }).format(new Date()) === 'Fri'
+let _cartiCheckAt = 0
+/**
+ * On Fridays, make sure "Feed Carti crickets" is on Kai's Chore Quest list (added once, then
+ * left alone so his check-off sticks). Chore Quest rebuilds todayC each day, so it's naturally
+ * a Friday-only job. Whole-state read/modify/PUT, the same write the bot farm uses for "done".
+ */
+async function ensureFridayChores() {
+  if (!isFridayKC() || Date.now() - _cartiCheckAt < 60000) return
+  _cartiCheckAt = Date.now()
+  try {
+    const r = await fetch(`${URL}/api/state`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) })
+    if (!r.ok) return
+    const state = await r.json()
+    state.todayC = state.todayC || {}
+    const list = Array.isArray(state.todayC.kai) ? state.todayC.kai : (state.todayC.kai = [])
+    if (list.some((c) => c.id === CARTI_CHORE.id)) return // already there today
+    list.push({ ...CARTI_CHORE })
+    const w = await fetch(`${URL}/api/state`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state), signal: AbortSignal.timeout(10000) })
+    if (w.ok) _famCache = { at: 0, state: null } // the caption cache should see the new chore now
+  } catch {
+    /* Chore Quest offline — try again next scan */
+  }
+}
+
 async function fetchThreads() {
+  await ensureFridayChores()
   const res = await fetch(`${URL}/api/state`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) })
   if (!res.ok) throw new Error(`chore-quest → ${res.status}`)
   const state = await res.json()

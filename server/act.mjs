@@ -80,6 +80,32 @@ export async function completeChores({ ids, who }) {
 }
 
 /**
+ * Mark Kai's "feed Carti" chore done in Chore Quest — the one write the bot farm makes to a
+ * kid's list, and only for this one pet duty (so it clears Carti's note from either app).
+ */
+export async function feedCartiDone() {
+  const get = async () => {
+    const r = await fetch(`${CHORES}/api/state`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) })
+    if (!r.ok) throw new Error(`chores read → ${r.status}`)
+    return r.json()
+  }
+  const state = await get()
+  const key = 'kai-feed-carti'
+  const onList = (state.todayC?.kai || []).some((c) => c.id === 'feed-carti')
+  if (!onList) return false // nothing to do — not on today's list
+  state.done = state.done || {}
+  if (state.done[key]) { refreshChores(); return true }
+  state.done[key] = true
+  const r = await fetch(`${CHORES}/api/state`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state), signal: AbortSignal.timeout(10000) })
+  if (!r.ok) throw new Error(`chores write → ${r.status}`)
+  const after = await get()
+  if (!after.done?.[key]) throw new Error('Chore Quest did not keep the change')
+  console.log('act: fed Carti — kai-feed-carti marked done')
+  refreshChores()
+  return true
+}
+
+/**
  * Blake read a kid's note: clear it. Same read-modify-write-verify as completeChores,
  * against the same Chore Quest state document. Clearing is the acknowledgement — the note
  * leaves the kid's card in Chore Quest and the speech bubble leaves their head on the map,

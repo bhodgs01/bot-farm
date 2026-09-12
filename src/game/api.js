@@ -85,6 +85,7 @@ export const actTask = (taskId) => post('/api/act/task', { id: taskId })
 
 /** Mark one of Blake's chores done (every id the astronaut stands for). */
 export const actChore = (ids) => post('/api/act/chore', { ids })
+export const actFeedCarti = () => post('/api/act/feed-carti', {})
 export const actSay = (kid) => post('/api/act/say', { kid })
 
 /** File the worker's situation as a Vikunja ticket in its client's project. */

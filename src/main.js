@@ -25,6 +25,7 @@ import {
   actProject,
   actTask,
   actChore,
+  actFeedCarti,
   actSay,
   actTicket,
   actJanine,
@@ -751,18 +752,25 @@ function markEmaSeen() {
 }
 /** Does this crew member want Blake's eyes right now? */
 /** KC's date as YYYY-MM-DD, and whether it's Friday there — for Carti's weekly cricket ask. */
-const todayKC = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Chicago' }).format(new Date())
-const isFridayKC = () => new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'America/Chicago' }).format(new Date()) === 'Fri'
-/** Carti wants crickets on Fridays, until Blake marks him fed for the day. */
+/**
+ * Carti is hungry when his Friday chore is still on Kai's list — the source of truth is Chore
+ * Quest itself, so Kai checking it off in his own app clears the note here too.
+ */
 function cartiHungry() {
-  return isFridayKC() && (state.cartiFedOn || '') !== todayKC()
+  return (familyChores.kai || []).some((c) => /feed carti/i.test(c))
 }
-/** Mark Carti fed for today: clears his dot and hushes his cricket bubble until next Friday. */
-function feedCarti() {
-  state.cartiFedOn = todayKC()
-  queueSave()
+/** Fed him: mark Kai's feed-carti chore done in Chore Quest; the note clears from both apps. */
+async function feedCarti() {
+  try {
+    await actFeedCarti()
+  } catch {
+    /* Chore Quest may be offline; the next scan reconciles */
+  }
+  // Clear it locally right away so the bubble/dot don't linger until the next poll.
+  familyChores = { ...familyChores, kai: (familyChores.kai || []).filter((c) => !/feed carti/i.test(c)) }
   colony.mascots?.muteReminder('gecko', true)
   renderCrew()
+  setTimeout(loadFamilyChores, 1500)
 }
 function crewAlert(m) {
   if (m.kind === 'ema') return emaWantsYou()

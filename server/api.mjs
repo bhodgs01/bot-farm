@@ -12,7 +12,7 @@ import {
   setThreadArchived,
 } from './scan.mjs'
 import { ask, chatEnabled, johnnyAsk } from './ask.mjs'
-import { setProjectStatus, closeTask, completeChores, createTicket, janineDraftAction, nudgeClient, clearSay } from './act.mjs'
+import { setProjectStatus, closeTask, completeChores, feedCartiDone, createTicket, janineDraftAction, nudgeClient, clearSay } from './act.mjs'
 import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
 import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGenerate, update as newsUpdate, topicById, todayKC, newsEnabled } from './news.mjs'
 import { refreshNews } from './harnesses/news.mjs'
@@ -650,6 +650,19 @@ export async function apiMiddleware(req, res, next) {
       try {
         const changed = await completeChores({ ids: list, who })
         return send(res, 200, { ok: true, changed })
+      } catch (err) {
+        return send(res, 409, { ok: false, error: String(err?.message || err) })
+      }
+    }
+
+    // Fed Carti: mark Kai's feed-carti chore done in Chore Quest, clearing his note.
+    if (url.pathname === '/api/act/feed-carti' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to feed Carti', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      try {
+        const done = await feedCartiDone()
+        return send(res, 200, { ok: true, done })
       } catch (err) {
         return send(res, 409, { ok: false, error: String(err?.message || err) })
       }
