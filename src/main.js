@@ -592,9 +592,9 @@ const actions = {
         setTimeout(poll, 3200)
         return
       }
-      if (thread.harness === 'tasks' && status === 'done') {
+      if (thread.harness === 'tasks' && (status === 'done' || status === 'dismiss')) {
         await actTask(thread.ref?.task)
-        hud.toast(`Closed: ${thread.title}`)
+        hud.toast(status === 'dismiss' ? `Dismissed: ${thread.title}` : `Closed: ${thread.title}`)
         colony.beamUp(thread.id)
       } else if (thread.harness === 'projects') {
         await actProject(thread.ref?.id, status)

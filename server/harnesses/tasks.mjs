@@ -23,6 +23,9 @@ const NOT_MINE = /coaching hub/i
 
 /** Vikunja project title → hex. Anything unlisted keeps its own title as the hex name. */
 const ZONE_FOR = [
+  // Notes to self, dictated to JARVIS. They stand on the Meetings hex beside the
+  // recaps, which is where Blake asked for them.
+  [/^notes?$/i, 'Meetings'],
   [/corrosion/i, 'CorrosionDC'],
   [/ngv|recruit/i, 'NGV Talent'],
   [/embassy|marc coaching/i, 'Embassy Landscape'],
@@ -71,7 +74,12 @@ async function fetchThreads() {
       }
       // A ticket on a client or FJ40 hex raises a hand so Blake can find it; only the generic
       // KC Proto bucket stays calm (those are captured in their own client projects).
-      const calm = zone === 'KC Proto'
+      // A note to self is a thought he parked, not a job anybody is waiting on, so it
+      // never raises a hand: it wears the blue "something to know" badge and offers a
+      // Dismiss instead. The generic KC Proto bucket stays calm for its own reason —
+      // those are tracked in their own client projects.
+      const notes = /^notes?$/i.test(p.title)
+      const calm = zone === 'KC Proto' || notes
       // A zone with nothing open would vanish, taking its landmark with it. One caretaker stays
       // behind so the tile is still a place you can point at, and so a client that is simply
       // up to date does not read as a client that was dropped.
@@ -108,14 +116,16 @@ async function fetchThreads() {
         const when = due ? (overdue ? `overdue since ${new Date(due).toLocaleDateString('en-US')}` : `due ${new Date(due).toLocaleDateString('en-US')}`) : 'no due date'
         out.push({
           id: `task:${t.id}`,
-          kind: 'task',
-          title: String(t.title || 'Task').slice(0, 120),
-          preview: [p.title, when, high ? 'high priority' : '', labels.join(', ')].filter(Boolean).join(' · '),
+          kind: notes ? 'info' : 'task',
+          title: `${notes ? '\u{1F4DD} ' : ''}${String(t.title || 'Task').slice(0, 120)}`,
+          preview: notes
+            ? [desc || 'A thought you parked.', `noted ${validDate(t.created) ? new Date(validDate(t.created)).toLocaleDateString('en-US') : 'recently'}`].join(' · ')
+            : [p.title, when, high ? 'high priority' : '', labels.join(', ')].filter(Boolean).join(' · '),
           project: zone,
           projectPath: `tasks://${p.id}`,
           worktree: '',
           cwd: p.title,
-          gitBranch: overdue ? 'overdue' : soon ? 'due soon' : 'open',
+          gitBranch: notes ? 'note to self' : overdue ? 'overdue' : soon ? 'due soon' : 'open',
           model: labels[0] || '',
           effort: '',
           createdAt: validDate(t.created) || now,
@@ -124,7 +134,8 @@ async function fetchThreads() {
           running: false,
           unread: calm ? false : !overdue,
           hasError: calm ? false : Boolean(overdue),
-          actions: ['done'],
+          actions: [notes ? 'dismiss' : 'done'],
+          exit: 'beam',
           details: {
             Ticket: `#${t.id}`,
             Project: p.title,
