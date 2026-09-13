@@ -458,16 +458,6 @@ function createBlake() {
   return g
 }
 
-let _fridayCache = { at: 0, val: false }
-/** True on a Kansas City Friday, cached to the minute — Pickle's cricket day. */
-function isFridayKC() {
-  const now = Date.now()
-  if (now - _fridayCache.at < 60000) return _fridayCache.val
-  const wd = new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'America/Chicago' }).format(new Date())
-  _fridayCache = { at: now, val: wd === 'Fri' }
-  return _fridayCache.val
-}
-
 const KINDS = {
   dog: { build: createColonyDog, name: "Ja'Barkus", intro: "I'm Ja'Barkus, the house dog. I have no job on the map — I just trot between the hexes and wag at everyone. Good boy." },
   lobster: { build: createClawd, name: 'Clawd', intro: "I'm Clawd, the mascot. Red, chunky, mostly claws. I patrol the paths and pinch at nothing in particular. Named after the feral one in the cluster." },
@@ -475,7 +465,13 @@ const KINDS = {
     build: createPickle,
     name: 'Carti',
     intro: "I'm Carti, Kai's leopard gecko. I amble the colony and store my snacks in my tail.",
-    reminder: () => (isFridayKC() ? { badge: '🦗', say: "I'm hungry, buy me crickets", note: "Crickets today — Kai's gecko needs feeding." } : null),
+    // Hunger, not the calendar. The cricket chore is CREATED on a Friday but it
+    // survives until somebody feeds him, so a weekday gate made Carti go quiet
+    // every Saturday while still wearing his red dot -- the crew list reads
+    // Chore Quest and this read the clock, so the two disagreed out loud.
+    // main.js drives muteReminder('gecko', !cartiHungry()), so Chore Quest is
+    // now the single source of truth for the dot, the badge and the bubble.
+    reminder: () => ({ badge: '🦗', say: "I'm hungry, buy me crickets", note: "Crickets today — Kai's gecko needs feeding." }),
   },
 }
 
@@ -752,7 +748,7 @@ export class Mascots {
     }
   }
 
-  /** A pet with a reminder (Pickle on Fridays) wears a 🦗 on its name and adds a line to its card. */
+  /** A pet with a live reminder (Carti while unfed) wears a 🦗 on its name and adds a line to its card. */
   /** Blake dismissed a reminder (fed Carti): mute its badge/bubble until it's re-armed. */
   muteReminder(kind, muted) {
     const m = this.list.find((x) => x.kind === kind)
@@ -761,7 +757,10 @@ export class Mascots {
 
   _applyReminder(m) {
     if (!m.reminderFn) return
-    const r = m.reminderMuted ? null : m.reminderFn()
+    // Default to muted. reminderMuted starts undefined, and now that the
+    // reminder is unconditional an undefined would show the bubble during the
+    // second before the first chore poll lands.
+    const r = m.reminderMuted === false ? m.reminderFn() : null
     const key = r ? r.badge : ''
     if (key === m.reminderKey) return
     m.reminderKey = key

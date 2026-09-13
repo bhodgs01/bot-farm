@@ -1644,7 +1644,8 @@ function applyThreads(list) {
   renderCrew()
   // And float a heart over the Ema mascot herself when she's texted on the Dada chat.
   colony.mascots?.setAlert('ema', emaWantsYou())
-  // Hush Carti's cricket bubble once he's been fed for the day; re-arm it next Friday.
+  // Carti's badge and bubble follow Chore Quest, exactly like his crew dot:
+  // unfed means he asks, fed means he stops.
   colony.mascots?.muteReminder('gecko', !cartiHungry())
 }
 
