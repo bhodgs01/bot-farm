@@ -86,6 +86,9 @@ async function fetchThreads() {
       const before = out.length
       const keeper = () => {
         if (out.length > before) return
+        // The Meetings / Notes hex already has the hub's own keeper holding it, so a
+        // second caretaker would just repeat the tile's name back at itself.
+        if (notes) return
         out.push({
           id: `task:keeper:${p.id}`,
           kind: 'task',
