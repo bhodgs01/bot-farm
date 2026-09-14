@@ -14,7 +14,7 @@
 
 const BASE = (process.env.MEETINGS_URL || 'http://meetings-hub-api.meetings.svc.cluster.local:3000').replace(/\/$/, '')
 const OPEN_URL = (process.env.MEETINGS_OPEN_URL || 'https://meetings.kcproto.com').replace(/\/$/, '')
-const ZONE = 'Meetings'
+const ZONE = 'Meetings / Notes'
 const TTL_MS = 90 * 1000
 const BORN = Date.parse('2026-09-12T06:00:00Z')
 const NL = String.fromCharCode(10)

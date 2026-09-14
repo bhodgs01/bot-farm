@@ -23,9 +23,9 @@ const NOT_MINE = /coaching hub/i
 
 /** Vikunja project title → hex. Anything unlisted keeps its own title as the hex name. */
 const ZONE_FOR = [
-  // Notes to self, dictated to JARVIS. They stand on the Meetings hex beside the
-  // recaps, which is where Blake asked for them.
-  [/^notes?$/i, 'Meetings'],
+  // Notes to self, dictated to JARVIS. They share the hex with the meeting
+  // recaps — one tile for the things said out loud and never written down.
+  [/^notes?$/i, 'Meetings / Notes'],
   [/corrosion/i, 'CorrosionDC'],
   [/ngv|recruit/i, 'NGV Talent'],
   [/embassy|marc coaching/i, 'Embassy Landscape'],

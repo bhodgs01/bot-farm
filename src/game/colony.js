@@ -72,6 +72,8 @@ const ZONE_ACCENT = {
   'Hetzner DR': 0x6a7fa6,
   'Pay me mother fucker': 0x5fae6a,
   Calendar: 0x6f8fd6,
+  // the violet of the 📝 Note tag, so the hex and the ticket pill agree
+  'Meetings / Notes': 0x8b7ce8,
 }
 
 /**
