@@ -155,7 +155,11 @@ async function fetchThreads() {
 
   // Work out where each failure lives before deciding what to draw.
   const placed = down.map((m) => {
-    if (BACKUP_MONITORS.test(m.name)) return { m, zone: 'Backups', node: '', why: 'a backup check' }
+    // The Backups tile already has a keeper that names every failing backup check.
+    // Sending a second person for the same failure would flag it twice in the
+    // needs-you queue, which is the noise this map exists to avoid. Counted here,
+    // drawn there.
+    if (BACKUP_MONITORS.test(m.name)) return { m, zone: '', node: '', why: 'the Backups tile owns this one' }
     const ns = namespaceOf(m.url)
     const host = hostOf(m)
     const node = (ns && byNamespace.get(ns)?.node) || byAddress.get(host) || ''
@@ -177,6 +181,7 @@ async function fetchThreads() {
       Watching: `${all.length} checks`,
       Down: down.length ? down.map((m) => `• ${m.name}`).join(NL) : 'none',
       Placed: placed.filter((p) => p.node).length ? placed.filter((p) => p.node).map((p) => `${p.m.name} → ${p.node}`).join(NL) : 'none out at a rack',
+      Backups: placed.filter((p) => !p.zone).length ? `${placed.filter((p) => !p.zone).length} on the Backups tile` : 'all green',
       Note: 'A failing check walks to the node its namespace runs on. One it cannot place waits at the Watchdog.',
     },
     project: 'Watchdog',
@@ -193,7 +198,7 @@ async function fetchThreads() {
 
   // One person per failure, standing where it failed. Past the cap the rest are a
   // number on the keeper: a storm should not bury the map in identical astronauts.
-  for (const p of placed.slice(0, MAX_PEOPLE)) {
+  for (const p of placed.filter((x) => x.zone).slice(0, MAX_PEOPLE)) {
     threads.push({
       ...base,
       id: `kuma:${p.m.name.replace(/[^\w]+/g, '-').toLowerCase()}`,
@@ -221,8 +226,9 @@ async function fetchThreads() {
       ref: { url: KUMA_OPEN_URL },
     })
   }
-  if (placed.length > MAX_PEOPLE) {
-    keeper.details.Note = `${placed.length - MAX_PEOPLE} more are down than are standing on the map; the rest are listed above.`
+  const drawn = placed.filter((x) => x.zone)
+  if (drawn.length > MAX_PEOPLE) {
+    keeper.details.Note = `${drawn.length - MAX_PEOPLE} more are down than are standing on the map; the rest are listed above.`
   }
   return threads
 }
