@@ -15,6 +15,8 @@
 import fsp from 'node:fs/promises'
 
 const ZONE = 'Watchdog'
+import { nodeForNamespace } from './kuma.mjs'
+
 const KUBE_API = process.env.KUBERNETES_SERVICE_HOST ? `https://${process.env.KUBERNETES_SERVICE_HOST}:${process.env.KUBERNETES_SERVICE_PORT || 443}` : ''
 const ADMIN_KEY = process.env.ANTHROPIC_ADMIN_KEY || ''
 const SPEND_ALERT = Number(process.env.SPEND_ALERT_USD || 25)
@@ -252,6 +254,43 @@ async function fetchThreads() {
     source: 'anthropic-keys',
     ref: { url: 'https://console.anthropic.com/settings/keys' },
   })
+
+  // A dead key is not an abstract fact, it is a pipeline that has quietly stopped.
+  // So each one walks out to the node running the namespace that holds it and stands
+  // at that rack — the same move the Kuma checks make. Blake asked for exactly this:
+  // show it where it runs, not in a list of strings.
+  for (const d of dead) {
+    for (const where of d.where) {
+      const ns = String(where).split('/')[0]
+      const node = await nodeForNamespace(ns).catch(() => '')
+      out.push({
+        ...base,
+        id: `keys:dead:${where.replace(/[^\w]+/g, '-').toLowerCase()}`,
+        title: `🔑 ${ns}`,
+        preview: `Dead key in ${where}. ${node ? `${ns} runs on ${node}.` : 'Nothing places that namespace right now.'}`,
+        details: {
+          Secret: where,
+          Key: d.tag,
+          Status: d.status,
+          Runs_on: node || 'not placed',
+          Fix: 'Mint a replacement at console.anthropic.com, put it in that secret, and restart the pod — a secretKeyRef env only re-reads on a restart.',
+        },
+        project: node ? 'Cluster' : 'Watchdog',
+        projectPath: `keys://${where}`,
+        cwd: node || ns,
+        gitBranch: 'dead key',
+        ...(node ? { attachTo: `node:${node}` } : {}),
+        createdAt: BORN + 2,
+        lastActivityAt: keys.at || now,
+        hasError: true,
+        alertKey: `deadkey:${where}`,
+        exit: 'beam',
+        sizeBytes: 1500,
+        source: 'anthropic-keys',
+        ref: { url: 'https://console.anthropic.com/settings/keys' },
+      })
+    }
+  }
 
   const total = spend.total
   out.push({
