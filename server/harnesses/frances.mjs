@@ -3,7 +3,14 @@
  *
  * Doors: the four contact sensors the caregiver app watches (front, back, garage, cave),
  * read straight from Home Assistant. The count of open doors rides over the keeper's head;
- * a door open at night, or open longer than ten minutes, raises a hand.
+ * a door open at night, or open longer than ten minutes, used to raise a hand.
+ *
+ * It no longer does. 🚨 These four entities are BLAKE'S OWN house — the same
+ * contact sensors the Home hex reads — because FRANCES_DOORS was never set and
+ * the fallback list is his. Home Assistant already texts him about them, so this
+ * was a second alarm for a door he had already been told about. It stays on the
+ * Frances hex as a readout: click it and you get every door, open or shut, and
+ * for how long.
  *
  * Alarm: the caregiver app's single active incident (`/api/floor`). While one is open and
  * nobody on the ladder has acknowledged it, the keeper's hand is up with the ladder on the
@@ -79,7 +86,6 @@ async function doorsThread(now) {
   })
   const open = doors.filter((d) => d.open)
   const tooLong = open.filter((d) => d.since && now - d.since > OPEN_TOO_LONG_MS)
-  const flag = open.length > 0 && (night || tooLong.length > 0)
   const details = Object.fromEntries(doors.map((d) => [d.label, !d.known ? 'no sensor' : d.unavailable ? 'sensor offline' : `${d.open ? 'OPEN' : 'closed'}${d.since ? ` · ${ago(now - d.since)} (${fmtTime.format(new Date(d.since))})` : ''}`]))
   return {
     ...base,
@@ -89,14 +95,19 @@ async function doorsThread(now) {
     plate: open.length ? String(open.length) : '',
     count: 0,
     preview: open.length ? `${open.map((d) => d.label).join(', ')} open${night ? ' · at night' : tooLong.length ? ' · too long' : ''}` : 'All doors shut',
-    details: { ...details, Rule: 'A hand goes up for a door open at night (10 PM to 7 AM) or open longer than ten minutes.' },
+    details: { ...details, Rule: 'Shown, never flagged. Home Assistant already texts Blake about these doors, and a second alarm for the same door is just a second alarm.' },
     cwd: 'apartment',
     gitBranch: open.length ? `${open.length} open` : 'shut',
     model: night ? 'night' : 'day',
     createdAt: BORN,
     lastActivityAt: Math.max(BORN, ...doors.map((d) => d.since || 0)),
-    hasError: flag,
-    alertKey: flag ? `doors:${open.map((d) => d.id).join(',')}` : '',
+    // Deliberately never flags. Blake asked for this one to stay on the map as a
+    // readout he can click — which doors, open how long, since when — without
+    // joining the needs-you queue, because Home Assistant already texts him about
+    // these exact sensors. The open doors are still named in the preview, so
+    // nothing is hidden; it just does not ask for him.
+    hasError: false,
+    alertKey: '',
     sizeBytes: 1500,
     ref: { url: 'https://homeassistant.kcproto.com/' },
   }

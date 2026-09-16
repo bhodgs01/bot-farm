@@ -31,7 +31,7 @@ const QUIET_DAYS = Number(process.env.UMAMI_QUIET_DAYS || 2)
  * just never raise a hand for being silent.
  */
 const QUIET_EXEMPT = new Set(
-  (process.env.UMAMI_QUIET_EXEMPT || 'dot.kcproto.com')
+  (process.env.UMAMI_QUIET_EXEMPT || 'dot.kcproto.com,frances.care')
     .split(',')
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean)
