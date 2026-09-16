@@ -20,6 +20,22 @@ const DAY = 86400000
 const ACTIVE_TTL_MS = 60 * 1000
 const DAILY_TTL_MS = 10 * 60 * 1000
 const QUIET_DAYS = Number(process.env.UMAMI_QUIET_DAYS || 2)
+/**
+ * Sites where nobody visiting is normal, so silence means nothing.
+ *
+ * The quiet rule assumes a page view is the sign of life, which is true for a
+ * client-facing site and false for anything driven by another channel. The DOT
+ * inspection app takes fifty submissions a day by text and reports itself
+ * healthy while its dashboard goes untouched for a week; flagging that is a
+ * false alarm every time. These still show their numbers on the card — they
+ * just never raise a hand for being silent.
+ */
+const QUIET_EXEMPT = new Set(
+  (process.env.UMAMI_QUIET_EXEMPT || 'dot.kcproto.com')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+)
 const BASE = String(process.env.UMAMI_URL || 'http://umami.umami.svc.cluster.local:3000').replace(/\/$/, '')
 const USER = process.env.UMAMI_USER || 'admin'
 const PASS = process.env.UMAMI_PASSWORD || ''
@@ -87,7 +103,7 @@ async function fetchThreads() {
   const onNow = live.filter((s) => s.live > 0).sort((a, b) => b.live - a.live)
   const liveTotal = onNow.reduce((n, s) => n + s.live, 0)
   // "Gone quiet": had visitors the week before last week, none in QUIET_DAYS days.
-  const quiet = live.filter((s) => s.weekPrev > 0 && s.lastAt && now - s.lastAt > QUIET_DAYS * DAY)
+  const quiet = live.filter((s) => s.weekPrev > 0 && s.lastAt && now - s.lastAt > QUIET_DAYS * DAY && !QUIET_EXEMPT.has(String(s.domain || '').toLowerCase()))
   const busiest = [...live].sort((a, b) => b.today - a.today).filter((s) => s.today > 0).slice(0, 5)
   const lastSeen = live.reduce((m, s) => Math.max(m, s.lastAt || 0), 0)
   const site = (s) => s.domain
@@ -114,7 +130,7 @@ async function fetchThreads() {
             .map((s) => [site(s), line(s)])
         ),
         ...(quiet.length ? { Quiet: quiet.map((s) => `${site(s)} (last ${Math.floor((now - s.lastAt) / DAY)}d ago)`).join(', ') } : {}),
-        Rule: `Awake while someone is on a site; hand up when a site with traffic goes ${QUIET_DAYS}d silent. Umami, no cookies.`,
+        Rule: `Awake while someone is on a site; hand up when a site with traffic goes ${QUIET_DAYS}d silent. Umami, no cookies.${QUIET_EXEMPT.size ? ` Never for ${[...QUIET_EXEMPT].join(', ')} — driven by another channel.` : ''}`,
       },
       project: ZONE,
       projectPath: 'umami://kcproto',
