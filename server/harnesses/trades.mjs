@@ -47,7 +47,9 @@ async function fetchThreads() {
       // The pile rises with the pot relative to twice what has been deposited, so a doubling
       // fills it. Never below a nub so there is always a little money showing.
       fill: Math.max(0.1, Math.min(1, total / (deposits * 2 || 4000))),
-      roof: `$${total.toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
+      // No figure over the pile: Snoop's own roof already reads the live pot out, and the
+      // same number twice on one hex is just noise. The pile's height says it, and the
+      // exact figure is on the card.
       title: '💰 Live pot',
       preview: `$${total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} · ${money(profit)} (${ret >= 0 ? '+' : ''}${ret.toFixed(1)}%) on $${deposits.toLocaleString('en-US', { maximumFractionDigits: 0 })} deposited · ${Number(pot.totalInvestors) || 1} investor${Number(pot.totalInvestors) === 1 ? '' : 's'}${last?.date ? ` · marked ${String(last.date).slice(0, 10)}` : ''}`,
       project: ZONE,

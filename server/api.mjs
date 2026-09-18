@@ -120,6 +120,55 @@ async function johnnyFacts() {
     .join(nl)
 }
 
+// Blake's own desk, on the Inbox hex ----------------------------------------------------
+/**
+ * The command centre: the room Blake actually sits in, modelled and set down beside the
+ * inbox desks. It reports nothing and never wants anything -- it is a door. Clicking it
+ * opens the Workshop, the spatial version of this same desk.
+ *
+ * Its createdAt is deliberately recent so it never becomes the Inbox's host building: the
+ * mail keeps gathering round its own desk, and the office simply stands next to it.
+ */
+function withOffice(threads) {
+  const office = {
+    id: 'office:blake',
+    kind: 'keeper',
+    landmark: 'blakesDesk',
+    title: "\u{1F5A5}️ Blake's Command Center",
+    preview: 'Your desk. Click it to open the Workshop.',
+    url: process.env.WORKSHOP_URL || 'https://desktop.kcproto.com',
+    urlLabel: 'the Workshop',
+    details: {
+      What: 'The room you actually work in, on the map',
+      Opens: process.env.WORKSHOP_URL || 'https://desktop.kcproto.com',
+    },
+    project: 'Inbox',
+    projectPath: 'office://blake',
+    worktree: '',
+    cwd: 'desk',
+    gitBranch: 'the desk',
+    model: '',
+    effort: '',
+    createdAt: Date.now(),
+    lastActivityAt: Date.now(),
+    lastFocusedAt: 0,
+    running: false,
+    unread: false,
+    hasError: false,
+    starred: false,
+    routine: '',
+    prState: '',
+    archived: false,
+    hasTranscript: false,
+    sizeBytes: 4000,
+    source: 'bot-farm',
+    canOpen: false,
+    canArchive: false,
+    ref: {},
+  }
+  return [...threads, office]
+}
+
 // ── the ledger: money on the map, added up ───────────────────────────────────────────────
 const dollars = (s) => Number(String(s || '').replace(/[^0-9.]/g, '')) || 0
 function withLedger(threads) {
@@ -711,7 +760,7 @@ export async function apiMiddleware(req, res, next) {
       // The night watch reads the same scan the map does, and rings for the few things that
       // should not wait until morning. Fire and forget: the pager never delays the map.
       nightWatch(scanned).catch(() => {})
-      const threads = withIntros(withWeek(withChief(withLedger(scanned))))
+      const threads = withIntros(withWeek(withChief(withOffice(withLedger(scanned)))))
       return send(res, 200, { nap: napMode(), threads, scannedAt: Date.now() })
     }
 

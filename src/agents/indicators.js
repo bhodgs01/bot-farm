@@ -264,7 +264,7 @@ export class Indicators {
       if (badge < 0) continue
 
       // A gentle bob, and an urgent one for the states that want your attention.
-      const urgent = badge === BADGE.waiting || badge === BADGE.blocked || badge === BADGE.visitor || badge === BADGE.door
+      const urgent = badge === BADGE.waiting || badge === BADGE.blocked || badge === BADGE.door
       const bobRate = urgent ? 3.4 : 1.6
       const bobAmp = urgent ? 0.075 : 0.035
       const bob = Math.sin(elapsed * bobRate + agent.phase) * bobAmp

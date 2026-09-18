@@ -52,7 +52,7 @@ const STAT_DEFS = [
   { key: 'printing', label: 'printing', cls: 'working' },
   { key: 'door', label: 'doors open', cls: 'waiting' },
   { key: 'plant', label: 'thirsty plants', cls: 'waiting' },
-  { key: 'visitor', label: 'movement', cls: 'blocked' },
+  { key: 'visitor', label: 'movement', cls: 'done' },
   { key: 'watched', label: 'starred', cls: 'done' },
   { key: 'info', label: 'fyi', cls: 'done' },
   { key: 'blocked', label: 'blocked', cls: 'blocked' },
@@ -1099,7 +1099,6 @@ function escapeHtml(s) {
 function statusClass(status) {
   if (status === 'working' || status === 'watching' || status === 'printing') return 'working'
   if (['waiting', 'mail', 'print', 'door', 'plant'].includes(status)) return 'waiting'
-  if (status === 'visitor') return 'blocked'
   if (status === 'blocked') return 'blocked'
   if (status === 'celebrating' || status === 'watched' || status === 'info') return 'done'
   return 'idle'

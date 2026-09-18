@@ -87,7 +87,7 @@ const ZONE_LANDMARK = {
   Collectorz: 'comicshop',
 }
 
-export const STATUS_ORDER = ['blocked', 'dada', 'visitor', 'door', 'plant', 'mail', 'print', 'waiting', 'working', 'watching', 'printing', 'celebrating', 'info', 'watched', 'you', 'idle', 'sleeping']
+export const STATUS_ORDER = ['blocked', 'dada', 'door', 'plant', 'mail', 'print', 'waiting', 'working', 'watching', 'printing', 'celebrating', 'visitor', 'info', 'watched', 'you', 'idle', 'sleeping']
 
 export const STATUS_LABEL = {
   working: 'Working',
@@ -433,7 +433,7 @@ export class Colony {
       list.forEach((thread, i) => {
         const status = statusFor(thread, now)
         if (stats[status] !== undefined) stats[status]++
-        const wantsYou = ['waiting', 'blocked', 'mail', 'print', 'door', 'plant', 'visitor', 'dada'].includes(status)
+        const wantsYou = ['waiting', 'blocked', 'mail', 'print', 'door', 'plant', 'dada'].includes(status)
         if (wantsYou) urgent.add(plot.id)
         if (wantsYou || status === 'working' || status === 'watching' || status === 'printing') active.add(plot.id)
         stats.agents++
@@ -1400,6 +1400,39 @@ export class Colony {
 
   pick(ndcX, ndcY, aspect) {
     return this.astronauts.pick(this.camera, ndcX, ndcY, aspect)
+  }
+
+  /**
+   * A building you can walk into: any set piece whose thread carries a `url`. Clicking the
+   * greenhouse should open the garden dashboard and clicking Blake's desk should open his
+   * workshop, because that is where those things actually live — the model on the map is a
+   * door to the real one, not a picture of it.
+   *
+   * Picked in screen space against the building's own middle, the way mascots and portals
+   * are, so it works while the camera is moving and needs no raycast against the merged
+   * geometry. Astronauts are picked first by the caller: a worker standing at a door still
+   * wins, or you could never open the card of someone at the greenhouse.
+   */
+  pickDoor(ndcX, ndcY, aspect, maxDist = 0.055) {
+    let best = null
+    let bd = maxDist
+    const v = this._doorV || (this._doorV = new THREE.Vector3())
+    for (const [id, entry] of this.buildings) {
+      const thread = this.threads.get(id)
+      if (!thread?.url || entry.retiring) continue
+      // Aim at the body of the piece rather than its feet, so the cursor target sits on the
+      // model and not on the ground in front of it.
+      v.copy(entry.mesh.position)
+      v.y += 1.1
+      v.project(this.camera)
+      if (v.z > 1) continue
+      const d = Math.hypot((v.x - ndcX) * aspect, v.y - ndcY)
+      if (d < bd) {
+        bd = d
+        best = { id, url: thread.url, title: thread.title || '', label: thread.urlLabel || '' }
+      }
+    }
+    return best
   }
 
   agentFor(id) {

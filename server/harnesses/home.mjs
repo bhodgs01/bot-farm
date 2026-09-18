@@ -296,6 +296,9 @@ async function fetchThreads() {
     g.project = GARDEN
     g.projectPath = 'home://garden'
     g.landmark = 'greenhouse'
+    // The greenhouse on the map is a door to the real garden dashboard.
+    g.url = process.env.GARDEN_URL || 'https://homeassistant.kcproto.com/dashboard-dashboard/garden'
+    g.urlLabel = 'the garden dashboard'
     g.createdAt = 0
     g.lastActivityAt = Date.now()
     out.push(g)

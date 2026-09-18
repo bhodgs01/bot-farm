@@ -547,7 +547,7 @@ const actions = {
   focusStatus: (status) => {
     const key = status === 'agents' ? null : status
     // 'waiting' is the attention pool: everything that wants a human, not just the ? badge.
-    const wanted = key === 'waiting' ? new Set(['waiting', 'blocked', 'mail', 'print', 'door', 'plant', 'visitor']) : key ? new Set([key]) : null
+    const wanted = key === 'waiting' ? new Set(['waiting', 'blocked', 'mail', 'print', 'door', 'plant']) : key ? new Set([key]) : null
     const pool = colony.astronauts.agents.filter((a) => (wanted ? wanted.has(a.status) : true))
     if (!pool.length) {
       hud.hint(key ? `Nobody is ${(STATUS_LABEL[key] || key).toLowerCase()} right now` : 'No crew on the surface')
@@ -1252,6 +1252,7 @@ engine.canvas.addEventListener('pointermove', (e) => {
   colony.astronauts.setHover(agent)
   const pet = !agent && colony.mascots ? colony.mascots.pick(engine.camera, p.x, p.y, p.aspect) : null
   const portal = !agent && !pet && colony.portals ? colony.portals.pick(engine.camera, p.x, p.y, p.aspect) : null
+  const door = !agent && !pet && !portal ? colony.pickDoor(p.x, p.y, p.aspect) : null
   if (pet) {
     hoverTip.innerHTML = `<b>${esc(pet.name)}</b>${((s) => (s ? `<i>${esc(s)}</i>` : ''))(petSubtitle(pet))}`
     hoverTip.hidden = false
@@ -1260,6 +1261,12 @@ engine.canvas.addEventListener('pointermove', (e) => {
     engine.canvas.style.cursor = 'default'
   } else if (portal) {
     hoverTip.innerHTML = `<b>🌀 ${esc(portal.def.label)}</b><i>Click to beam to the Brain</i>`
+    hoverTip.hidden = false
+    hoverTip.style.left = `${Math.min(e.clientX + 16, window.innerWidth - hoverTip.offsetWidth - 8)}px`
+    hoverTip.style.top = `${Math.min(e.clientY + 18, window.innerHeight - hoverTip.offsetHeight - 8)}px`
+    engine.canvas.style.cursor = 'pointer'
+  } else if (door) {
+    hoverTip.innerHTML = `<b>${esc(door.title)}</b><i>Click to open ${esc(door.label || 'it')}</i>`
     hoverTip.hidden = false
     hoverTip.style.left = `${Math.min(e.clientX + 16, window.innerWidth - hoverTip.offsetWidth - 8)}px`
     hoverTip.style.top = `${Math.min(e.clientY + 18, window.innerHeight - hoverTip.offsetHeight - 8)}px`
@@ -1309,6 +1316,14 @@ engine.canvas.addEventListener('pointerup', (e) => {
   const portal = colony.portals ? colony.portals.pick(engine.camera, p.x, p.y, p.aspect) : null
   if (portal) {
     beamToBrain(portal)
+    return
+  }
+  // A set piece that stands for something real: the greenhouse opens the garden dashboard,
+  // Blake's desk opens the workshop. The model is the door, so clicking it goes there.
+  const door = colony.pickDoor(p.x, p.y, p.aspect)
+  if (door) {
+    window.open(door.url, '_blank', 'noopener')
+    hud.toast(`Opening ${door.label || door.title}`)
     return
   }
   petCard.hidden = true
@@ -1923,7 +1938,7 @@ settings.onChange((changed, scope) => {
 // ── the queue ────────────────────────────────────────────────────────────────────────
 
 /** Everyone who wants a human, most urgent first: a problem before a mail, a mail before a task. */
-const QUEUE_ORDER = ['blocked', 'visitor', 'door', 'plant', 'print', 'mail', 'waiting']
+const QUEUE_ORDER = ['blocked', 'door', 'plant', 'print', 'mail', 'waiting']
 function queueItems() {
   const rank = new Map(QUEUE_ORDER.map((s, i) => [s, i]))
   return colony.astronauts.agents
