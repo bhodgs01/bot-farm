@@ -194,6 +194,12 @@ async function failoverThread(now) {
     const r = await fetch(DR_URL, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10000) })
     if (!r.ok) throw new Error(`dr → ${r.status}`)
     dr = await r.json()
+    // The status API answers 200 with {error} when its own kubectl call fails, so a
+    // transport-only check reads that as "zero pods" and the preview below then claims the
+    // failover controller is GONE. On 2026-09-18 it did exactly that for hours while the
+    // controller was up: an unreachable prober must report that it cannot see, never that
+    // DR is dead.
+    if (dr?.error) throw new Error(dr.error)
   } catch (err) {
     error = err.message
   }
