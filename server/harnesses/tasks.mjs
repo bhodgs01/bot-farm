@@ -36,6 +36,7 @@ const ZONE_FOR = [
   [/caregiver|frances/i, 'Frances'],
   [/janine/i, 'KC Proto'],
   [/client ops|kc proto|meetings/i, 'KC Proto'],
+  [/unlimited ?awesome/i, 'Unlimited Awesome'],
   [/hive/i, 'Trade Floor'],
   [/^inbox$/i, 'Inbox'],
 ]

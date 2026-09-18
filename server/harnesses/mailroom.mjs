@@ -41,6 +41,9 @@ export const CLIENTS = [
   { zone: 'NED Builds',        match: /nedbuilds|ned builds|\bned\b/i },
   { zone: 'Print Service',     match: /print request|3d print|print quote/i },
   { zone: 'Trade Floor',       match: /alpaca|brokerage|trade-bot/i },
+  // Alan's retainer. The domain catches anyone there; the match catches him writing from
+  // somewhere else, and the company's own names for itself.
+  { zone: 'Unlimited Awesome', domain: ['unlimitedawesome.com'], match: /unlimited ?awesome|supertutor|UA-MAS/i },
 ]
 
 const IGNORE_SENDERS = /no-?reply|noreply|notifications?@|mailer-daemon|calendar-notification/i

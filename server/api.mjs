@@ -120,6 +120,65 @@ async function johnnyFacts() {
     .join(nl)
 }
 
+// Unlimited Awesome, next door to Collectorz ---------------------------------------------
+/**
+ * Alan's retainer gets its own hex, and the hex gets the Creative castle from UA's own Six
+ * Castles of Human Flourishing — the one for the making disciplines.
+ *
+ * This keeper exists so the tile stands whether or not anything is happening on it: a client
+ * on a retainer is a standing fact, not something that appears when mail arrives. Alan's mail
+ * (mailroom's CLIENTS table) and any Unlimited Awesome tickets (tasks.mjs ZONE_FOR) gather
+ * round it. Calm by doctrine — a client existing is not something Blake acts on.
+ */
+function withUnlimited(threads) {
+  const mail = threads.filter((t) => t.project === UA_ZONE && t.source === 'gmail').length
+  const tickets = threads.filter((t) => t.project === UA_ZONE && t.harness === 'tasks').length
+  const bits = [mail ? `${mail} message${mail === 1 ? '' : 's'}` : '', tickets ? `${tickets} ticket${tickets === 1 ? '' : 's'}` : '']
+    .filter(Boolean)
+    .join(' · ')
+  const ua = {
+    id: 'client:unlimited',
+    kind: 'keeper',
+    landmark: 'castlecreative',
+    title: '\u{1F3F0} Unlimited Awesome',
+    preview: bits ? `Alan's retainer. ${bits}.` : "Alan's retainer. Nothing waiting.",
+    url: process.env.UA_URL || 'https://unlimitedawesome.com',
+    urlLabel: 'unlimitedawesome.com',
+    details: {
+      Client: 'Alan Smithson - Unlimited Awesome (EdTech)',
+      Contact: 'alan@unlimitedawesome.com',
+      What: 'Retainer: building the agent org (SuperTutor, marketing agents)',
+      Castle: 'Creative - one of UA’s Six Castles of Human Flourishing',
+    },
+    project: UA_ZONE,
+    projectPath: 'client://unlimited-awesome',
+    worktree: '',
+    cwd: 'unlimitedawesome.com',
+    gitBranch: 'retainer',
+    model: '',
+    effort: '',
+    // Oldest on its hex, so it hosts the castle and the mail gathers round it.
+    createdAt: 0,
+    lastActivityAt: Date.now(),
+    lastFocusedAt: 0,
+    running: false,
+    unread: false,
+    hasError: false,
+    starred: false,
+    routine: '',
+    prState: '',
+    archived: false,
+    hasTranscript: false,
+    sizeBytes: 4000,
+    source: 'bot-farm',
+    canOpen: false,
+    canArchive: false,
+    ref: {},
+  }
+  return [...threads, ua]
+}
+const UA_ZONE = 'Unlimited Awesome'
+
 // Blake's own desk, on the Inbox hex ----------------------------------------------------
 /**
  * The command centre: the room Blake actually sits in, modelled and set down beside the
@@ -760,7 +819,7 @@ export async function apiMiddleware(req, res, next) {
       // The night watch reads the same scan the map does, and rings for the few things that
       // should not wait until morning. Fire and forget: the pager never delays the map.
       nightWatch(scanned).catch(() => {})
-      const threads = withIntros(withWeek(withChief(withOffice(withLedger(scanned)))))
+      const threads = withIntros(withWeek(withChief(withUnlimited(withOffice(withLedger(scanned))))))
       return send(res, 200, { nap: napMode(), threads, scannedAt: Date.now() })
     }
 

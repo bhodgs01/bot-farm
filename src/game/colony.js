@@ -72,6 +72,8 @@ const ZONE_ACCENT = {
   'Hetzner DR': 0x6a7fa6,
   'Pay me mother fucker': 0x5fae6a,
   Calendar: 0x6f8fd6,
+  // UA's own purple for the Creative castle, from their brand guide (#9B59B6).
+  'Unlimited Awesome': 0x9b59b6,
   // the violet of the 📝 Note tag, so the hex and the ticket pill agree
   'Meetings / Notes': 0x8b7ce8,
 }
@@ -108,6 +110,7 @@ function loadDeskModel() {
 
 const ZONE_LANDMARK = {
   Inbox: 'desk',
+  'Unlimited Awesome': 'castlecreative',
   'Embassy Landscape': 'yard',
   // Placeholder until the comic-shop set piece lands; a vault reads as "things worth money".
   Collectorz: 'comicshop',

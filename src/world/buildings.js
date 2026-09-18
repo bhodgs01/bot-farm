@@ -70,7 +70,7 @@ const KIND_SCALE = {
   hq: 0.95, clubhouse: 0.95, house: 0.95, tradingfloor: 0.9, shield: 0.95, launchpad: 0.95,
   recruitdesk: 0.85, grill: 0.85, vault: 0.9, controltower: 0.95, garage: 0.95, outpost: 0.9, coins: 0.8, chiefOfStaff: 0.92, reception: 0.92, orderCounter: 0.92,
   apartment: 0.9, theater: 0.9, kennel: 0.9, fj40: 0.95, dish: 1, pumpjack: 1, deck: 0.95, gazebo: 0.95,
-  comicshop: 0.85, blakesDesk: 0.8,
+  comicshop: 0.85, blakesDesk: 0.8, castlecreative: 0.5,
   // small fixtures that stand alone
   signpost: 0.7, tvwall: 0.7, keyrack: 0.7, meter: 0.7, countdown: 0.7, mailbox: 0.7,
   // rebuilt kit pieces, used mostly as fillers (fillers are halved again on top of this)
@@ -124,6 +124,57 @@ const ACCENT_MASK = cellMask([CELL.TRIM])
 class Composer {
   constructor() {
     this.parts = []
+    /** The frame everything is currently being added into; null at the piece's own origin. */
+    this._frame = null
+    this._frames = []
+  }
+
+  /**
+   * Open a nested frame: everything added until the matching `end()` is placed relative to it.
+   * A common idiom in the packs GPT writes — a banner built around its own origin and then
+   * hung at the top of a tower, rather than every vertex hand-offset by the author.
+   *
+   * Frames nest, and the name is documentation only. `x`/`y`/`z` offset, `rx`/`ry`/`rz`
+   * rotate, `s` scales.
+   */
+  group(name, o = {}) {
+    const m = new THREE.Matrix4().compose(
+      new THREE.Vector3(o.x || 0, o.y || 0, o.z || 0),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(o.rx || 0, o.ry || 0, o.rz || 0)),
+      new THREE.Vector3(o.s ?? 1, o.s ?? 1, o.s ?? 1),
+    )
+    this._frames.push(this._frame)
+    this._frame = this._frame ? this._frame.clone().multiply(m) : m
+    return this
+  }
+
+  /** Close the innermost frame. */
+  end() {
+    this._frame = this._frames.pop() ?? null
+    return this
+  }
+
+  /**
+   * Place a finished geometry into the frame that is currently open, and file it. A rotor's
+   * pivot is a position too, so it rides along — miss that and a spinning part inside a
+   * group turns about a point back at the building's origin.
+   */
+  _push(geo) {
+    if (this._frame) {
+      geo.applyMatrix4(this._frame)
+      const pivot = geo.getAttribute('aPivot')
+      const spin = geo.getAttribute('aSpin')
+      if (pivot && spin && spin.array.some((v) => v !== 0)) {
+        const v = new THREE.Vector3()
+        for (let i = 0; i < pivot.count; i++) {
+          v.fromBufferAttribute(pivot, i).applyMatrix4(this._frame)
+          pivot.setXYZ(i, v.x, v.y, v.z)
+        }
+        pivot.needsUpdate = true
+      }
+    }
+    this.parts.push(geo)
+    return this
   }
 
   /**
@@ -159,8 +210,7 @@ class Composer {
     geo.setAttribute('aSpinAxis', new THREE.BufferAttribute(axis, 1))
     geo.setAttribute('aPivot', new THREE.BufferAttribute(pivot, 3))
 
-    this.parts.push(geo)
-    return this
+    return this._push(geo)
   }
 
   /**
@@ -203,8 +253,7 @@ class Composer {
     geo.setAttribute('aSpin', new THREE.BufferAttribute(spin, 1))
     geo.setAttribute('aSpinAxis', new THREE.BufferAttribute(axis, 1))
     geo.setAttribute('aPivot', new THREE.BufferAttribute(pivot, 3))
-    this.parts.push(geo)
-    return this
+    return this._push(geo)
   }
   /** Scatter `count` copies of a part around a ring, jittered so it never reads as a pattern. */
   ring(name, count, radius, rand, o = {}) {
@@ -217,6 +266,14 @@ class Composer {
   }
 
   finish() {
+    // Every part must agree about having an index or the merge refuses. Kit parts are indexed
+    // and most procedural boxes are too, but an extrusion is not, so a piece that mixes the
+    // two (a castle with a shaped banner) would fail here. Only pay for the conversion when
+    // the parts actually disagree.
+    const indexed = this.parts.filter((g) => g.index).length
+    if (indexed && indexed !== this.parts.length) {
+      this.parts = this.parts.map((g) => (g.index ? g.toNonIndexed() : g))
+    }
     const merged = BufferGeometryUtils.mergeGeometries(this.parts, false)
     for (const p of this.parts) p.dispose()
     merged.computeBoundingBox()
@@ -2570,6 +2627,37 @@ const KINDS = {
       c.geom(g,b.cell,b.glow?{emissive:b.glow}:{});
     }
     return 'Blake\'s Command Center';
+  },
+
+  castlecreative(c, rand) {
+    const B=(w,h,d,k,o={})=>c.geom(new THREE.BoxGeometry(w,h,d),k,o);
+    const C=(r,h,k,o={},n=12)=>c.geom(new THREE.CylinderGeometry(r,r,h,n),k,o);
+    const P=(pts,d,k,o={})=>{const s=new THREE.Shape();pts.forEach(([x,y],i)=>i?s.lineTo(x,y):s.moveTo(x,y));s.closePath();const g=new THREE.ExtrudeGeometry(s,{depth:d,bevelEnabled:false,curveSegments:12});g.translate(0,0,-d/2);c.geom(g,k,o);};
+    const A=(w,h,t,d,k,o={})=>{const r=w/2,cy=h-r-t,s=new THREE.Shape();s.moveTo(-r-t,0);s.lineTo(-r-t,cy);s.absarc(0,cy,r+t,Math.PI,0,true);s.lineTo(r+t,0);s.lineTo(r,0);s.lineTo(r,cy);s.absarc(0,cy,r,0,Math.PI,false);s.lineTo(-r,0);s.closePath();const g=new THREE.ExtrudeGeometry(s,{depth:d,bevelEnabled:false,curveSegments:12});g.translate(0,0,-d/2);c.geom(g,k,o);};
+    const pack=(geos,k,o={})=>{const p=[],n=[];for(const a of geos){const g=a.index?a.toNonIndexed():a;p.push(...g.attributes.position.array);n.push(...g.attributes.normal.array);}const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(n,3));c.geom(g,k,o);};
+    const roof=(w,d,h,o={})=>P([[-w/2,0],[w/2,0],[0,h]],d,CELL.RED,o);
+    const dome=(r,h,k,o={})=>{const a=new THREE.SphereGeometry(r,24,12,0,Math.PI*2,0,Math.PI/2);a.scale(1,h/r,1);c.geom(a,k,o);};
+    const pane=(w,h,o={},lit=false)=>{B(w+.10,h+.10,.055,CELL.SLATE,o);B(w,h,.025,lit?CELL.TRIM:CELL.SOLAR_A,{...o,z:(o.z||0)+Math.cos(o.ry||0)*.035,x:(o.x||0)+Math.sin(o.ry||0)*.035,emissive:lit?.55:0});};
+    const archpane=(w,h,o={})=>{const r=w/2,s=new THREE.Shape();s.moveTo(-r,0);s.lineTo(-r,h-r);s.absarc(0,h-r,r,Math.PI,0,true);s.lineTo(r,0);s.closePath();const a=new THREE.ExtrudeGeometry(s,{depth:.025,bevelEnabled:false,curveSegments:12});c.geom(a,CELL.SOLAR_A,o);A(w,h+.065,.065,.085,CELL.SLATE,o);};
+    const hedge=(length,o={})=>{const s=new THREE.Shape();s.moveTo(-.25,0);s.lineTo(.25,0);s.lineTo(.25,.60);s.quadraticCurveTo(.25,.70,.15,.70);s.lineTo(-.15,.70);s.quadraticCurveTo(-.25,.70,-.25,.60);s.closePath();const a=new THREE.ExtrudeGeometry(s,{depth:length,bevelEnabled:false,curveSegments:6});a.translate(0,0,-length/2);a.rotateY(Math.PI/2);c.geom(a,CELL.ROCK,o);};
+    const flag=(x,y,z,k=CELL.TRIM)=>{C(.022,.85,CELL.GREY,{x,y:y+.425,z});P([[0,0],[.47,-.02],[.42,-.35],[0,-.32]],.024,k,{x,y:y+.77,z});};
+    // Fixed offset centres the full footprint, including moving parts.
+    c.group('footprint',{x:-0.03,z:-0.20500004});
+
+    C(1.50,2.55,CELL.WHITE,{y:1.275,z:-.75,label:'Round keep'},24);for(const y of [.15,1.45,2.53])C(1.55,.12,CELL.SLATE,{y,z:-.75},24);
+    for(let i=0;i<10;i++){const a=i*Math.PI/5;archpane(.29,.70,{x:1.505*Math.sin(a),y:1.63,z:-.75+1.505*Math.cos(a),ry:a});}
+    c.group('dome',{y:2.61,z:-.75});dome(1.48,1.10,CELL.SOLAR_A,{label:'Observatory dome'});for(let i=0;i<4;i++){const g=new THREE.TorusGeometry(1.5,.025,6,48,Math.PI);g.rotateY(i*Math.PI/4);c.geom(g,CELL.GREY);}B(.085,.22,1.13,CELL.GREY,{y:1.06,z:.1});c.end();
+    const rings=[];for(const a of [-.55,.55]){const r=new THREE.TorusGeometry(1.92,.055,8,56);r.rotateX(a);rings.push(r);}const orb=new THREE.SphereGeometry(.17,10,8);orb.translate(1.92,0,0);rings.push(orb);pack(rings,CELL.GREY,{y:3.0,z:-.75,spin:.15,label:'Great orrery'});
+    for(const x of [-2.5,2.5]){B(.64,1.55,1.65,CELL.WHITE,{x,y:.775,z:-.4});roof(.82,1.83,.80,{x,y:1.55,z:-.4});}
+    for(const x of [-2.5,2.5])for(const z of [-.88,-.10])pane(.23,.45,{x:x+Math.sign(x)*.327,y:.93,z,ry:Math.sign(x)*Math.PI/2});
+    B(5.5,.07,2.8,CELL.ROCK,{y:.035,z:1.75,label:'Maze forecourt'});
+    for(const x of [-2.4,-1.4,1.4,2.4])hedge(1,{x,y:.07,z:2.67});for(const x of [-2.65,2.65])for(const z of [.75,1.75,2.75])hedge(1,{x,y:.07,z,ry:Math.PI/2});
+    for(const x of [-1.3,1.3]){hedge(1,{x,y:.07,z:1.68});hedge(1,{x:x+Math.sign(x)*.28,y:.07,z:1.12,ry:Math.PI/2});}
+    A(.70,1.28,.22,.45,CELL.WHITE,{z:1.05,label:'Gear gate'});B(.065,.8,.055,CELL.TRIM,{x:.3,y:.44,z:1.30,emissive:.6});
+    for(const x of [-.49,.49]){const geos=[new THREE.TorusGeometry(.46,.09,6,20)];for(let i=0;i<12;i++){const a=i*Math.PI/6,q=new THREE.BoxGeometry(.14,.17,.13);q.translate(0,.47,0);q.rotateZ(a);geos.push(q);}for(let i=0;i<3;i++)geos.push(new THREE.BoxGeometry(.75,.07,.10).rotateZ(i*Math.PI/3));pack(geos,CELL.BLACK,{x,y:1.64,z:1.19,rz:x<0?0:Math.PI/12,label:x<0?'Meshing gear pair':undefined});}
+    B(.045,1.95,.03,CELL.TRIM,{x:-2.5,y:1.10,z:.442,emissive:.6,label:'Rune strip'});flag(2.5,2.36,-.4,CELL.TRIM);
+    c.end();
+    return {label:"Castle of Creative Problem Solving",kind:'hero',pose(t,p){p.dome.rotation.y=t*Math.PI/2;}};
   },
 
   tower(c, rand) {

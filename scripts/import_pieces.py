@@ -8,7 +8,7 @@ is accepted. A function whose name already exists replaces the old one in place;
 added before `tower` and excluded from the random pick (set pieces are chosen by zone, never at
 random).
 """
-import re, sys, subprocess
+import os, re, sys, subprocess
 
 TARGET = 'src/world/buildings.js'
 # A block: `<indent>name(c[, rand][, accent]) {` ... `<same indent>},` (trailing comma optional)
@@ -45,10 +45,20 @@ def main():
     end = s.index('\n}\n', start) + 1
     kinds = s[start:end]
     existing = {m.group(2): m.group(0) for m in BLOCK_RE.finditer(kinds)}
+    # The palette this app actually has. A piece written for another project's palette (the
+    # Unlimited Campus pack speaks ROOF / STONE / EARTH / GLOW) resolves every one of those to
+    # `undefined`, and a single undefined cell does not fail quietly: it takes the whole scan
+    # down and the map comes up blank. So an unknown CELL is a hard reject, not a warning.
+    kit = open(os.path.join(os.path.dirname(TARGET), 'kit.js'), encoding='utf8').read()
+    palette = set(re.findall(r'^\s*([A-Z_0-9]+):\s*\d+', kit[kit.index('export const CELL = {'):], re.M))
     replaced, added, rejected = [], [], []
     for name, code in incoming.items():
         if 'Math.random' in code or 'import ' in code or 'new THREE.Mesh' in code:
-            rejected.append(name)
+            rejected.append((name, 'Math.random / import / Mesh'))
+            continue
+        foreign = sorted(set(re.findall(r'CELL\.([A-Z_0-9]+)', code)) - palette)
+        if foreign:
+            rejected.append((name, 'unknown CELL: ' + ', '.join(foreign)))
             continue
         if name in existing:
             kinds = kinds.replace(existing[name], code, 1)
@@ -62,8 +72,8 @@ def main():
     # to exclude any more.
     print('replaced:', ', '.join(replaced) or '-')
     print('added:   ', ', '.join(added) or '-')
-    if rejected:
-        print('rejected:', ', '.join(rejected), '(Math.random / import / Mesh)')
+    for name, why in rejected:
+        print('rejected:', name, '--', why)
     if dry:
         print('(dry run, nothing written)')
         return
