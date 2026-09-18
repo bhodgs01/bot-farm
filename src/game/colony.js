@@ -113,7 +113,7 @@ function loadDeskModel() {
  * number, so moving the room to a different wall is a one-line change rather than another
  * round of guessed angles and offsets.
  */
-const DESK_SIDE = 3
+const DESK_SIDE = 2
 
 const ZONE_LANDMARK = {
   Inbox: 'desk',
