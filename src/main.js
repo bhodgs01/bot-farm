@@ -184,9 +184,20 @@ petCard.addEventListener('keydown', (ev) => {
   if (ev.target.tagName === 'INPUT') ev.stopPropagation()
 })
 // Escape closes the card too — a moving mascot made it hard to click bare ground to dismiss.
+// It also lets the camera go: clicking a face sends it chasing that person around the colony,
+// and short of pressing Home there was no way to stop it and just look somewhere.
 window.addEventListener('keydown', (ev) => {
-  if (ev.key === 'Escape' && !petCard.hidden) petCard.hidden = true
+  if (ev.key !== 'Escape') return
+  if (!petCard.hidden) petCard.hidden = true
+  stopFollowing()
 })
+
+/** Let go of whoever the camera is chasing. Safe to call when it is not chasing anyone. */
+function stopFollowing(announce = true) {
+  if (!rig.followFn) return
+  rig.follow(null)
+  if (announce) hud.toast('Camera let go')
+}
 
 const PETS = new Set(['dog', 'lobster', 'gecko'])
 const KIDS = new Set(['kai', 'maya', 'ema'])
@@ -1333,7 +1344,8 @@ engine.canvas.addEventListener('pointerup', (e) => {
   }
   petCard.hidden = true
   // Nobody there: a zone's deck or its name plate opens that repo's sidebar instead, and
-  // bare ground puts everything down.
+  // bare ground puts everything down — including whoever the camera was chasing.
+  stopFollowing(false)
   const plot = plotUnder(e, p)
   if (plot) {
     selectProject(plot.name, {})

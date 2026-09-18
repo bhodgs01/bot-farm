@@ -532,6 +532,7 @@ const emptyState = () => ({
   opened: [],
   plots: {},
   seen: {},
+  emaSeen: '',
   settings: null,
   updatedAt: 0,
 })
@@ -621,6 +622,10 @@ async function readState() {
       opened: asArray(raw.opened),
       plots: applyPins(asObject(raw.plots)),
       seen: asObject(raw.seen),
+      // Which of Ema's messages Blake has already looked at. The page saves it; without it
+      // here the server dropped it on the way through and her marker came back on every
+      // refresh, however many times he dismissed it.
+      emaSeen: typeof raw.emaSeen === 'string' ? raw.emaSeen : '',
       names: asNames(raw.names),
       settings: raw.settings && typeof raw.settings === 'object' ? raw.settings : null,
       home: asPose(raw.home),
@@ -645,6 +650,7 @@ async function writeState(next) {
     opened: asArray(next.opened),
     plots: applyPins(asObject(next.plots)),
     seen: asObject(next.seen),
+    emaSeen: typeof next.emaSeen === 'string' ? next.emaSeen : '',
     names: asNames(next.names),
     settings: next.settings && typeof next.settings === 'object' ? next.settings : null,
     home: asPose(next.home),

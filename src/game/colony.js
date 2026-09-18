@@ -108,10 +108,12 @@ function loadDeskModel() {
   return deskModel
 }
 
-/** Centre-to-edge of one hex, less half a room: far enough back to line the wall, not overhang. */
-const BUILDING_BACK_OFF = 2.6
-/** A flat-top hex's sides face every 60 degrees, so anything laid against one turns in steps. */
-const HEX_SIDE_STEP = Math.PI / 3
+/**
+ * Which of the hex's six edges Blake's desk backs onto, 0-5, going round. Pure taste — one
+ * number, so moving the room to a different wall is a one-line change rather than another
+ * round of guessed angles and offsets.
+ */
+const DESK_SIDE = 3
 
 const ZONE_LANDMARK = {
   Inbox: 'desk',
@@ -684,18 +686,20 @@ export class Colony {
    * its own crew have somewhere to stand in front of it.
    */
   _faceTheView(mesh, plot) {
-    // A hex here is flat-top with a 30 degree phase, so its six sides face multiples of 60
-    // degrees. The camera looks in from 45, which is not one of them — pointing the room
-    // straight at the viewer left its back wall cutting across the tile at an angle to every
-    // edge. Snap to the nearest side instead: as close to facing you as the hexagon allows,
-    // and flush with the wall behind it.
-    const open = Math.round(Math.PI / 4 / HEX_SIDE_STEP) * HEX_SIDE_STEP
-    mesh.rotation.y = open
+    // Stand the room on one of the hex's own six edge positions, facing in.
+    //
+    // Two goes at this placed it by hand — an angle aimed at the camera, then a guessed
+    // distance — and both left it adrift in the middle of the tile with the mail desk
+    // standing through it. The tile already knows where its edges are: slots 1..6 sit at the
+    // six edge midpoints and slot 0 is the centre, spaced so two things on different slots do
+    // not touch. Taking a real slot gets the wall and the clearance for free.
+    const slot = plot.slotFor(1 + (DESK_SIDE % 6))
     const c = plot.center || plot.middle
-    if (!c) return
-    // Straight back along the way it faces, so it sits against that side and leaves the
-    // middle of the tile free for whoever else stands there.
-    mesh.position.set(c.x - Math.sin(open) * BUILDING_BACK_OFF, mesh.position.y, c.z - Math.cos(open) * BUILDING_BACK_OFF)
+    if (!c || !slot) return
+    mesh.position.set(c.x + slot.x, mesh.position.y, c.z + slot.z)
+    // Open toward the middle of its tile: the room's own +z, turned to point back at the
+    // centre it is standing out from.
+    mesh.rotation.y = Math.atan2(-slot.x, -slot.z)
   }
 
   _syncBuilding(thread, plot, index) {
