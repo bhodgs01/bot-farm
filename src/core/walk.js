@@ -70,6 +70,7 @@ export class WalkMode {
         this.look.x = e.clientX
         this.look.y = e.clientY
         this.look.moved += Math.abs(dx) + Math.abs(dy)
+        this.travel = null
         this.yaw -= dx * LOOK
         this.pitch = THREE.MathUtils.clamp(this.pitch - dy * LOOK, -1.2, 1.0)
       }
@@ -80,6 +81,19 @@ export class WalkMode {
     }
     canvas.addEventListener('pointerup', up)
     canvas.addEventListener('pointercancel', up)
+  }
+
+  /**
+   * Walk yourself over to something you clicked. Stops `stop` metres short, facing it, and
+   * calls `onArrive`. Any key or drag of your own cancels the trip — you are still driving.
+   */
+  goTo(x, z, { stop = 2.3, onArrive = null } = {}) {
+    if (!this.active) return
+    this.travel = { x, z, stop, onArrive }
+  }
+
+  cancelTravel() {
+    this.travel = null
   }
 
   /** True while the pointer is being dragged to look, so a click is not also a pick. */
@@ -96,6 +110,7 @@ export class WalkMode {
     this.yaw = Math.atan2(this.engine.camera.position.x - t.x, this.engine.camera.position.z - t.z) + Math.PI
     this.pitch = -0.08
     this.vel.set(0, 0, 0)
+    this.travel = null
     this.active = true
     this.rig.unfollow?.()
     this.engine.canvas.style.cursor = 'grab'
@@ -142,10 +157,38 @@ export class WalkMode {
       side += this.stick.dx
     }
     const len = Math.hypot(fwd, side) || 1
-    const speed = k.has('ShiftLeft') || k.has('ShiftRight') ? JOG : WALK
-    const wantX = ((Math.sin(this.yaw) * fwd + Math.cos(this.yaw) * side) / len) * speed
-    const wantZ = ((Math.cos(this.yaw) * fwd - Math.sin(this.yaw) * side) / len) * speed
+    let speed = k.has('ShiftLeft') || k.has('ShiftRight') ? JOG : WALK
+
+    // travelling to something you clicked: steer yourself until you are there
+    if (this.travel) {
+      if (Math.abs(fwd) + Math.abs(side) > 0.01) this.travel = null
+      else {
+        const t = this.travel
+        const dx = t.x - this.pos.x
+        const dz = t.z - this.pos.z
+        const left = Math.hypot(dx, dz)
+        if (left <= t.stop) {
+          this.travel = null
+          this.vel.set(0, 0, 0)
+          const done = t.onArrive
+          if (done) done()
+        } else {
+          const want = Math.atan2(dx, dz)
+          let turn = want - this.yaw
+          turn = Math.atan2(Math.sin(turn), Math.cos(turn))
+          this.yaw += turn * Math.min(1, dt * 5)
+          // slow into the last couple of metres, and only walk on once roughly facing it
+          speed = Math.min(JOG, Math.max(1.4, left - t.stop)) * (Math.abs(turn) > 1.1 ? 0.25 : 1)
+          fwd = 1
+          side = 0
+        }
+      }
+    }
+    const norm = Math.hypot(fwd, side) || 1
+    const wantX = ((Math.sin(this.yaw) * fwd + Math.cos(this.yaw) * side) / norm) * speed
+    const wantZ = ((Math.cos(this.yaw) * fwd - Math.sin(this.yaw) * side) / norm) * speed
     const moving = Math.abs(fwd) + Math.abs(side) > 0.01
+    void len
     this.vel.x = THREE.MathUtils.damp(this.vel.x, moving ? wantX : 0, ACCEL, dt)
     this.vel.z = THREE.MathUtils.damp(this.vel.z, moving ? wantZ : 0, ACCEL, dt)
 

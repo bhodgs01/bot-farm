@@ -1194,6 +1194,8 @@ engine.canvas.addEventListener('pointerup', (e) => {
   if (agent) {
     // The bubble is the alert; the astronaut itself introduces who it is.
     select(agent.id, { mode: colony.astronauts.pickPart === 'badge' ? 'card' : 'intro' })
+    // on foot, clicking someone walks you over to them
+    if (walk?.active && Math.hypot(agent.pos.x - walk.pos.x, agent.pos.z - walk.pos.z) > 3) walk.goTo(agent.pos.x, agent.pos.z)
     return
   }
   const pet = colony.mascots ? colony.mascots.pick(engine.camera, p.x, p.y, p.aspect) : null
@@ -1211,7 +1213,12 @@ engine.canvas.addEventListener('pointerup', (e) => {
   // Nobody there: a zone's deck or its name plate opens that repo's sidebar instead, and
   // bare ground puts everything down.
   const plot = plotUnder(e, p)
-  if (plot) selectProject(plot.name, {})
+  if (plot) {
+    selectProject(plot.name, {})
+    // and clicking a hex walks you to it
+    const c = plot.center || plot
+    if (walk?.active && c && Number.isFinite(c.x) && Math.hypot(c.x - walk.pos.x, c.z - walk.pos.z) > 3) walk.goTo(c.x, c.z, { stop: 6 })
+  }
   else {
     select(null, {})
     actions.closeProject()
