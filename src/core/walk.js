@@ -89,7 +89,14 @@ export class WalkMode {
    */
   goTo(x, z, { stop = 2.3, onArrive = null } = {}) {
     if (!this.active) return
-    this.travel = { x, z, stop, onArrive }
+    // route round the buildings the same way the crowd does; a straight line gets stuck on corners
+    let path = null
+    try {
+      path = this.nav?.findPath?.(this.pos.x, this.pos.z, x, z) || null
+    } catch {
+      path = null
+    }
+    this.travel = { x, z, stop, onArrive, path, at: 0, stall: 0, best: Infinity }
   }
 
   cancelTravel() {
@@ -167,13 +174,31 @@ export class WalkMode {
         const dx = t.x - this.pos.x
         const dz = t.z - this.pos.z
         const left = Math.hypot(dx, dz)
-        if (left <= t.stop) {
+        // getting no closer for a while means this is as near as the ground allows (someone
+        // standing on a stage, say): stop there and count it as arriving if you are close.
+        if (left < t.best - 0.05) {
+          t.best = left
+          t.stall = 0
+        } else t.stall += dt
+        if (left <= t.stop || t.stall > 1.5) {
+          const done = t.onArrive
+          const near = left < 12
           this.travel = null
           this.vel.set(0, 0, 0)
-          const done = t.onArrive
-          if (done) done()
+          if (done && near) done()
         } else {
-          const want = Math.atan2(dx, dz)
+          // steer at the next waypoint of the route, but measure the trip by the target itself
+          let ax = t.x
+          let az = t.z
+          if (t.path && t.path.length) {
+            while (t.at < t.path.length - 1 && Math.hypot(t.path[t.at].x - this.pos.x, t.path[t.at].z - this.pos.z) < 1.4) t.at++
+            const wp = t.path[t.at]
+            if (wp) {
+              ax = wp.x
+              az = wp.z
+            }
+          }
+          const want = Math.atan2(ax - this.pos.x, az - this.pos.z)
           let turn = want - this.yaw
           turn = Math.atan2(Math.sin(turn), Math.cos(turn))
           this.yaw += turn * Math.min(1, dt * 5)
