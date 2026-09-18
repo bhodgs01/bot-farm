@@ -135,11 +135,22 @@ async function sayThreads() {
 /** Kai's standing Friday job: feed Carti his crickets. No XP, no allowance — it's a pet duty. */
 const CARTI_CHORE = { id: 'feed-carti', task: 'Feed Carti crickets 🦗', xp: 0, pay: 0, icon: '🦗', cat: 'pets' }
 const isFridayKC = () => new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: 'America/Chicago' }).format(new Date()) === 'Fri'
+const dayKC = () => new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'America/Chicago' }).format(new Date())
 let _cartiCheckAt = 0
 /**
- * On Fridays, make sure "Feed Carti crickets" is on Kai's Chore Quest list (added once, then
- * left alone so his check-off sticks). Chore Quest rebuilds todayC each day, so it's naturally
- * a Friday-only job. Whole-state read/modify/PUT, the same write the bot farm uses for "done".
+ * On Fridays, make sure "Feed Carti crickets" is on Kai's Chore Quest list, and that last
+ * week's tick is off it.
+ *
+ * 🚨 This used to assume Chore Quest rebuilt `todayC` each day, so adding the chore once and
+ * leaving it alone would naturally come round again. It does not: the app has no daily
+ * rollover at all, only a manual "clear day" button, and `done` keys carry no date. So the
+ * chore stayed on Kai's list for ever, every later Friday hit the "already there" return,
+ * and `done['kai-feed-carti']` from the first feeding was never cleared — Carti asked once
+ * in his life and was silent every Friday after.
+ *
+ * The state itself now remembers which Friday it was last armed for. On a new Friday the
+ * chore is put back on the list if missing and its tick is cleared; for the rest of that day
+ * the stamp matches, so Kai checking it off sticks until next week.
  */
 async function ensureFridayChores() {
   if (!isFridayKC() || Date.now() - _cartiCheckAt < 60000) return
@@ -148,10 +159,15 @@ async function ensureFridayChores() {
     const r = await fetch(`${URL}/api/state`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(8000) })
     if (!r.ok) return
     const state = await r.json()
+    const today = dayKC()
+    if (state.cartiArmed === today) return // already seen to, today
+    state.cartiArmed = today
     state.todayC = state.todayC || {}
     const list = Array.isArray(state.todayC.kai) ? state.todayC.kai : (state.todayC.kai = [])
-    if (list.some((c) => c.id === CARTI_CHORE.id)) return // already there today
-    list.push({ ...CARTI_CHORE })
+    if (!list.some((c) => c.id === CARTI_CHORE.id)) list.push({ ...CARTI_CHORE })
+    // A weekly job that was done last week is not done this week. The key carries no date,
+    // so clearing it here is the only thing that makes the chore come round again.
+    if (state.done) delete state.done[`kai-${CARTI_CHORE.id}`]
     const w = await fetch(`${URL}/api/state`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(state), signal: AbortSignal.timeout(10000) })
     if (w.ok) _famCache = { at: 0, state: null } // the caption cache should see the new chore now
   } catch {
