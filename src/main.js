@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import './ui/styles.css'
 import { DEFAULT_PRESET, Settings, hasStoredSettings } from './core/settings.js'
+import { WalkMode } from './core/walk.js'
 import { Engine } from './core/engine.js'
 import { CameraRig } from './core/camera.js'
 import { Colony, STATUS_LABEL, STATUS_ORDER, statusFor, transcriptProgress } from './game/colony.js'
@@ -66,6 +67,7 @@ if (!hasStoredSettings()) settings.applyPreset(DEFAULT_PRESET)
 const engine = new Engine(settings).mount(app)
 const rig = new CameraRig(engine.camera, engine.canvas, settings)
 const colony = new Colony(engine.scene, settings, engine.camera, engine.renderer)
+const walk = new WalkMode({ engine, rig, campus: colony, nav: colony.nav, hud: null })
 
 let state = { archived: [], archivedAt: {}, opened: [], plots: {}, seen: {}, home: null, homes: {}, names: {} }
 
@@ -363,6 +365,11 @@ const actions = {
   },
   /** The rail's headset button: enter or leave VR. */
   toggleVr: () => vr?.toggle?.(),
+  toggleWalk: () => {
+    if (!walk) return
+    walk.toggle()
+    if (walk.active) hud.toast?.('Dropped in. WASD to walk, drag to look, Esc to fly again.')
+  },
 
   /** Give a worker a name of Blake's own; an empty name gives the source's back. */
   renameWorker: (id, name) => {
@@ -755,6 +762,7 @@ const actions = {
 }
 
 const hud = new Hud(app, settings, actions)
+walk.hud = hud
 // VR sidecar: shows the rail switch when a headset session is possible.
 const vr = installVr({ engine, colony, rig, hud, settings })
 /** The day, played back: the same glow the live map uses, pointed at the recorded past. */
@@ -1923,6 +1931,7 @@ engine.add({
   update(dt, elapsed) {
     // In a headset the player group owns the camera; the rig sits out.
     if (vr.active) vr.update(dt)
+    else if (walk?.active) walk.update(dt)
     else rig.update(dt)
     colony.update(dt, elapsed, vr.active ? vr.player.position : rig.target)
     // Whatever the camera is orbiting is what should be in focus.

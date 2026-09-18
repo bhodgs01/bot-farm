@@ -17,6 +17,8 @@ import { FACE, FRAME_COLS, FRAME_ROWS } from '../agents/faces.js'
  */
 
 const ICON = {
+  walk: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="13" cy="4" r="2"/><path d="M11 21l1.5-5.5L9 13l1-5 4 2 2 3"/><path d="M10 8l-3 2-1 4"/><path d="M12.5 15.5L16 21"/></svg>`,
+  fly: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l18-8-8 18-2-7z"/></svg>`,
   settings: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>`,
   eye: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>`,
   eyeOff: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M9.9 4.24A9.1 9.1 0 0 1 12 4c6.5 0 10 7 10 7a18.5 18.5 0 0 1-2.16 3.19M6.6 6.6C4.06 8.2 2 11 2 11s3.5 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24M2 2l20 20"/></svg>`,
@@ -60,6 +62,7 @@ const STAT_DEFS = [
 
 export class Hud {
   constructor(root, settings, actions) {
+    this.root = root
     this.settings = settings
     this.actions = actions
     this.visible = true
@@ -387,6 +390,7 @@ export class Hud {
     })
     on('#btn-planet', 'click', () => this.actions.cyclePlanet?.())
     on('#btn-vr', 'click', () => this.actions.toggleVr?.())
+    on('#btn-walk', 'click', () => this.actions.toggleWalk?.())
     on('#btn-scrub', 'click', () => this.setScrubber(this.actions.toggleScrubber?.()))
     on('#btn-time', 'click', () => this.actions.cycleTime?.())
     on('#btn-open', 'click', () => this.actions.openThread?.())
@@ -941,6 +945,23 @@ export class Hud {
     this.$('#btn-scrub').title = on ? 'Back to now (Y)' : 'Play the day back (Y)'
   }
 
+  /** Walking the colony on foot: the rail button, and the controls hint along the bottom. */
+  setWalk(on) {
+    const b = this.$('#btn-walk')
+    if (b) {
+      b.setAttribute('aria-pressed', String(Boolean(on)))
+      b.innerHTML = on ? ICON.fly : ICON.walk
+      b.title = on ? 'Fly again (Esc)' : 'Drop in and walk the colony (Esc to fly again)'
+    }
+    if (!this._walkHint) {
+      this._walkHint = document.createElement('div')
+      this._walkHint.innerHTML = '<kbd>W A S D</kbd> to walk · drag to look · <kbd>Shift</kbd> to jog · <kbd>Esc</kbd> to fly again'
+      this._walkHint.style.cssText = 'position:absolute;left:50%;bottom:18px;transform:translateX(-50%);color:rgba(255,255,255,.72);font-size:12.5px;pointer-events:none;text-align:center;z-index:5'
+      this.root.appendChild(this._walkHint)
+    }
+    this._walkHint.style.display = on ? 'block' : 'none'
+  }
+
   /** The VR switch on the rail: shown only where a headset session is possible. */
   setVrAvailable(on) {
     this.$('#btn-vr').hidden = !on
@@ -1171,6 +1192,7 @@ const TEMPLATE = `
   <button class="btn icon" id="btn-planet" title="Change planet (Tab)">${ICON.globe}</button>
   <button class="btn icon" id="btn-time" title="Change the time of day (L)">${ICON.sun}</button>
   <button class="btn icon" id="btn-scrub" title="Play the day back (Y)" aria-pressed="false">${ICON.history}</button>
+  <button class="btn icon" id="btn-walk" title="Drop in and walk the colony (Esc to fly again)" aria-pressed="false">${ICON.walk}</button>
   <button class="btn icon" id="btn-vr" title="Walk the colony in VR (headset)" aria-pressed="false" hidden>${ICON.vr}</button>
 </div>
 
