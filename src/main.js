@@ -1950,7 +1950,7 @@ engine.add({
 
 engine.start()
 // Debug handle for headless checks and the console; nothing in the app reads it.
-window.__botfarm = { actions, colony, settings, rig, vr, nap: applyNap }
+window.__botfarm = { actions, colony, settings, rig, vr, walk, nap: applyNap }
 
 boot()
 
