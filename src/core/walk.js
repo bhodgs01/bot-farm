@@ -176,11 +176,14 @@ export class WalkMode {
         const left = Math.hypot(dx, dz)
         // getting no closer for a while means this is as near as the ground allows (someone
         // standing on a stage, say): stop there and count it as arriving if you are close.
+        // only count a stall once actually walking: turning to face the target takes a moment,
+        // and the first metre of a route can head away from the target
+        const turning = t.turning || 0
         if (left < t.best - 0.05) {
           t.best = left
           t.stall = 0
-        } else t.stall += dt
-        if (left <= t.stop || t.stall > 1.5) {
+        } else if (!turning) t.stall += dt
+        if (left <= t.stop || t.stall > 2.5) {
           const done = t.onArrive
           const near = left < 12
           this.travel = null
@@ -203,7 +206,8 @@ export class WalkMode {
           turn = Math.atan2(Math.sin(turn), Math.cos(turn))
           this.yaw += turn * Math.min(1, dt * 5)
           // slow into the last couple of metres, and only walk on once roughly facing it
-          speed = Math.min(JOG, Math.max(1.4, left - t.stop)) * (Math.abs(turn) > 1.1 ? 0.25 : 1)
+          t.turning = Math.abs(turn) > 0.7
+          speed = Math.min(JOG, Math.max(1.8, left - t.stop)) * (Math.abs(turn) > 1.1 ? 0.35 : 1)
           fwd = 1
           side = 0
         }
