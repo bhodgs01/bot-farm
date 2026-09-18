@@ -1603,6 +1603,13 @@ kbd {
 .pet-card .pet-say { font-size: 12.5px; line-height: 1.45; color: #ffe6a1; background: rgba(255,214,102,0.10); border-left: 2px solid #ffd166; padding: 6px 9px; border-radius: 8px; }
 .pet-card .pet-dismiss { margin-top: 2px; padding: 7px 10px; border: 0; border-radius: 9px; background: #ffd166; color: #221c08; font-weight: 600; font-size: 12.5px; cursor: pointer; }
 .pet-card .pet-dismiss:hover { background: #ffdb85; }
+/* Ema's own words, in her colour rather than the yellow of a chore note. */
+.pet-card .pet-say.chat { color: #ffd7e6; background: rgba(255,122,168,0.12); border-left-color: #ff7aa8; }
+.pet-card .pet-reply { display: flex; gap: 6px; margin-top: 2px; }
+.pet-card .pet-reply input { flex: 1; min-width: 0; padding: 7px 9px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.16); background: rgba(255,255,255,0.06); color: #eef2ff; font: inherit; font-size: 12.5px; }
+.pet-card .pet-reply input:focus { outline: none; border-color: #ff7aa8; }
+.pet-card .pet-reply button { padding: 7px 11px; border: 0; border-radius: 9px; background: #ff7aa8; color: #2a0b18; font-weight: 600; font-size: 12.5px; cursor: pointer; }
+.pet-card .pet-reply button:disabled { opacity: 0.7; cursor: default; }
 
 .johnny-card[hidden] { display: none !important; }
 .johnny-card { position: fixed; z-index: 60; right: 18px; bottom: 18px; width: min(92vw, 350px); max-height: min(68vh, 500px); display: flex; flex-direction: column; background: rgba(12, 15, 24, 0.96); border: 1px solid rgba(255,255,255,0.14); border-radius: 16px; box-shadow: 0 18px 50px rgba(0,0,0,0.55); overflow: hidden; }

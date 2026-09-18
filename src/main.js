@@ -144,6 +144,45 @@ petCard.addEventListener('click', (ev) => {
   }
   if (ev.target.closest('.px')) petCard.hidden = true
 })
+// Writing back to Ema from her own card. The card stays open on success — a conversation is
+// not a task to be dismissed — and says so in place rather than by a toast that floats away.
+petCard.addEventListener('submit', async (ev) => {
+  const form = ev.target.closest('.pet-reply')
+  if (!form) return
+  ev.preventDefault()
+  const input = form.querySelector('input')
+  const text = input.value.trim()
+  if (!text) return
+  const btn = form.querySelector('button')
+  input.disabled = true
+  btn.disabled = true
+  btn.textContent = 'Sending…'
+  try {
+    await actReply('dada:ema', text)
+    input.value = ''
+    btn.textContent = 'Sent ✓'
+    markEmaSeen()
+    setTimeout(poll, 1500)
+  } catch (err) {
+    const msg = String(err?.message || err)
+    btn.textContent = 'Send'
+    if (/sign in/i.test(msg) || /401/.test(msg)) {
+      hud.toast('Sign in first — a tab just opened', 'err')
+      window.open('/api/act/auth', '_blank', 'noopener')
+    } else {
+      hud.toast(`It did not send: ${msg}`, 'err')
+    }
+  } finally {
+    input.disabled = false
+    btn.disabled = false
+    input.focus()
+  }
+})
+// The map listens for bare keys (A archives, N cycles, H hides). A message to a nine-year-old
+// contains most of the alphabet, so the card's own input keeps its keystrokes to itself.
+petCard.addEventListener('keydown', (ev) => {
+  if (ev.target.tagName === 'INPUT') ev.stopPropagation()
+})
 // Escape closes the card too — a moving mascot made it hard to click bare ground to dismiss.
 window.addEventListener('keydown', (ev) => {
   if (ev.key === 'Escape' && !petCard.hidden) petCard.hidden = true
@@ -206,11 +245,20 @@ function showPetCard(m, at) {
   if (m.kind === 'ema') markEmaSeen()
   const kidSay = KIDS.has(m.kind) ? (familySays[m.kind] || '').trim() : ''
   const cartiSay = m.kind === 'gecko' && cartiHungry() ? "I'm hungry, buy me crickets" : ''
+  // The Ema walking about the colony and the Ema on the Home hex are the same daughter, and
+  // this is the one anybody clicks. Her chat comes to her: what she last said, and a box to
+  // answer it, rather than sending Blake off to find a different astronaut with a heart.
+  const chat = m.kind === 'ema' ? threads.find((t) => t.id === 'dada:ema') : null
+  const said = chat ? String(chat.details?.Latest || '').trim() : ''
   petCard.innerHTML =
     `<header><b>${esc(m.name)}</b><button class="px" title="Close" aria-label="Close">✕</button></header>` +
     (kidSay ? `<div class="pet-say">💬 ${esc(kidSay)}</div>` : '') +
     (cartiSay ? `<div class="pet-say">🦗 ${esc(cartiSay)}</div>` : '') +
+    (said ? `<div class="pet-say chat">${chat.unread ? '💗' : '💬'} ${esc(said)}</div>` : '') +
     `<span>${esc(petBody(m)).replace(/\n/g, '<br>')}</span>` +
+    (chat
+      ? '<form class="pet-reply" autocomplete="off"><input name="r" placeholder="Write back to Ema…" maxlength="2000"><button class="btn primary" type="submit">Send</button></form>'
+      : '') +
     (kidSay ? `<button class="pet-dismiss" data-kid="${esc(m.kind)}">Got it — clear this note</button>` : '') +
     (cartiSay ? `<button class="pet-dismiss" data-fed="1">🦗 Fed him — clear it</button>` : '')
   petCard.hidden = false
