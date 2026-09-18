@@ -62,6 +62,11 @@ const DECK_HEIGHT = DECK_TOP + DECK_SKIRT
 const SLOTS_PER_CELL = 7
 const MAX_CELLS = 9
 /**
+ * How brightly a hex with nothing running burns after dark. Not zero: a dark patch reads
+ * as broken, and the colony is still there — it is asleep, not gone.
+ */
+const IDLE_AT_NIGHT = 0.3
+/**
  * Named client projects stay one hex each, however busy they get. A client that sprawls across
  * nine tiles is harder to point at than a single crowded one, and crew past the seven slots
  * just stand closer together.
@@ -624,12 +629,22 @@ export class Plot {
   }
 
   /** Night lighting, plus a pulse on the border when this plot holds something urgent. */
-  setNight(night, urgent, elapsed) {
+  /**
+   * Dusk on one hex. `awake` is whether anything on it is actually running: after dark the
+   * ones that are not fall back to a low ember instead of the full border glow, so the map
+   * at midnight shows the night shift rather than a uniformly lit town. Eased rather than
+   * switched, because a hex that finishes its work should settle, not blink out.
+   */
+  setNight(night, urgent, elapsed, awake = true) {
+    const want = awake ? 1 : IDLE_AT_NIGHT
+    this._lit = this._lit === undefined ? want : this._lit + (want - this._lit) * 0.06
+    // Only the night half of the glow dims: by day every hex is lit by the same sun.
+    const lit = 1 - night * (1 - this._lit)
     if (this.borderMaterial) {
       this.borderMaterial.emissiveIntensity =
-        0.3 + night * 1.4 + (urgent ? 0.4 + Math.sin(elapsed * 3.4) * 0.32 : 0)
+        (0.3 + night * 1.4) * lit + (urgent ? 0.4 + Math.sin(elapsed * 3.4) * 0.32 : 0)
     }
-    if (this.lampMaterial) this.lampMaterial.color.copy(this._lampBase).multiplyScalar(0.5 + night * 2.4)
+    if (this.lampMaterial) this.lampMaterial.color.copy(this._lampBase).multiplyScalar((0.5 + night * 2.4) * lit)
   }
 
   dispose() {

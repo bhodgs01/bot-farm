@@ -1379,7 +1379,14 @@ export class Colony {
 
   _updatePlots(night, elapsed) {
     const urgent = this.replayUrgent || this.urgentPlots
-    for (const plot of this.plotOrder) plot.setNight(night, urgent?.has(plot.id) ?? false, elapsed)
+    // The night shift: after dark a hex with nothing running goes dim, so a glance at 11pm
+    // says what is still awake out there. A hex that wants you never goes dark, whatever
+    // the hour — the whole point of a raised hand is that it survives the night.
+    for (const plot of this.plotOrder) {
+      const wants = urgent?.has(plot.id) ?? false
+      const awake = wants || (this.replayUrgent ? true : this.activePlots.has(plot.id))
+      plot.setNight(night, wants, elapsed, awake)
+    }
   }
 
   _updateScaffolds() {
