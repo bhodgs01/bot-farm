@@ -16,10 +16,12 @@ const TTL_MS = 60 * 1000
 const SOON_MS = 24 * 60 * 60 * 1000
 
 /**
- * Projects that are somebody else's to-do list, not Blake's. The Marc Coaching Hub writes
- * follow-ups for Marc's own team into Vikunja; they are his to chase, not Blake's.
+ * Projects that are somebody else's to-do list, or nobody's any more. The Marc Coaching Hub
+ * writes follow-ups for Marc's own team into Vikunja; they are his to chase, not Blake's.
+ * Franky was retired from the roster long ago, but its Vikunja project outlived it and kept
+ * raising a hex of its own — a tile for an agent that no longer exists.
  */
-const NOT_MINE = /coaching hub/i
+const NOT_MINE = /coaching hub|^franky$/i
 
 /** Vikunja project title → hex. Anything unlisted keeps its own title as the hex name. */
 const ZONE_FOR = [
