@@ -109,7 +109,9 @@ function loadDeskModel() {
 }
 
 /** Centre-to-edge of one hex, less half a room: far enough back to line the wall, not overhang. */
-const BUILDING_BACK_OFF = 2.0
+const BUILDING_BACK_OFF = 2.6
+/** A flat-top hex's sides face every 60 degrees, so anything laid against one turns in steps. */
+const HEX_SIDE_STEP = Math.PI / 3
 
 const ZONE_LANDMARK = {
   Inbox: 'desk',
@@ -682,11 +684,18 @@ export class Colony {
    * its own crew have somewhere to stand in front of it.
    */
   _faceTheView(mesh, plot) {
-    const toCamera = Math.PI / 4
-    mesh.rotation.y = toCamera
-    const back = BUILDING_BACK_OFF
+    // A hex here is flat-top with a 30 degree phase, so its six sides face multiples of 60
+    // degrees. The camera looks in from 45, which is not one of them — pointing the room
+    // straight at the viewer left its back wall cutting across the tile at an angle to every
+    // edge. Snap to the nearest side instead: as close to facing you as the hexagon allows,
+    // and flush with the wall behind it.
+    const open = Math.round(Math.PI / 4 / HEX_SIDE_STEP) * HEX_SIDE_STEP
+    mesh.rotation.y = open
     const c = plot.center || plot.middle
-    if (c) mesh.position.set(c.x - Math.SQRT1_2 * back, mesh.position.y, c.z - Math.SQRT1_2 * back)
+    if (!c) return
+    // Straight back along the way it faces, so it sits against that side and leaves the
+    // middle of the tile free for whoever else stands there.
+    mesh.position.set(c.x - Math.sin(open) * BUILDING_BACK_OFF, mesh.position.y, c.z - Math.cos(open) * BUILDING_BACK_OFF)
   }
 
   _syncBuilding(thread, plot, index) {

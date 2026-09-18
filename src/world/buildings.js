@@ -70,7 +70,7 @@ const KIND_SCALE = {
   hq: 0.95, clubhouse: 0.95, house: 0.95, tradingfloor: 0.9, shield: 0.95, launchpad: 0.95,
   recruitdesk: 0.85, grill: 0.85, vault: 0.9, controltower: 0.95, garage: 0.95, outpost: 0.9, coins: 0.8, chiefOfStaff: 0.92, reception: 0.92, orderCounter: 0.92,
   apartment: 0.9, theater: 0.9, kennel: 0.9, fj40: 0.95, dish: 1, pumpjack: 1, deck: 0.95, gazebo: 0.95,
-  comicshop: 0.85, blakesDesk: 0.8, castlecreative: 0.5,
+  comicshop: 0.85, blakesDesk: 0.4, castlecreative: 0.5,
   // small fixtures that stand alone
   signpost: 0.7, tvwall: 0.7, keyrack: 0.7, meter: 0.7, countdown: 0.7, mailbox: 0.7,
   // rebuilt kit pieces, used mostly as fillers (fillers are halved again on top of this)
