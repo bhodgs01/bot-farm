@@ -15,13 +15,15 @@ import { ask, chatEnabled, johnnyAsk } from './ask.mjs'
 import { setProjectStatus, closeTask, completeChores, feedCartiDone, createTicket, janineDraftAction, nudgeClient, clearSay } from './act.mjs'
 import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
 import { applySeen, markSeen } from './seen.mjs'
-import { nightWatch } from './notify.mjs'
+import { nightWatch, recentPushes, pagerTest } from './notify.mjs'
+import { remedyFor, runRemedy } from './remedy.mjs'
 import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGenerate, update as newsUpdate, topicById, todayKC, newsEnabled } from './news.mjs'
 import { refreshNews } from './harnesses/news.mjs'
 import { napMode, fetchNap } from './harnesses/home.mjs'
 import { familyChores, familySays } from './harnesses/chores.mjs'
 import { hasValidAuth } from './auth.mjs'
 import { plexArt } from './harnesses/plex.mjs'
+import { dadaReply } from './harnesses/dada.mjs'
 import { withIntros } from './intro.mjs'
 
 // ── history: who had a hand up, hour by hour ─────────────────────────────────────────────
@@ -877,7 +879,10 @@ export async function apiMiddleware(req, res, next) {
       if (back) {
         const wanted = recentDays(back)
         const days = await Promise.all(wanted.map(async (day) => ({ day, snapshots: await readHistory(day) })))
-        return send(res, 200, { days: days.filter((d) => d.snapshots.length).reverse() })
+        // What the pager rang for over the same stretch. A push that happened while he slept
+        // is otherwise invisible to the map that sent it.
+        const pages = await recentPushes(back * 86400000).catch(() => [])
+        return send(res, 200, { days: days.filter((d) => d.snapshots.length).reverse(), pages })
       }
       const day = url.searchParams.get('day') || todayKC()
       if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return send(res, 400, { error: 'Bad day' })
@@ -897,6 +902,62 @@ export async function apiMiddleware(req, res, next) {
       if (!thread) return send(res, 404, { error: 'That worker has walked off the map' })
       const mark = await markSeen(id, thread.seenStamp || thread.lastActivityAt || Date.now(), who)
       return send(res, 200, { ok: true, stamp: mark?.stamp || 0 })
+    }
+
+    // The known fix for this failure, run from the card. The browser names the worker; the
+    // server decides what — if anything — may be done about it (see remedy.mjs).
+    if (url.pathname === '/api/act/fix' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to fix things', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      const { id } = await readJsonBody(req, 16 * 1024)
+      const thread = (await scanThreads()).find((t) => t.id === id)
+      if (!thread) return send(res, 404, { error: 'That worker has walked off the map' })
+      const remedy = remedyFor(thread)
+      if (!remedy) return send(res, 400, { error: 'Nothing here has a known fix' })
+      try {
+        const out = await runRemedy({ remedy, who })
+        return send(res, 200, { ok: true, ...out })
+      } catch (err) {
+        return send(res, 502, { ok: false, error: String(err?.message || err) })
+      }
+    }
+
+    // Ring Blake's own pager, on purpose. The only push the map sends that is not about
+    // something being wrong — pressed by him, at an hour of his choosing, so he never has
+    // to find out during an actual emergency whether the thing works.
+    if (url.pathname === '/api/act/pager-test' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to test the pager', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      try {
+        return send(res, 200, { ok: true, ...(await pagerTest({ who })) })
+      } catch (err) {
+        return send(res, 502, { ok: false, error: String(err?.message || err) })
+      }
+    }
+
+    // Write back to Ema without leaving the map. The only action here that puts words in
+    // Blake's name in front of another person, so it is narrow on purpose: the thread must
+    // be one that offered a reply, and the text goes through verbatim — nothing writes for
+    // him. Answering is also reading, so the same call puts her heart down.
+    if (url.pathname === '/api/act/reply' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to write back', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      const { id, text } = await readJsonBody(req, 16 * 1024)
+      if (typeof id !== 'string' || !id) return send(res, 400, { error: 'Bad id' })
+      const message = String(text || '').trim()
+      if (!message) return send(res, 400, { error: 'Nothing to send' })
+      const thread = (await scanThreads()).find((t) => t.id === id)
+      if (!thread) return send(res, 404, { error: 'That worker has walked off the map' })
+      if (!(thread.actions || []).includes('reply')) return send(res, 400, { error: 'That one cannot be replied to' })
+      const r = await dadaReply(message)
+      if (!r.ok) return send(res, 502, { ok: false, error: r.error || 'send failed' })
+      // Replying is reading: clear the waiting mark so her heart does not survive the answer.
+      await markSeen(id, thread.seenStamp || thread.lastActivityAt || Date.now(), who).catch(() => {})
+      console.log(`act: ${who} replied to ${id} (${message.length} chars)`)
+      return send(res, 200, { ok: true })
     }
 
     if (url.pathname === '/api/act/project' && req.method === 'POST') {

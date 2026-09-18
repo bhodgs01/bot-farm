@@ -109,5 +109,14 @@ export const actStar = (threadId, on) => post('/api/act/star', { id: threadId, o
 /** "I read it." Clears a waiting mark the source itself cannot tell has been read. */
 export const actRead = (threadId) => post('/api/act/read', { id: threadId })
 
+/** Write back, in Blake's own words, to a thread that can be answered (Ema's chat). */
+export const actReply = (threadId, text) => post('/api/act/reply', { id: threadId, text })
+
+/** Run the known fix for a failing worker: the server decides what that is. */
+export const actFix = (threadId) => post('/api/act/fix', { id: threadId })
+
+/** Ring the pager on purpose, to hear that it works. */
+export const actPagerTest = () => post('/api/act/pager-test', {})
+
 /** The hourly snapshots the day scrubber replays. */
 export const fetchHistory = (days = 2) => req(`/api/history?days=${days}`)

@@ -36,6 +36,9 @@ import {
   actStar,
   actNews,
   actRead,
+  actReply,
+  actFix,
+  actPagerTest,
   fetchHistory,
 } from './game/api.js'
 
@@ -563,6 +566,23 @@ const actions = {
         hud.toast('Meetings hub opened. Press Record on the meeting there.')
         return
       }
+      // The one action on the map that changes the cluster rather than a record of it, so
+      // it asks first and names exactly what it will touch. Everything else here is either
+      // reversible or a piece of paper.
+      if (status === 'fix') {
+        const what = thread.remedy?.label || 'run the known fix'
+        if (!window.confirm(`${what}?\n\nThis restarts it for real. The tile will go through its rollout.`)) return
+        hud.toast(`Working on ${thread.title}…`)
+        const r = await actFix(thread.id)
+        hud.toast(`${r.did} — ${r.note}`)
+        setTimeout(poll, 2500)
+        return
+      }
+      if (status === 'pager') {
+        const r = await actPagerTest()
+        hud.toast(r.ok ? 'Pager rung. Your phone should have it.' : 'The pager did not answer.')
+        return
+      }
       if (status === 'nudge') {
         const r = await actNudge(thread.id)
         hud.toast(`Reminder drafted in Gmail for ${r.draft?.to || 'the client'}. Send it from Drafts.`)
@@ -637,6 +657,40 @@ const actions = {
         window.open('/api/ask/auth', '_blank', 'noopener')
       } else {
         hud.appendChat(thread.id, 'worker', `I could not answer: ${msg}`)
+      }
+    }
+  },
+
+  /**
+   * Write back to a person from their card — Ema's chat is the one that can be answered.
+   * The text goes through exactly as typed: no model sits between Blake and his daughter.
+   * Her message lands in the transcript as hers, his answer as his, so the card reads like
+   * the conversation it is.
+   */
+  replyWorker: async (text) => {
+    const thread = threads.find((t) => t.id === selectedId)
+    if (!thread) return
+    hud.appendChat(thread.id, 'me', text)
+    try {
+      await actReply(thread.id, text)
+      // Answering is reading: put her hand down here too, so the map agrees with the card
+      // before the next scan comes round.
+      Object.assign(thread, {
+        unread: false,
+        gitBranch: 'you answered',
+        preview: `You: ${text}`.slice(0, 240),
+        actions: (thread.actions || []).filter((a) => a !== 'read'),
+      })
+      applyThreads(threads.slice())
+      hud.toast('Sent.')
+      setTimeout(poll, 1500)
+    } catch (err) {
+      const msg = String(err?.message || err)
+      if (/sign in/i.test(msg) || /401/.test(msg) || /Failed to fetch/i.test(msg)) {
+        hud.appendChat(thread.id, 'worker', 'You need to sign in first. A sign-in tab just opened; come back and send it again.')
+        window.open('/api/act/auth', '_blank', 'noopener')
+      } else {
+        hud.appendChat(thread.id, 'worker', `It did not send: ${msg}`)
       }
     }
   },

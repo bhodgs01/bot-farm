@@ -1733,6 +1733,8 @@ kbd {
 .wywo li span { opacity: 0.7; }
 .wywo li i { opacity: 0.5; font-style: normal; }
 .wywo li.more { opacity: 0.5; }
+/* The pager going off outranks everything else on this card, and reads like it. */
+.wywo h4.paged { color: var(--warn, #ffb454); }
 .wywo .acts { margin-top: 4px; }
 .wywo .acts .btn { width: 100%; }
 

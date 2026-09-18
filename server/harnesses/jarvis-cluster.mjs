@@ -547,10 +547,18 @@ function deriveAgent(agent, snap, signals, probeUp) {
   const now = Date.now()
 
   const problems = pods.flatMap(podProblems)
+  // The workloads that are actually short of replicas, named. A rollout restart is the fix
+  // for most of what goes wrong here (a wedged process, a pod that lost its node), so the
+  // card offers it — but only ever for a deployment this agent owns and that is genuinely
+  // down, and the name is carried from here rather than accepted from the browser.
+  const broken = []
   for (const d of deploys) {
     const want = d.spec?.replicas ?? 1
     const ready = d.status?.readyReplicas || 0
-    if (want > 0 && ready < want) problems.push(`${d.metadata.name}: ${ready}/${want} ready`)
+    if (want > 0 && ready < want) {
+      problems.push(`${d.metadata.name}: ${ready}/${want} ready`)
+      broken.push({ ns: d.metadata.namespace, name: d.metadata.name })
+    }
   }
   if (probeUp === false) problems.push('dashboard not answering')
   if (sig.error) problems.push(sig.message)
@@ -614,6 +622,12 @@ function deriveAgent(agent, snap, signals, probeUp) {
     lastActivityAt: activityAt,
     lastFocusedAt: 0,
     running,
+    // One known fix, when there is exactly one obvious thing to restart. Several broken
+    // workloads at once is not a button — that is a situation, and it wants a person.
+    remedy:
+      broken.length === 1
+        ? { kind: 'restart', ns: broken[0].ns, name: broken[0].name, label: `Restart ${broken[0].name}` }
+        : null,
     unread: Boolean(sig.unread),
     hasError: problems.length > 0,
     starred: false,

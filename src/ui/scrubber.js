@@ -61,10 +61,13 @@ const marksOf = (snap) => new Map((snap?.marks || []).map((m) => [m.id, m]))
 
 export function installScrubber({ colony, hud, onFly }) {
   let snaps = []
+  let pages = []
   let index = 0
   let open = false
   let playing = false
   let timer = 0
+  let stepMs = STEP_MS
+  let stopAt = Infinity
   let loading = null
 
   const root = document.createElement('div')
@@ -96,6 +99,7 @@ export function installScrubber({ colony, hud, onFly }) {
       loading = fetchHistory(2)
         .then((payload) => {
           snaps = flatten(payload)
+          pages = Array.isArray(payload?.pages) ? payload.pages : []
           loading = null
           return snaps
         })
@@ -130,14 +134,38 @@ export function installScrubber({ colony, hud, onFly }) {
     playBtn.textContent = on ? '❚❚' : '▶'
     playBtn.title = on ? 'Pause' : 'Play the day back'
     clearInterval(timer)
-    if (!on) return
+    if (!on) {
+      stepMs = STEP_MS
+      stopAt = Infinity
+      return
+    }
     timer = setInterval(() => {
-      if (index >= snaps.length - 1) {
+      if (index >= Math.min(snaps.length - 1, stopAt)) {
         setPlaying(false)
         return
       }
       show(index + 1)
-    }, STEP_MS)
+    }, stepMs)
+  }
+
+  /**
+   * Play one stretch of the recording in a fixed amount of time, whatever it holds — the
+   * night is forty snapshots and a quiet afternoon is four, and both should take about ten
+   * seconds to watch. Used for the overnight replay the morning opens with.
+   */
+  async function playWindow(fromAt, toAt, totalMs = 10000) {
+    const first = snaps.findIndex((s) => s.at >= fromAt)
+    if (first < 0) return false
+    let last = first
+    while (last + 1 < snaps.length && snaps[last + 1].at <= toAt) last++
+    if (last - first < 2) return false
+    // Open first and let it settle on "now"; the window is then wound back onto the night.
+    await toggle(true)
+    stopAt = last
+    stepMs = Math.max(140, Math.round(totalMs / (last - first)))
+    show(first)
+    setPlaying(true)
+    return true
   }
 
   async function toggle(on) {
@@ -172,6 +200,16 @@ export function installScrubber({ colony, hud, onFly }) {
     }
   })
 
+  // A replay that started on its own must stop the moment he reaches for the map: the
+  // colony he is touching is the live one, and a recording playing over it is a lie.
+  window.addEventListener(
+    'pointerdown',
+    (e) => {
+      if (playing && !root.contains(e.target)) setPlaying(false)
+    },
+    true,
+  )
+
   // ── while you were out ──────────────────────────────────────────────────────────────
   function stampLook() {
     write(LAST_LOOK, Date.now())
@@ -187,13 +225,16 @@ export function installScrubber({ colony, hud, onFly }) {
     return found
   }
 
-  function renderCard(since, before, now) {
+  function renderCard(since, before, now, { overnight } = {}) {
     const then = handsOf(before)
     const nowHands = handsOf(now)
     const fresh = [...nowHands.values()].filter((h) => !then.has(h.id))
     const gone = [...then.values()].filter((h) => !nowHands.has(h.id))
     const delivered = [...marksOf(now).values()].filter((m) => !marksOf(before).has(m.id))
-    if (!fresh.length && !gone.length && !delivered.length) return false
+    // Anything the pager rang for while he was away. This goes first and stays even when
+    // nothing else changed: being woken and not being told why is the worst of both.
+    const rang = pages.filter((p) => p.at >= since)
+    if (!fresh.length && !gone.length && !delivered.length && !rang.length) return false
 
     const hours = Math.round((Date.now() - since) / 3600000)
     const ago = hours >= 24 ? `${Math.round(hours / 24)} day${hours >= 48 ? 's' : ''}` : hours >= 1 ? `${hours} hour${hours === 1 ? '' : 's'}` : 'a while'
@@ -202,13 +243,18 @@ export function installScrubber({ colony, hud, onFly }) {
         .slice(0, 6)
         .map((h) => `<li><span>${glyph}</span> ${escapeHtml(h.title)} <i>${escapeHtml(h.project || '')}</i></li>`)
         .join('')
+    const paged = rang
+      .slice(0, 4)
+      .map((p) => `<li><span>🔔</span> ${escapeHtml(String(p.title || 'Paged you').replace(/^Bot Farm: /, ''))} <i>${escapeHtml(clock(p.at))}</i></li>`)
+      .join('')
     card.innerHTML = `
       <header>While you were out <button class="btn icon ghost" data-act="dismiss" title="Dismiss">✕</button></header>
       <p class="sub">Since you last looked, ${escapeHtml(ago)} ago.</p>
+      ${rang.length ? `<h4 class="paged">${rang.length === 1 ? 'The pager went off' : `The pager went off ${rang.length} times`}</h4><ul>${paged}${rang.length > 4 ? `<li class="more">+${rang.length - 4} more</li>` : ''}</ul>` : ''}
       ${fresh.length ? `<h4>${plural(fresh.length, 'new hand', 'new hands')}</h4><ul>${list(fresh, '▲')}${fresh.length > 6 ? `<li class="more">+${fresh.length - 6} more</li>` : ''}</ul>` : ''}
       ${gone.length ? `<h4>${plural(gone.length, 'came down', 'came down')}</h4><ul>${list(gone, '▼')}${gone.length > 6 ? `<li class="more">+${gone.length - 6} more</li>` : ''}</ul>` : ''}
       ${delivered.length ? `<h4>Delivered</h4><ul>${list(delivered, '✅')}</ul>` : ''}
-      <div class="acts"><button class="btn" data-act="replay">Play the day back</button></div>`
+      <div class="acts"><button class="btn" data-act="replay">${overnight ? 'Play the night back' : 'Play the day back'}</button></div>`
     card.hidden = false
     return true
   }
@@ -232,7 +278,28 @@ export function installScrubber({ colony, hud, onFly }) {
     const before = snapshotAt(since)
     const now = list[list.length - 1]
     if (!before || before === now) return
-    if (renderCard(since, before, now)) hud?.hint?.('While you were out — the summary is top-left')
+    const overnight = sleptThrough(since)
+    if (renderCard(since, before, now, { overnight })) {
+      hud?.hint?.(overnight ? 'Last night, in ten seconds — the summary is top-left' : 'While you were out — the summary is top-left')
+    }
+    // The first look of the morning gets the night played back at it: the hexes light up the
+    // way they did at 2am, which is the only way anyone ever sees the hours the colony works
+    // alone. Ten seconds, once, and any touch of the map stops it.
+    if (overnight) await playWindow(since, Date.now(), 10000)
+  }
+
+  /**
+   * True when the gap he was away for was the night — he stopped looking last evening and
+   * this is the next morning. Not merely "a long time": an afternoon away is not a night,
+   * and should not trigger a replay of hours he was awake for.
+   */
+  function sleptThrough(since) {
+    const hourKC = (at) => Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Chicago' }).format(new Date(at)))
+    const now = Date.now()
+    const gapHours = (now - since) / 3600000
+    const wakingUp = hourKC(now) >= 4 && hourKC(now) < 12
+    const wentToBed = hourKC(since) >= 20 || hourKC(since) < 5
+    return gapHours >= 3 && gapHours <= 20 && wakingUp && wentToBed
   }
 
   // A tab left open while he is actually at the desk should not later claim he was away.

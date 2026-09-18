@@ -13,6 +13,12 @@ import { seenStamp } from '../seen.mjs'
 const URL = process.env.DADA_URL || 'http://dada-chat.dada-chat.svc.cluster.local:3130'
 const UID = process.env.DADA_UID || ''
 const OPEN_URL = process.env.DADA_OPEN_URL || 'https://dada-chat.kcproto.com'
+/**
+ * Whose chat this is. The card is named for the person on the other end, always — the
+ * source names the *last speaker*, so after Blake answered, his own daughter's astronaut
+ * used to be labelled "Blake".
+ */
+const NAME = process.env.DADA_NAME || 'Ema'
 const ZONE = 'Home'
 const TTL_MS = 20 * 1000
 const NL = String.fromCharCode(10)
@@ -65,7 +71,7 @@ async function fetchThreads() {
     {
       id: 'dada:ema',
       kind: 'dada',
-      title: `${hud.emoji ? `${hud.emoji} ` : '💗 '}${who}`,
+      title: `${hud.emoji ? `${hud.emoji} ` : '💗 '}${NAME}`,
       preview: preview.slice(0, 240),
       // What "read" would mean if Blake presses it: everything up to her newest message.
       seenStamp: stamp,

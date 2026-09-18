@@ -118,6 +118,36 @@ export async function push({ title, body }) {
 }
 
 /**
+ * What the watch has rung for lately, newest first. The map is otherwise the only place
+ * Blake learns anything, and a pager that fires while he sleeps is invisible to it: he
+ * wakes to a notification with no idea whether the colony knows it happened. This is how
+ * the morning card can say "you were paged at 3:14, for this".
+ */
+export async function recentPushes(sinceMs = 12 * 3600 * 1000) {
+  const map = await load()
+  const cutoff = Date.now() - sinceMs
+  return Object.entries(map)
+    .filter(([, v]) => v && !v.seeded && (v.at || 0) >= cutoff)
+    .map(([key, v]) => ({ at: v.at, id: v.id, title: v.title || '', body: v.body || '', key }))
+    .sort((a, b) => b.at - a.at)
+}
+
+/**
+ * Ring the pager on purpose, so Blake can hear for himself that it works without waiting
+ * for something to go wrong at 3am. Deliberately a button he presses rather than something
+ * that fires on its own: the one honest test of a pager is the one you are awake for.
+ */
+export async function pagerTest({ who } = {}) {
+  const when = new Date().toLocaleTimeString('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit' })
+  await push({
+    title: 'Bot Farm: pager test',
+    body: `This is the night watch checking in at ${when}. A real one only rings for Frances, a node, a disk, or a backup check.`,
+  })
+  console.log(`night watch: pager test sent${who ? ` by ${who}` : ''}`)
+  return { sent: true, at: Date.now() }
+}
+
+/**
  * Look at a scan and ring for anything new that qualifies. Safe to call on every poll:
  * outside the quiet hours, or with the push switched off, it does nothing at all.
  */
@@ -150,9 +180,11 @@ export async function nightWatch(threads) {
   for (const hit of hits.slice(0, MAX_PER_SWEEP)) {
     const t = hit.thread
     const body = [String(t.title || '').replace(/^[^\w(]+\s*/, ''), String(t.preview || '').split(NL)[0]].filter(Boolean).join(NL)
+    const title = `Bot Farm: ${hit.rule.title}`
     try {
-      await push({ title: `Bot Farm: ${hit.rule.title}`, body: body.slice(0, 400) })
-      map[hit.key] = { at: Date.now(), id: t.id }
+      await push({ title, body: body.slice(0, 400) })
+      // Keep what was said, not just that something was: the morning card reads this back.
+      map[hit.key] = { at: Date.now(), id: t.id, title, body: body.slice(0, 200) }
       count++
       console.log(`night watch: pushed ${hit.rule.what} — ${t.id}`)
     } catch (err) {

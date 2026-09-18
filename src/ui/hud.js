@@ -402,7 +402,11 @@ export class Hud {
       const text = input.value.trim()
       if (!text) return
       input.value = ''
-      this.actions.askWorker?.(text)
+      // The same box, two jobs. On most workers it asks the worker what it needs; on a
+      // thread that can be answered it is a message to a person, and must never be handed
+      // to the model instead.
+      if (this._replyMode) this.actions.replyWorker?.(text)
+      else this.actions.askWorker?.(text)
     })
     // Rename: a small pencil beside the title. An empty answer gives the source's name back.
     this.$('#btn-rename').addEventListener('click', () => {
@@ -685,16 +689,38 @@ export class Hud {
     if (intro) introBox.querySelector('p').textContent = thread.intro
     // Stage buttons: what this thread can be moved to next.
     const stage = this.$('.thread-pop .stage')
-    const STAGE_LABEL = { active: 'Make active', in_process: 'Start work', completed: 'Mark complete', paid: 'Paid ✓', done: 'Close ticket ✓', dismiss: 'Dismiss ✓', chore: 'Done ✓', seen: 'Got it ✓', read: 'Read ✓', ticket: '🎫 Make it a ticket', join: '📹 Join', record: '🎙️ Record', nudge: '💌 Nudge (draft)', approve: 'Send it ✓', skip: 'Skip', ack: 'Remove flag', unack: 'Flag again', star: '★ Star', unstar: 'Unstar' }
+    const STAGE_LABEL = { active: 'Make active', in_process: 'Start work', completed: 'Mark complete', paid: 'Paid ✓', done: 'Close ticket ✓', dismiss: 'Dismiss ✓', chore: 'Done ✓', seen: 'Got it ✓', read: 'Read ✓', ticket: '🎫 Make it a ticket', join: '📹 Join', record: '🎙️ Record', nudge: '💌 Nudge (draft)', approve: 'Send it ✓', skip: 'Skip', ack: 'Remove flag', unack: 'Flag again', star: '★ Star', unstar: 'Unstar', fix: '🔧 Fix it', pager: '🔔 Test the pager' }
     // A flagged worker offers to have the flag removed; an acknowledged one offers it back.
     this.renderReader(thread)
     if (intro) this.$('.thread-pop .reader').hidden = true
     // Any raised hand can become a ticket, unless it already is one.
     const ticketable = (thread.unread || thread.hasError) && !['tasks', 'janine'].includes(thread.harness) && !/^(chief|ledger|deadline):/.test(thread.id)
-    // A finished job with a client address can be nudged: a reminder drafted into Gmail, never sent from here.
-    const nudgeable = thread.project === 'Completed' && thread.details?.Email
-    const acts = (Array.isArray(thread.actions) ? thread.actions : []).filter((a) => !(hasStories && a === 'read')).concat(nudgeable ? ['nudge'] : []).concat(ticketable ? ['ticket'] : []).concat(thread.hasError ? ['ack'] : thread.acked ? ['unack'] : []).concat(thread.watched ? ['unstar'] : ['star'])
-    stage.innerHTML = acts.map((a) => `<button class="btn ${a === 'paid' || a === 'done' || a === 'dismiss' || a === 'chore' || a === 'seen' || a === 'approve' ? 'primary' : ''}" data-stage="${escapeHtml(a)}">${escapeHtml(STAGE_LABEL[a] || a)}</button>`).join('')
+    // A finished job with a client address can be nudged: a reminder drafted into Gmail, never
+    // sent from here. Keyed off what the job itself carries (an address, and days owed) rather
+    // than the name of the hex it stands on — this was pinned to "Completed", a hex that was
+    // retired when receivables moved, and the button quietly stopped appearing at all.
+    const nudgeable = Boolean(thread.details?.Email && thread.details?.Owed)
+    // A thread that can be answered turns the ask box into a message box. There is no
+    // "reply" button: the box below it is the reply, and two ways to do it is one too many.
+    const canReply = (Array.isArray(thread.actions) ? thread.actions : []).includes('reply')
+    this._replyMode = canReply
+    const who = String(thread.title || '').replace(/^\p{Extended_Pictographic}️?\s*/u, '') || 'them'
+    const askInput = this.$('.thread-pop form.ask input')
+    askInput.placeholder = canReply ? `Write back to ${who}…` : 'Ask what it needs…'
+    askInput.maxLength = canReply ? 2000 : 400
+    const askBtn = this.$('.thread-pop form.ask button[type=submit]')
+    askBtn.textContent = canReply ? 'Send' : 'Ask'
+    askBtn.title = canReply ? `Send this straight to ${who}` : 'Ask this worker'
+    // A failure the map knows the fix for offers it, first, and says what it will do.
+    const fixable = Boolean(thread.hasError && thread.remedy)
+    // The pager lives on the chief's card: it is his to test, and belongs with the rest of
+    // what the colony does while nobody is watching.
+    const pageable = thread.id === 'chief:day'
+    const acts = (Array.isArray(thread.actions) ? thread.actions : []).filter((a) => a !== 'reply' && !(hasStories && a === 'read')).concat(fixable ? ['fix'] : []).concat(pageable ? ['pager'] : []).concat(nudgeable ? ['nudge'] : []).concat(ticketable ? ['ticket'] : []).concat(thread.hasError ? ['ack'] : thread.acked ? ['unack'] : []).concat(thread.watched ? ['unstar'] : ['star'])
+    // "Fix it" names the thing it will do to the cluster. A button that hides which
+    // deployment it restarts is a button nobody should press.
+    const label = (a) => (a === 'fix' && thread.remedy?.label ? `🔧 ${thread.remedy.label}` : STAGE_LABEL[a] || a)
+    stage.innerHTML = acts.map((a) => `<button class="btn ${a === 'paid' || a === 'done' || a === 'dismiss' || a === 'chore' || a === 'seen' || a === 'approve' ? 'primary' : ''}" data-stage="${escapeHtml(a)}">${escapeHtml(label(a))}</button>`).join('')
     stage.hidden = intro || acts.length === 0
     for (const b of stage.querySelectorAll('button')) b.addEventListener('click', () => this.actions.stageThread?.(b.dataset.stage))
 
