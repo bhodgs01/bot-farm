@@ -1248,11 +1248,14 @@ engine.canvas.addEventListener('pointermove', (e) => {
   }
   const p = ndc(e)
   const agent = colony.pick(p.x, p.y, p.aspect)
-  hoverId = agent?.id ?? null
-  colony.astronauts.setHover(agent)
   const pet = !agent && colony.mascots ? colony.mascots.pick(engine.camera, p.x, p.y, p.aspect) : null
   const portal = !agent && !pet && colony.portals ? colony.portals.pick(engine.camera, p.x, p.y, p.aspect) : null
-  const door = !agent && !pet && !portal ? colony.pickDoor(p.x, p.y, p.aspect) : null
+  const doorHit = !pet && !portal ? colony.pickDoor(p.x, p.y, p.aspect) : null
+  const door = doorHit && (!agent || doorHit.dist < colony.screenDist(agent.pos, p.x, p.y, p.aspect)) ? doorHit : null
+  // The ring follows whatever the click would take, so a door under the pointer does not
+  // leave a worker highlighted behind it.
+  hoverId = door ? null : (agent?.id ?? null)
+  colony.astronauts.setHover(door ? null : agent)
   if (pet) {
     hoverTip.innerHTML = `<b>${esc(pet.name)}</b>${((s) => (s ? `<i>${esc(s)}</i>` : ''))(petSubtitle(pet))}`
     hoverTip.hidden = false
@@ -1300,6 +1303,16 @@ engine.canvas.addEventListener('pointerup', (e) => {
   if (e.button !== 0 || !rig.wasClick) return
   const p = ndc(e)
   const agent = colony.pick(p.x, p.y, p.aspect)
+  // A door wins when the pointer is genuinely closer to it than to any worker. Workers used
+  // to be picked first no matter what, so on a crowded hex — the Inbox, where the mail
+  // gathers a step in front of the office — every click on the building hit a letter
+  // standing near it and opened that card instead of the door.
+  const door = colony.pickDoor(p.x, p.y, p.aspect)
+  if (door && (!agent || door.dist < colony.screenDist(agent.pos, p.x, p.y, p.aspect))) {
+    window.open(door.url, '_blank', 'noopener')
+    hud.toast(`Opening ${door.label || door.title}`)
+    return
+  }
   if (agent) {
     // The bubble is the alert; the astronaut itself introduces who it is.
     select(agent.id, { mode: colony.astronauts.pickPart === 'badge' ? 'card' : 'intro' })
@@ -1316,14 +1329,6 @@ engine.canvas.addEventListener('pointerup', (e) => {
   const portal = colony.portals ? colony.portals.pick(engine.camera, p.x, p.y, p.aspect) : null
   if (portal) {
     beamToBrain(portal)
-    return
-  }
-  // A set piece that stands for something real: the greenhouse opens the garden dashboard,
-  // Blake's desk opens the workshop. The model is the door, so clicking it goes there.
-  const door = colony.pickDoor(p.x, p.y, p.aspect)
-  if (door) {
-    window.open(door.url, '_blank', 'noopener')
-    hud.toast(`Opening ${door.label || door.title}`)
     return
   }
   petCard.hidden = true

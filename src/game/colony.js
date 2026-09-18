@@ -80,6 +80,32 @@ const ZONE_ACCENT = {
  * What a zone's buildings are when the source did not say: the whole hex dressed as one
  * place, so every email on the Inbox gets a desk and every Embassy task a patch of yard.
  */
+/**
+ * Blake's desk, the detailed version.
+ *
+ * Most set pieces are Composer geometry: a few dozen palette-coloured parts merged into one
+ * buffer that the building shader can rise out of the ground, repaint in the hex's accent and
+ * light up at night. This one is a 220k-triangle GLB carrying its own textures and materials,
+ * so it cannot go through that pipeline at all.
+ *
+ * It is therefore treated as a dressing on top of the Composer piece rather than a
+ * replacement for it: the cheap version is built and placed as usual, the GLB is fetched once
+ * in the background, and when it arrives it is hung on that same building and the procedural
+ * geometry is simply not drawn. The tile is never empty while it loads, the building keeps its
+ * place in the layout, and if the fetch fails (a phone on a bad connection) the colony carries
+ * on with the piece it already has.
+ */
+const DESK_GLB = '/blakesDeskDetailed.glb'
+let deskModel = null
+function loadDeskModel() {
+  if (!deskModel) {
+    deskModel = import('three/examples/jsm/loaders/GLTFLoader.js')
+      .then(({ GLTFLoader }) => new Promise((resolve, reject) => new GLTFLoader().load(DESK_GLB, (g) => resolve(g.scene), undefined, reject)))
+      .catch(() => null)
+  }
+  return deskModel
+}
+
 const ZONE_LANDMARK = {
   Inbox: 'desk',
   'Embassy Landscape': 'yard',
@@ -616,6 +642,31 @@ export class Colony {
     return PLOT_PALETTE[start]
   }
 
+  /**
+   * Hang the detailed desk on the Composer piece standing in for it, matched to its footprint
+   * so the layout does not shift underneath it. `setDrawRange(0, 0)` hides the placeholder's
+   * own geometry while keeping it as the anchor: it stays the thing the colony positions,
+   * measures and walks people to, and the model simply rides along as its child.
+   */
+  async _dressDesk(mesh) {
+    if (mesh.userData.dressed) return
+    mesh.userData.dressed = true
+    const scene = await loadDeskModel()
+    // The building may have been taken down while the model was in flight.
+    if (!scene || !mesh.parent) return
+    const placeholder = new THREE.Box3().setFromObject(mesh)
+    const model = scene.clone(true)
+    const box = new THREE.Box3().setFromObject(model)
+    const want = Math.max(placeholder.max.x - placeholder.min.x, placeholder.max.z - placeholder.min.z)
+    const have = Math.max(box.max.x - box.min.x, box.max.z - box.min.z)
+    if (have > 0 && want > 0) model.scale.setScalar(want / have)
+    // Sit it on the same ground the placeholder stood on, in the placeholder's own frame.
+    model.position.y = placeholder.min.y - mesh.position.y
+    mesh.add(model)
+    mesh.geometry.setDrawRange(0, 0)
+    mesh.userData.model = model
+  }
+
   _syncBuilding(thread, plot, index) {
     let entry = this.buildings.get(thread.id)
     // Whole, always — unless the thread names a fill level (money piles), where the reveal
@@ -629,6 +680,12 @@ export class Colony {
       mesh.rotation.y = ((hashString(thread.id) >>> 8) % 360) * (Math.PI / 180)
       // The cinema faces the default view, screen toward the camera.
       if (mesh.userData.kind === 'theater') mesh.rotation.y += Math.PI
+      // The desk is an open room: it has a front, so it does not get the random spin the
+      // rest of the kit does, and the detailed model is fetched to dress it.
+      if (mesh.userData.kind === 'blakesDesk') {
+        mesh.rotation.y = 0
+        this._dressDesk(mesh)
+      }
       if (mesh.userData.kind === 'shield') this._hangDecal(mesh, '/owl-cybergrade.png', { x: 0.56, y: 0.92, z: 1.28, w: 0.5, h: 0.5 * (715 / 500) })
       // New buildings rise from nothing rather than appearing whole.
       mesh.userData.setProgress(0)
@@ -1403,6 +1460,19 @@ export class Colony {
   }
 
   /**
+   * How far a world point sits from the pointer, in the screen units every picker here uses.
+   * Lets a caller ask which of two different kinds of thing the pointer was really aiming at.
+   */
+  screenDist(pos, ndcX, ndcY, aspect, yOffset = 1.1) {
+    const v = this._distV || (this._distV = new THREE.Vector3())
+    v.copy(pos)
+    v.y += yOffset
+    v.project(this.camera)
+    if (v.z > 1) return Infinity
+    return Math.hypot((v.x - ndcX) * aspect, v.y - ndcY)
+  }
+
+  /**
    * A building you can walk into: any set piece whose thread carries a `url`. Clicking the
    * greenhouse should open the garden dashboard and clicking Blake's desk should open his
    * workshop, because that is where those things actually live — the model on the map is a
@@ -1429,7 +1499,7 @@ export class Colony {
       const d = Math.hypot((v.x - ndcX) * aspect, v.y - ndcY)
       if (d < bd) {
         bd = d
-        best = { id, url: thread.url, title: thread.title || '', label: thread.urlLabel || '' }
+        best = { id, url: thread.url, title: thread.title || '', label: thread.urlLabel || '', dist: d }
       }
     }
     return best
