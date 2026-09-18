@@ -108,6 +108,9 @@ function loadDeskModel() {
   return deskModel
 }
 
+/** Centre-to-edge of one hex, less half a room: far enough back to line the wall, not overhang. */
+const BUILDING_BACK_OFF = 2.0
+
 const ZONE_LANDMARK = {
   Inbox: 'desk',
   'Unlimited Awesome': 'castlecreative',
@@ -670,6 +673,22 @@ export class Colony {
     mesh.userData.model = model
   }
 
+  /**
+   * Stand an open-fronted room against the back of its hex, opening toward the camera.
+   *
+   * The default view looks in from azimuth PI/4, so "towards you" is (+x, +z) and the far
+   * wall of a tile is (-x, -z). The model's open side is its +z, so a quarter turn points it
+   * at the viewer; the same diagonal, negated, pushes it back off the middle of the tile so
+   * its own crew have somewhere to stand in front of it.
+   */
+  _faceTheView(mesh, plot) {
+    const toCamera = Math.PI / 4
+    mesh.rotation.y = toCamera
+    const back = BUILDING_BACK_OFF
+    const c = plot.center || plot.middle
+    if (c) mesh.position.set(c.x - Math.SQRT1_2 * back, mesh.position.y, c.z - Math.SQRT1_2 * back)
+  }
+
   _syncBuilding(thread, plot, index) {
     let entry = this.buildings.get(thread.id)
     // Whole, always — unless the thread names a fill level (money piles), where the reveal
@@ -683,10 +702,11 @@ export class Colony {
       mesh.rotation.y = ((hashString(thread.id) >>> 8) % 360) * (Math.PI / 180)
       // The cinema faces the default view, screen toward the camera.
       if (mesh.userData.kind === 'theater') mesh.rotation.y += Math.PI
-      // The desk is an open room: it has a front, so it does not get the random spin the
-      // rest of the kit does, and the detailed model is fetched to dress it.
+      // The desk is an open room: it has a front, so instead of the random spin the rest of
+      // the kit takes, it is turned to face you and pushed back against the far wall of its
+      // hex — you look into the room across the tile, rather than at the back of it.
       if (mesh.userData.kind === 'blakesDesk') {
-        mesh.rotation.y = 0
+        this._faceTheView(mesh, plot)
         this._dressDesk(mesh)
       }
       if (mesh.userData.kind === 'shield') this._hangDecal(mesh, '/owl-cybergrade.png', { x: 0.56, y: 0.92, z: 1.28, w: 0.5, h: 0.5 * (715 / 500) })
@@ -705,6 +725,7 @@ export class Colony {
         entry.plot = plot.id
         entry.slot = index
         entry.mesh.position.copy(want)
+        if (entry.mesh.userData.kind === 'blakesDesk') this._faceTheView(entry.mesh, plot)
       }
     }
 
