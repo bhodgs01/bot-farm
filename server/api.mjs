@@ -568,6 +568,49 @@ function asHomes(v) {
   return out
 }
 
+/**
+ * Hexes Blake has placed by hand, and meant.
+ *
+ * The layout is otherwise owned by the page: whichever tab saves last wins, which is normally
+ * right — he drags a hex and it stays where he dropped it. But a tab holds its own idea of the
+ * map in memory, so a placement made anywhere else (a scripted move, a second device) is
+ * overwritten by the next save from a page that still remembers the old one, about a second
+ * later. Moving the Unlimited Awesome hex next to Collectorz lost that race twice.
+ *
+ * A pin is the server's answer: applied on the way in and on the way out, so no page can move
+ * it and every page is told the same thing. Deliberately a short list in one env var — pinning
+ * a hex takes the drag-to-move away from it, so it should be rare and on purpose.
+ *
+ * ZONE_PINS="Unlimited Awesome:-2,1;Some Other Zone:3,4"
+ */
+const ZONE_PINS = String(process.env.ZONE_PINS || '')
+  .split(';')
+  .map((s) => s.trim())
+  .filter(Boolean)
+  .map((entry) => {
+    const i = entry.lastIndexOf(':')
+    const zone = entry.slice(0, i).trim()
+    const [q, r] = entry.slice(i + 1).split(',').map((n) => Number(n.trim()))
+    return zone && Number.isInteger(q) && Number.isInteger(r) ? { zone, cell: [q, r] } : null
+  })
+  .filter(Boolean)
+
+/** Put every pinned zone on its cell, and move anyone else off it. */
+function applyPins(plots) {
+  if (!ZONE_PINS.length || !plots || typeof plots !== 'object') return plots
+  const out = { ...plots }
+  for (const { zone, cell } of ZONE_PINS) {
+    const key = cell.join(',')
+    for (const [z, cells] of Object.entries(out)) {
+      if (z === zone || !Array.isArray(cells)) continue
+      const kept = cells.filter((c) => !(Array.isArray(c) && c.join(',') === key))
+      if (kept.length !== cells.length) out[z] = kept
+    }
+    out[zone] = [cell]
+  }
+  return out
+}
+
 async function readState() {
   try {
     const raw = JSON.parse(await fsp.readFile(STATE_FILE, 'utf8'))
@@ -576,7 +619,7 @@ async function readState() {
       archived: asArray(raw.archived),
       archivedAt: asObject(raw.archivedAt),
       opened: asArray(raw.opened),
-      plots: asObject(raw.plots),
+      plots: applyPins(asObject(raw.plots)),
       seen: asObject(raw.seen),
       names: asNames(raw.names),
       settings: raw.settings && typeof raw.settings === 'object' ? raw.settings : null,
@@ -600,7 +643,7 @@ async function writeState(next) {
     archived: asArray(next.archived),
     archivedAt: asObject(next.archivedAt),
     opened: asArray(next.opened),
-    plots: asObject(next.plots),
+    plots: applyPins(asObject(next.plots)),
     seen: asObject(next.seen),
     names: asNames(next.names),
     settings: next.settings && typeof next.settings === 'object' ? next.settings : null,
