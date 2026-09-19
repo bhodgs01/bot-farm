@@ -9,7 +9,10 @@
  */
 import * as THREE from 'three'
 import { FAMILY_IDS, build as buildFamily, preload as preloadFamily } from './family-builders.js'
-import { createR2D2, createBB8, createRocky, createNekoBus, createPitDroid, createWallE, createEve } from './companions.js'
+import {
+  createR2D2, createBB8, createRocky, createNekoBus, createPitDroid, createWallE, createEve,
+  createBaymax, createGizmo, createSpike, createPixarLamp, createLegoVader, createYoda, createPikachu,
+} from './companions.js'
 import { createJohnny5 } from './johnny-five.js'
 import { createTotoro } from './totoro.js'
 import { createTotoroProcession } from './totoro-companions.js'
@@ -491,6 +494,14 @@ KINDS.nekobus = { build: createNekoBus, name: 'Neko Bus', intro: 'Twelve legs, o
 KINDS.walle = { build: createWallE, name: 'WALL-E', intro: 'I tidy as I go. Every hex has something worth keeping, if you look at it long enough.' }
 KINDS.eve = { build: createEve, name: 'EVE', intro: 'I scan, I hover, I report. Directive: keep an eye on the place. WALL-E follows me about.' }
 
+KINDS.baymax = { build: createBaymax, name: 'Baymax', intro: 'Hello. I am Baymax, your personal healthcare companion. On a scale of one to ten, how would you rate the colony today?' }
+KINDS.gizmo = { build: createGizmo, name: 'Gizmo', intro: 'Three rules: keep me out of the light, keep me dry, and never feed me after midnight. The cluster runs at midnight, so do be careful.' }
+KINDS.spike = { build: createSpike, name: 'Spike', intro: 'Mohawk, bad attitude, no respect for the rota. If something goes missing off a hex, it was probably me.' }
+KINDS.pixarlamp = { build: createPixarLamp, name: 'Lampy', intro: 'I hop. I look at things. Occasionally I flatten something small and bounce off looking pleased.' }
+KINDS.legovader = { build: createLegoVader, name: 'Lego Vader', intro: 'I find your uptime disturbing. I walk the colony in small plastic steps and judge the deployments.' }
+KINDS.yoda = { build: createYoda, name: 'Yoda', intro: 'Wander this colony, I do. Patience with the deploys, you must have. Rolled back, it will be, hmm.' }
+KINDS.pikachu = { build: createPikachu, name: 'Pikachu', intro: 'Pika. I trot between the hexes and spark a bit when the printers start up.' }
+
 // The pit droid crew: three of them, and unlike everyone else here they have a job. See
 // PitCrew below — they travel together and turn up wherever something is actually broken.
 KINDS.pitdroid = { build: createPitDroid, name: 'Pit Droid', intro: 'One of three. We go where the red lights are, stand about looking at the problem, and move on when it clears.' }
@@ -707,7 +718,8 @@ export class Mascots {
     // The whole family walks the colony. Warm their face textures, then spawn each one.
     preloadFamily()
     for (const id of FAMILY_IDS) this.spawn(id)
-    for (const id of ['r2d2', 'bb8', 'rocky', 'nekobus', 'walle', 'eve', 'pitdroid']) this.spawn(id)
+    for (const id of ['r2d2', 'bb8', 'rocky', 'nekobus', 'walle', 'eve', 'pitdroid',
+      'baymax', 'gizmo', 'spike', 'pixarlamp', 'legovader', 'yoda', 'pikachu']) this.spawn(id)
     this.spawn('johnny5')
     this.spawn('totoro')
     // Totoro's little ones — Chu (blue) and Chibi (white) — hop along behind him. They're not

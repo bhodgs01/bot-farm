@@ -904,6 +904,13 @@ const CREW_FACE = {
   pitdroid: '/companions/pitdroid.png',
   walle: '/companions/walle.png',
   eve: '/companions/eve.png',
+  baymax: '/companions/baymax.png',
+  gizmo: '/companions/gizmo.png',
+  spike: '/companions/spike.png',
+  pixarlamp: '/companions/pixarlamp.png',
+  legovader: '/companions/legovader.png',
+  yoda: '/companions/yoda.png',
+  pikachu: '/companions/pikachu.png',
 }
 const crewTile = document.createElement('div')
 crewTile.className = 'crew-tile panel'
