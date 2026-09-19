@@ -4,8 +4,9 @@
  *
  * States, by doctrine (the farm shows what Blake acts on, not vanity counts):
  *   running  = somebody is on one of the sites RIGHT NOW (count over the head = live visitors)
- *   unread   = a site that normally gets traffic has gone quiet for QUIET_DAYS (probably broken
- *              upstream of the health check) — hand up with a ?
+ *   quiet    = a site that normally gets traffic has gone quiet for QUIET_DAYS (probably broken
+ *              upstream of the health check). Shown on the card and the hover line, but NOT a
+ *              raised hand — Blake wants to know, not to be alerted (2026-09-19).
  *   asleep   = nothing live and nothing quiet: lastActivityAt is the last real pageview seen,
  *              so the colony's own 3-day rule puts the watcher to bed
  *
@@ -143,9 +144,13 @@ async function fetchThreads() {
       lastActivityAt: Math.max(lastSeen, BORN),
       lastFocusedAt: 0,
       running: liveTotal > 0,
-      unread: quiet.length > 0,
+      // Worth knowing, not worth a raised hand (Blake, 9/19: "still want to know, just doesn't
+      // need to be an alert"). A site going quiet stays on the card and in the hover line —
+      // "Gone quiet: marc.kcproto.com" — but no longer claims a place in Needs-you. Same call
+      // as DOT and the Frances doors: an alert nobody acts on trains you to ignore alerts.
+      unread: false,
       hasError: false,
-      alertKey: quiet.length ? `analytics:quiet:${quiet.map(site).join(',')}` : '',
+      alertKey: '',
       starred: false,
       routine: '',
       prState: '',
