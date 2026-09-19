@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 
 /**
- * The Brain hex's gateway ring: eight portals that beam you out to the worlds of the JARVIS
+ * The Brain hex's gateway ring: nine portals that beam you out to the worlds of the JARVIS
  * Brain, Star-Trek style. The slugs are live pages on brain.kcproto.com; the labels and colors
  * are ours. Edit this list to change where the portals go — it's the whole configuration.
  */
@@ -17,6 +17,11 @@ export const BRAIN_PORTALS = [
   { label: '📚 Letters', slug: 'school?dept=letters', color: 0x8b5cc9 },
   { label: '🛠️ Ops', slug: 'school?dept=ops', color: 0x3fa8a0 },
   { label: '🔒 Restricted', slug: 'school?dept=restricted', color: 0xb8493f },
+  // Arcade Island: not a department but a place in the school — neon on the water, every
+  // building a game you can walk into. It is a planet to the campus (topic 'arcade'), and
+  // `?planet=` is the deep link the campus actually reads, so this one lands on the island.
+  // The trailing slash skips the /school -> /school/ redirect hop.
+  { label: '🕹️ Arcade', slug: 'school/?planet=arcade', color: 0xff4fd8 },
 ]
 
 function roundRect(ctx, x, y, w, h, r) {
