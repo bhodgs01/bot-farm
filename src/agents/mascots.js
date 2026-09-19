@@ -9,6 +9,7 @@
  */
 import * as THREE from 'three'
 import { FAMILY_IDS, build as buildFamily, preload as preloadFamily } from './family-builders.js'
+import { createR2D2, createBB8, createRocky, createNekoBus, createPitDroid, createWallE, createEve } from './companions.js'
 import { createJohnny5 } from './johnny-five.js'
 import { createTotoro } from './totoro.js'
 import { createTotoroProcession } from './totoro-companions.js'
@@ -480,6 +481,20 @@ const KINDS = {
 // built group's userData, so these entries only need the builder.
 for (const id of FAMILY_IDS) KINDS[id] = { build: () => buildFamily(id) }
 
+// The companions. Six of them simply live here, the way Ja'Barkus and Clawd do: no job, no
+// hand up, they wander the paths and are nice to come across. Each drives its own limbs from
+// userData.animate, so the walk loop hands over a speed and leaves the posing alone.
+KINDS.r2d2 = { build: createR2D2, name: 'R2-D2', intro: 'Beep. I roll the colony, scan the hexes and mind my own business. Ask Threepio if you need it in words.' }
+KINDS.bb8 = { build: createBB8, name: 'BB-8', intro: 'I roll faster than I mean to and my head stays put. Mostly I follow whoever looks busiest.' }
+KINDS.rocky = { build: createRocky, name: 'Rocky', intro: "I'm a rock with legs, which is more than most rocks manage. I take the long way round everywhere." }
+KINDS.nekobus = { build: createNekoBus, name: 'Neko Bus', intro: 'Twelve legs, one grin, no timetable. I turn up where I am needed and leave when it suits me.' }
+KINDS.walle = { build: createWallE, name: 'WALL-E', intro: 'I tidy as I go. Every hex has something worth keeping, if you look at it long enough.' }
+KINDS.eve = { build: createEve, name: 'EVE', intro: 'I scan, I hover, I report. Directive: keep an eye on the place. WALL-E follows me about.' }
+
+// The pit droid crew: three of them, and unlike everyone else here they have a job. See
+// PitCrew below — they travel together and turn up wherever something is actually broken.
+KINDS.pitdroid = { build: createPitDroid, name: 'Pit Droid', intro: 'One of three. We go where the red lights are, stand about looking at the problem, and move on when it clears.' }
+
 // Johnny 5: a tracked robot who patrols the colony and reports what he's seen. He drives his
 // own treads and arms; the click card is special (a 6-hour rundown), handled in main.js.
 KINDS.johnny5 = { build: createJohnny5, name: 'Johnny 5', intro: 'Johnny 5 is alive! I roll the colony and log what I see. Input, please.' }
@@ -488,6 +503,53 @@ KINDS.johnny5 = { build: createJohnny5, name: 'Johnny 5', intro: 'Johnny 5 is al
 // limbs (paws, ears, tail, breathing) from userData.update, so the walk loop feeds him a speed
 // and leaves the posing to him. No job, no hand up — he's here so the place feels looked after.
 KINDS.totoro = { build: createTotoro, name: 'Totoro', intro: 'A quiet guardian of the colony. An enormous appetite, and a knack for turning up right when the rain starts.' }
+
+/**
+ * The other two pit droids.
+ *
+ * A single droid turning up at a fault reads as a stray; three arriving together reads as a
+ * crew being sent. So only the leader wanders and picks the destination — these two keep
+ * station on him in a loose wedge, which is cheaper than three independent walkers and looks
+ * more deliberate than three things happening to end up in the same place.
+ *
+ * They stay out of `this.list` on purpose: no card, no crew tile, no nameplate. They are the
+ * rest of the same crew, not two more characters to meet.
+ */
+function createPitCrew(leader) {
+  const group = new THREE.Group()
+  group.name = 'pit crew'
+  const mates = [createPitDroid(), createPitDroid()]
+  for (const m of mates) group.add(m)
+  // Behind the leader and off to each side, at slightly different depths so the three are
+  // never in a straight line.
+  const station = [
+    { side: -0.95, back: 1.05 },
+    { side: 0.95, back: 1.5 },
+  ]
+  group.userData.update = (dt, elapsed, groundAt) => {
+    const yaw = leader.rotation.y
+    const fx = Math.sin(yaw)
+    const fz = Math.cos(yaw)
+    mates.forEach((m, i) => {
+      const o = station[i]
+      // Right of the heading is the heading turned a quarter turn.
+      const wantX = leader.position.x - fx * o.back + Math.cos(yaw) * o.side
+      const wantZ = leader.position.z - fz * o.back - Math.sin(yaw) * o.side
+      const gap = Math.hypot(wantX - m.position.x, wantZ - m.position.z)
+      const k = 1 - Math.exp(-dt * 4)
+      m.position.x += (wantX - m.position.x) * k
+      m.position.z += (wantZ - m.position.z) * k
+      m.position.y = groundAt ? groundAt(m.position.x, m.position.z) : 0
+      let d = yaw - m.rotation.y
+      while (d > Math.PI) d -= Math.PI * 2
+      while (d < -Math.PI) d += Math.PI * 2
+      m.rotation.y += d * Math.min(1, dt * 5)
+      // Out of step with each other and with the leader, so they do not march in lockstep.
+      m.userData.animate(elapsed + i * 0.8, gap > 0.06)
+    })
+  }
+  return group
+}
 
 /** Characters built to the people contract (arms, legs, swappable faces) walk and emote. */
 const isPerson = (m) => Boolean(m.mesh.userData.arms || m.mesh.userData.legs)
@@ -645,11 +707,18 @@ export class Mascots {
     // The whole family walks the colony. Warm their face textures, then spawn each one.
     preloadFamily()
     for (const id of FAMILY_IDS) this.spawn(id)
+    for (const id of ['r2d2', 'bb8', 'rocky', 'nekobus', 'walle', 'eve', 'pitdroid']) this.spawn(id)
     this.spawn('johnny5')
     this.spawn('totoro')
     // Totoro's little ones — Chu (blue) and Chibi (white) — hop along behind him. They're not
     // wanderers with cards of their own; a procession controller trails the main Totoro, so
     // they stay out of this.list (no pick, no crew tile, no card) and just follow and hop.
+    // Three pit droids, one of them in charge of where they go.
+    const pit = this.list.find((m) => m.kind === 'pitdroid')
+    if (pit) {
+      this.pitCrew = createPitCrew(pit.mesh)
+      this.group.add(this.pitCrew)
+    }
     const totoro = this.list.find((m) => m.kind === 'totoro')
     if (totoro) {
       this.totoroCompanions = createTotoroProcession(totoro.mesh)
@@ -793,6 +862,23 @@ ${r.note}` : m.baseIntro
       m.target.set((Math.random() - 0.5) * 30, 0, (Math.random() - 0.5) * 30)
       return
     }
+    // The pit crew has somewhere to be. Anything actually broken pulls them across the map;
+    // with nothing down they wander like everyone else, which is the point — seeing them
+    // trundle off somewhere is the tell that a hex has gone red.
+    if (m.kind === 'pitdroid') {
+      const broken = [...(this.colony.brokenPlots || [])]
+      if (broken.length) {
+        const id = broken[(Math.random() * broken.length) | 0]
+        const plot = plots.find((pl) => pl.id === id)
+        if (plot) {
+          const c = plot.middle || plot.center
+          // Stand around the trouble rather than on it.
+          const a = Math.random() * Math.PI * 2
+          m.target.set(c.x + Math.cos(a) * 2.6, 0, c.z + Math.sin(a) * 2.6)
+          return
+        }
+      }
+    }
     const plot = plots[(Math.random() * plots.length) | 0]
     const c = plot.middle || plot.center
     m.target.set(c.x + (Math.random() - 0.5) * 6, 0, c.z + (Math.random() - 0.5) * 6)
@@ -932,7 +1018,11 @@ ${r.note}` : m.baseIntro
       const tracked = m.mesh.userData.locomotion === 'tracks'
       // Totoro (and Johnny 5) pose their own limbs and vertical motion from userData.update, so
       // they skip both the generic arm/leg swing and the whole-body walking bob.
-      const selfDriven = !tracked && typeof m.mesh.userData.update === 'function'
+      // Two contracts in the same list: the older mascots pose from update(dt, {speed}), the
+      // companion pack from animate(elapsedSeconds, walking). Either way the body drives
+      // itself, so the generic swing and the walking bob stay out of its way.
+      const animates = typeof m.mesh.userData.animate === 'function'
+      const selfDriven = !tracked && (animates || typeof m.mesh.userData.update === 'function')
       const ground = this.colony.groundAt(m.pos.x, m.pos.z)
       // A tracked robot rolls flat; a self-animated body handles its own bob; a plain legged
       // mascot gets the little walking bob here.
@@ -965,6 +1055,8 @@ ${r.note}` : m.baseIntro
       // a person swings their limbs the generic way.
       if (tracked) {
         m.mesh.userData.update?.(dt, { speed: walking ? 1.1 : 0, turn: 0 })
+      } else if (animates) {
+        m.mesh.userData.animate(elapsed, walking)
       } else if (selfDriven) {
         m.mesh.userData.update?.(dt, { speed: walking ? 1 : 0 })
       } else if (isPerson(m)) {
@@ -989,6 +1081,7 @@ ${r.note}` : m.baseIntro
       }
     }
     // After the leader (Totoro) has moved this frame, let his companions trail him.
+    this.pitCrew?.userData.update(dt, elapsed, (x, z) => this.colony.groundAt(x, z))
     this.totoroCompanions?.userData.update(dt)
     // The soot swarm runs on its own nap/wake choreography.
     this._updateSoot(dt, elapsed)

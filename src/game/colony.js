@@ -312,6 +312,7 @@ export class Colony {
     this.uiVisible = true
     this.hoveredPlot = null
     this.activePlots = new Set()
+    this.brokenPlots = new Set()
     this._dustTint = new THREE.Color(this.planet.ground.high)
     this._c = new THREE.Color()
     this.stats = { agents: 0, projects: 0, working: 0, waiting: 0, mail: 0, print: 0, watching: 0, printing: 0, door: 0, plant: 0, visitor: 0, watched: 0, info: 0, blocked: 0, done: 0 }
@@ -457,6 +458,8 @@ export class Colony {
     // Plots with anyone working, waiting or stuck keep their name on screen; quiet ones
     // only show it on hover.
     const active = new Set()
+    /** Plots with a genuine failure on them — a repair crew's to-do list. */
+    const broken = new Set()
 
     for (const [name, list] of projects) {
       const plot = this.plots.get(name)
@@ -471,6 +474,9 @@ export class Colony {
         if (stats[status] !== undefined) stats[status]++
         const wantsYou = ['waiting', 'blocked', 'mail', 'print', 'door', 'plant', 'dada'].includes(status)
         if (wantsYou) urgent.add(plot.id)
+        // Something is actually broken here, as opposed to merely waiting on Blake. The pit
+        // droid crew reads this to know where to turn up.
+        if (status === 'blocked') broken.add(plot.id)
         if (wantsYou || status === 'working' || status === 'watching' || status === 'printing') active.add(plot.id)
         stats.agents++
 
@@ -533,6 +539,7 @@ export class Colony {
     this.threads = new Map(live.map((t) => [t.id, t]))
     this.urgentPlots = urgent
     this.activePlots = active
+    this.brokenPlots = broken
     this._rebuildNavigation()
     this.stats = { ...stats, done: stats.celebrating }
     this.astronauts.setRoster(roster, this._world())

@@ -892,7 +892,19 @@ window.addEventListener('resize', () => hud.setSideWidth(sideWidth()))
 const FAMILY = new Set(['blake', 'misa', 'kai', 'maya', 'ema'])
 const CREW_EMOJI = { dog: '🐕', lobster: '🦞', gecko: '🦎', johnny5: '🤖', totoro: '🌳' }
 // Non-family crew who still have a rendered round face rather than an emoji.
-const CREW_FACE = { johnny5: '/johnny5-face.png', totoro: '/totoro-face.png' }
+const CREW_FACE = {
+  johnny5: '/johnny5-face.png',
+  totoro: '/totoro-face.png',
+  // The companions ship a neutral head render each, so they get a real face in the tile
+  // rather than all seven falling back to the same generic smiley.
+  r2d2: '/companions/r2d2.png',
+  bb8: '/companions/bb8.png',
+  rocky: '/companions/rocky.png',
+  nekobus: '/companions/nekobus.png',
+  pitdroid: '/companions/pitdroid.png',
+  walle: '/companions/walle.png',
+  eve: '/companions/eve.png',
+}
 const crewTile = document.createElement('div')
 crewTile.className = 'crew-tile panel'
 crewTile.hidden = true
