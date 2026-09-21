@@ -214,8 +214,11 @@ export class WalkMode {
       }
     }
     const norm = Math.hypot(fwd, side) || 1
-    const wantX = ((Math.sin(this.yaw) * fwd + Math.cos(this.yaw) * side) / norm) * speed
-    const wantZ = ((Math.cos(this.yaw) * fwd - Math.sin(this.yaw) * side) / norm) * speed
+    // The camera looks along (sin yaw, cos yaw), so its right hand is (-cos yaw, sin yaw): the
+    // cross of forward with up. This used to move along (cos yaw, -sin yaw), which is its LEFT,
+    // so D strafed left and A right (and the phone thumbstick with them). Alan caught it.
+    const wantX = ((Math.sin(this.yaw) * fwd - Math.cos(this.yaw) * side) / norm) * speed
+    const wantZ = ((Math.cos(this.yaw) * fwd + Math.sin(this.yaw) * side) / norm) * speed
     const moving = Math.abs(fwd) + Math.abs(side) > 0.01
     void len
     this.vel.x = THREE.MathUtils.damp(this.vel.x, moving ? wantX : 0, ACCEL, dt)
