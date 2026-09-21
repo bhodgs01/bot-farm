@@ -127,7 +127,7 @@ export async function recentPushes(sinceMs = 12 * 3600 * 1000) {
   const map = await load()
   const cutoff = Date.now() - sinceMs
   return Object.entries(map)
-    .filter(([, v]) => v && !v.seeded && (v.at || 0) >= cutoff)
+    .filter(([k, v]) => v && !k.startsWith('__') && !v.seeded && (v.at || 0) >= cutoff)
     .map(([key, v]) => ({ at: v.at, id: v.id, title: v.title || '', body: v.body || '', key }))
     .sort((a, b) => b.at - a.at)
 }
@@ -145,6 +145,63 @@ export async function pagerTest({ who } = {}) {
   })
   console.log(`night watch: pager test sent${who ? ` by ${who}` : ''}`)
   return { sent: true, at: Date.now() }
+}
+
+/**
+ * The morning digest.
+ *
+ * The night watch is deliberately almost silent — four things ring, everything else waits.
+ * That leaves a gap at the other end: the map knows what the day holds and says nothing until
+ * Blake opens it. So once a morning, one push with what actually wants him.
+ *
+ * One a day, on purpose. This is the counterweight to a session spent taking alerts away: the
+ * point is that a single summary he trusts beats a dozen interruptions he learns to swipe past.
+ */
+const DIGEST_HOUR = Number(process.env.MORNING_DIGEST_HOUR ?? 7)
+const DIGEST_ON = process.env.MORNING_DIGEST !== '0'
+
+function dayKC(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', { year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'America/Chicago' }).format(now)
+}
+
+export async function morningDigest(threads) {
+  if (!DIGEST_ON || !ENABLED) return { sent: 0 }
+  const now = new Date()
+  if (hourKC(now) !== DIGEST_HOUR) return { sent: 0, skipped: 'not the hour' }
+  const map = await load()
+  const today = dayKC(now)
+  if (map.__digest?.day === today) return { sent: 0, skipped: 'already sent today' }
+  // Claim the day before sending: a push that fails should not be retried every poll for
+  // the rest of the hour.
+  map.__digest = { day: today, at: Date.now() }
+  await save()
+
+  const live = threads.filter((t) => !t.archived && !t.acked)
+  const wants = live.filter((t) => t.unread || t.hasError)
+  const broken = wants.filter((t) => t.hasError)
+  const waiting = wants.filter((t) => !t.hasError)
+  const name = (t) => String(t.title || '').replace(/^[^\w$]+\s*/, '').slice(0, 42)
+  const due = live
+    .filter((t) => t.id.startsWith('deadline:') && t.unread)
+    .map((t) => name(t))
+  const weather = live.find((t) => t.id === 'weather:now')?.plate || ''
+
+  const lines = []
+  if (broken.length) lines.push(`Broken (${broken.length}): ${broken.slice(0, 4).map(name).join(', ')}`)
+  if (waiting.length) lines.push(`Waiting (${waiting.length}): ${waiting.slice(0, 5).map(name).join(', ')}`)
+  if (due.length) lines.push(`Due: ${due.slice(0, 3).join(', ')}`)
+  if (weather) lines.push(`Outside: ${weather}`)
+  if (!lines.length) lines.push('Nothing wants you. The colony is quiet.')
+
+  const title = wants.length ? `Bot Farm: ${wants.length} want you today` : 'Bot Farm: all quiet'
+  try {
+    await push({ title, body: lines.join(NL).slice(0, 600) })
+    console.log(`morning digest: sent (${wants.length} wanting)`)
+    return { sent: 1, wanting: wants.length }
+  } catch (err) {
+    console.warn('morning digest:', err.message)
+    return { sent: 0, error: err.message }
+  }
 }
 
 /**

@@ -15,7 +15,7 @@ import { ask, chatEnabled, johnnyAsk } from './ask.mjs'
 import { setProjectStatus, closeTask, completeChores, feedCartiDone, createTicket, janineDraftAction, nudgeClient, clearSay } from './act.mjs'
 import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
 import { applySeen, markSeen } from './seen.mjs'
-import { nightWatch, recentPushes, pagerTest } from './notify.mjs'
+import { nightWatch, morningDigest, recentPushes, pagerTest } from './notify.mjs'
 import { remedyFor, runRemedy } from './remedy.mjs'
 import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGenerate, update as newsUpdate, topicById, todayKC, newsEnabled } from './news.mjs'
 import { refreshNews } from './harnesses/news.mjs'
@@ -868,6 +868,9 @@ export async function apiMiddleware(req, res, next) {
       // The night watch reads the same scan the map does, and rings for the few things that
       // should not wait until morning. Fire and forget: the pager never delays the map.
       nightWatch(scanned).catch(() => {})
+      // ...and once a morning, the other half: one summary of what the day holds, rather than
+      // a dozen interruptions through it.
+      morningDigest(scanned).catch(() => {})
       const threads = withIntros(withWeek(withChief(withUnlimited(withOffice(withLedger(scanned))))))
       return send(res, 200, { nap: napMode(), threads, scannedAt: Date.now() })
     }

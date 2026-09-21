@@ -206,6 +206,7 @@ let familyChores = {}
 async function loadFamilyChores() {
   try {
     familyChores = (await (await fetch('/api/family-chores')).json()) || {}
+    syncMoods()
   } catch {
     /* keep the last good copy */
   }
@@ -959,6 +960,23 @@ function emaWantsYou() {
   const d = threads.find((t) => t.id === 'dada:ema')
   return Boolean(d && d.unread && (d.preview || '') !== (state.emaSeen || ''))
 }
+/**
+ * The faces the colony has a reason for.
+ *
+ * A kid with chores still on today's list looks cross about it, and so does Ema while a
+ * message of hers is sitting unread — the same two facts her heart and the crew dots already
+ * key off, said a third way that you can read from across the map without clicking anything.
+ * Everyone else keeps cycling through their moods as before.
+ */
+function syncMoods() {
+  const moods = {}
+  for (const kid of ['kai', 'maya', 'ema']) {
+    if ((familyChores[kid] || []).length) moods[kid] = 'annoyed'
+  }
+  if (emaWantsYou()) moods.ema = 'annoyed'
+  colony.mascots?.setMoods(moods)
+}
+
 /** Mark Ema's current message seen: clears her heart and dot until the next one. */
 function markEmaSeen() {
   const d = threads.find((t) => t.id === 'dada:ema')
@@ -967,6 +985,7 @@ function markEmaSeen() {
   state.emaSeen = sig
   queueSave()
   colony.mascots?.setAlert('ema', false)
+  syncMoods()
   renderCrew()
 }
 /** Does this crew member want Blake's eyes right now? */
@@ -1812,6 +1831,7 @@ function applyThreads(list) {
   renderCrew()
   // And float a heart over the Ema mascot herself when she's texted on the Dada chat.
   colony.mascots?.setAlert('ema', emaWantsYou())
+  syncMoods()
   // Carti's badge and bubble follow Chore Quest, exactly like his crew dot:
   // unfed means he asks, fed means he stops.
   colony.mascots?.muteReminder('gecko', !cartiHungry())

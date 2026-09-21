@@ -537,7 +537,11 @@ function createPitCrew(leader) {
     { side: -0.95, back: 1.05 },
     { side: 0.95, back: 1.5 },
   ]
-  group.userData.update = (dt, elapsed, groundAt) => {
+  group.userData.update = (dt, elapsed, groundAt, face) => {
+    for (const m of mates) {
+      if (face && m.userData.expression !== face) m.userData.setExpression(face)
+      else if (!face && m.userData.expression !== 'neutral') m.userData.setExpression('neutral')
+    }
     const yaw = leader.rotation.y
     const fx = Math.sin(yaw)
     const fz = Math.cos(yaw)
@@ -1086,19 +1090,69 @@ ${r.note}` : m.baseIntro
         }
         if (m.mesh.userData.head) m.mesh.userData.head.rotation.y = Math.sin(elapsed * 0.6 + m.phase) * 0.22 * (1 - m.gait)
       }
-      // A fresh random face every 2-3 seconds for anyone who has expressions (family + Johnny 5).
-      if (m.mesh.userData.expressions && elapsed >= m.exprUntil) {
+      // A face that means something beats a face that is merely different. Anyone the colony
+      // has an opinion about wears it and holds it; everyone else keeps cycling, which is what
+      // stops a room full of characters looking like waxworks.
+      const forced = this.moods?.[m.kind] || this._pitMood(m, elapsed)
+      if (forced) {
+        if (m.expr !== forced) this._setExpression(m, forced)
+        m.exprUntil = elapsed + 2
+      } else if (m.mesh.userData.expressions && elapsed >= m.exprUntil) {
         this._setExpression(m, this._pickExpression(m))
         m.exprUntil = elapsed + 2 + Math.random()
       }
     }
     // After the leader (Totoro) has moved this frame, let his companions trail him.
-    this.pitCrew?.userData.update(dt, elapsed, (x, z) => this.colony.groundAt(x, z))
+    this.pitCrew?.userData.update(dt, elapsed, (x, z) => this.colony.groundAt(x, z), this._pitFace)
     this.totoroCompanions?.userData.update(dt)
     // The soot swarm runs on its own nap/wake choreography.
     this._updateSoot(dt, elapsed)
     // Totoro raises his umbrella whenever it's really raining in KC.
     if (this.totoroUmbrella) this.totoroUmbrella.visible = Boolean(this.colony.sky?.weather?.rain)
+  }
+
+  /**
+   * Faces the colony has a reason for, by mascot kind: {kai: 'annoyed', ...}. Anything listed
+   * holds that expression until it is taken off the list again; anything absent goes back to
+   * cycling. Set from main.js, which is where the chores and the chat live.
+   */
+  setMoods(map) {
+    this.moods = map || {}
+  }
+
+  /**
+   * The pit crew's own face, which is about where they are rather than who they are.
+   *
+   * Standing at a fault they look annoyed — that is the tell, visible from across the map,
+   * that the hex under them is the broken one. When the fault they came for clears they look
+   * pleased for a few seconds, and the hex gets the same burst a hand coming down gets, before
+   * they wander off again.
+   */
+  _pitMood(m, elapsed) {
+    if (m.kind !== 'pitdroid') return null
+    const broken = this.colony.brokenPlots
+    let at = null
+    for (const plot of this.colony.plotOrder || []) {
+      if (!broken?.has(plot.id)) continue
+      const c = plot.middle || plot.center
+      if (Math.hypot(c.x - m.pos.x, c.z - m.pos.z) < 4.2) { at = plot; break }
+    }
+    if (at) {
+      this._pitAt = at.id
+      this._pitGlad = 0
+      return (this._pitFace = 'annoyed')
+    }
+    // It was standing at one a moment ago and that hex is no longer broken: job done.
+    if (this._pitAt && !broken?.has(this._pitAt)) {
+      const plot = (this.colony.plotOrder || []).find((pl) => pl.id === this._pitAt)
+      if (plot) {
+        const c = plot.middle || plot.center
+        ;(this.colony._celebrations ||= []).push({ x: c.x, z: c.z, accent: plot.accent })
+      }
+      this._pitAt = null
+      this._pitGlad = elapsed + 4
+    }
+    return (this._pitFace = this._pitGlad && elapsed < this._pitGlad ? 'happy' : null)
   }
 
   /** A random face, never the same one twice in a row — the character cycles through them. */
