@@ -887,7 +887,8 @@ export class Hud {
       form.parentNode.insertBefore(row, form)
     }
     const first = client.split(/\s+/)[0] || 'there'
-    const job = String(thread.details?.Job || thread.title || 'your print').replace(/^[^\w$]+/, '').trim()
+    // The order's name, never the card's title: on a finished print the title is the printer.
+    const job = String(thread.ref?.job || thread.details?.Job || 'your print').replace(/^[^\w$]+/, '').trim()
     const STARTERS = [
       // Worded so the job name is never the subject of a verb: job names are often plural
       // ("2 toy figurines"), and "your 2 toy figurines is ready" reads like a form letter.

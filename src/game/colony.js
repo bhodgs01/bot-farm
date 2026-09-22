@@ -101,7 +101,16 @@ const DESK_GLB = '/blakesDeskDetailed.glb'
 let deskModel = null
 function loadDeskModel() {
   if (!deskModel) {
-    deskModel = import('three/examples/jsm/loaders/GLTFLoader.js')
+    // Eight megabytes of desk is the least urgent thing on the map, and it was racing the
+    // family's faces for the connection at boot — which is what left the crew walking about
+    // headless. The placeholder desk is already standing, so this waits for the page to go
+    // quiet and lets the faces land first.
+    deskModel = new Promise((resolve) => {
+      const go = () => resolve()
+      if (typeof requestIdleCallback === 'function') requestIdleCallback(go, { timeout: 8000 })
+      else setTimeout(go, 5000)
+    })
+      .then(() => import('three/examples/jsm/loaders/GLTFLoader.js'))
       .then(({ GLTFLoader }) => new Promise((resolve, reject) => new GLTFLoader().load(DESK_GLB, (g) => resolve(g.scene), undefined, reject)))
       .catch(() => null)
   }

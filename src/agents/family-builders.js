@@ -139,6 +139,10 @@ export function build(id) {
         .then((t) => {
           material.map = t
           material.needsUpdate = true
+          // The face that is actually showing is the only one needed to have a head. Waiting
+          // for all five meant the family walked the colony headless while 25 photographs
+          // downloaded — longer still once a 7.9 MB desk was competing for the same pipe.
+          if (face.visible) headFaces.visible = true
         })
         // A single face that fails to load must never leave the whole head hidden.
         .catch(() => {})
@@ -170,6 +174,9 @@ export function build(id) {
 export function setExpression(g, name) {
   const ex = g.userData.expressions
   if (!ex?.[name]) return
+  // A sprite with no map yet is a white slab where a face should be, so an expression that
+  // has not finished downloading is simply not worn — the current one stays until it has.
+  if (!ex[name].every((o) => o.material?.map)) return
   for (const [key, items] of Object.entries(ex)) for (const o of items) o.visible = key === name
   g.userData.expression = name
 }

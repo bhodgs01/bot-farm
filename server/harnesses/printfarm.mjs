@@ -104,7 +104,10 @@ async function fetchThreads() {
         canArchive: false,
         // The order this machine is working for, if any — enough for "message the client" to
         // find the customer's own email thread. A one-off print has no order and no button.
-        ref: { printer: p.id, order: order?.id ?? null, client: order?.client || '' },
+        // What the CUSTOMER calls this job. The card's title is the machine once a print has
+        // finished ("jimothy"), and a starter that borrowed the title emailed a customer about
+        // "printing jimothy". The order's own name is the only one fit to send.
+        ref: { printer: p.id, order: order?.id ?? null, client: order?.client || '', job: order?.name || '' },
         actions: order?.client ? ['message', ...(CLOSEOUT ? ['closeout'] : [])] : [],
       })
     } else {
@@ -146,7 +149,10 @@ async function fetchThreads() {
         canArchive: false,
         // The order this machine is working for, if any — enough for "message the client" to
         // find the customer's own email thread. A one-off print has no order and no button.
-        ref: { printer: p.id, order: order?.id ?? null, client: order?.client || '' },
+        // What the CUSTOMER calls this job. The card's title is the machine once a print has
+        // finished ("jimothy"), and a starter that borrowed the title emailed a customer about
+        // "printing jimothy". The order's own name is the only one fit to send.
+        ref: { printer: p.id, order: order?.id ?? null, client: order?.client || '', job: order?.name || '' },
         actions: order?.client ? ['message', ...(CLOSEOUT ? ['closeout'] : [])] : [],
       })
     }
