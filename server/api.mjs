@@ -12,7 +12,7 @@ import {
   setThreadArchived,
 } from './scan.mjs'
 import { ask, chatEnabled, johnnyAsk } from './ask.mjs'
-import { setProjectStatus, closeTask, completeChores, feedCartiDone, createTicket, janineDraftAction, nudgeClient, clearSay } from './act.mjs'
+import { setProjectStatus, closeTask, completeChores, feedCartiDone, createTicket, janineDraftAction, nudgeClient, clearSay, previewClientMessage, sendClientMessage } from './act.mjs'
 import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
 import { applySeen, markSeen } from './seen.mjs'
 import { nightWatch, morningDigest, recentPushes, pagerTest } from './notify.mjs'
@@ -1092,6 +1092,38 @@ export async function apiMiddleware(req, res, next) {
       if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
       try {
         return send(res, 200, { ok: true, ...(await pagerTest({ who })) })
+      } catch (err) {
+        return send(res, 502, { ok: false, error: String(err?.message || err) })
+      }
+    }
+
+    // Message the client a print is for, in the email thread their order came from. Two
+    // steps on purpose: preview says who and which thread without sending anything, so the
+    // page can show Blake exactly where it is going; send is the only step that emails.
+    if (url.pathname === '/api/act/message/preview' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to message clients', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      const { id } = await readJsonBody(req, 16 * 1024)
+      const thread = (await scanThreads()).find((t) => t.id === id)
+      if (!thread) return send(res, 404, { error: 'That print has walked off the map' })
+      if (!(thread.actions || []).includes('message')) return send(res, 400, { error: 'That print is not for a client' })
+      try {
+        return send(res, 200, { ok: true, ...(await previewClientMessage({ thread })) })
+      } catch (err) {
+        return send(res, 409, { ok: false, error: String(err?.message || err) })
+      }
+    }
+    if (url.pathname === '/api/act/message' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to message clients', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      const { id, text } = await readJsonBody(req, 32 * 1024)
+      const thread = (await scanThreads()).find((t) => t.id === id)
+      if (!thread) return send(res, 404, { error: 'That print has walked off the map' })
+      if (!(thread.actions || []).includes('message')) return send(res, 400, { error: 'That print is not for a client' })
+      try {
+        return send(res, 200, { ok: true, ...(await sendClientMessage({ thread, text, who })) })
       } catch (err) {
         return send(res, 502, { ok: false, error: String(err?.message || err) })
       }

@@ -38,6 +38,8 @@ import {
   actRead,
   actReply,
   actFix,
+  actMessagePreview,
+  actMessage,
   actPagerTest,
   fetchHistory,
 } from './game/api.js'
@@ -752,6 +754,45 @@ const actions = {
       } else {
         hud.appendChat(thread.id, 'worker', `It did not send: ${msg}`)
       }
+    }
+  },
+
+  /**
+   * Email the client behind a print, in their own thread.
+   *
+   * Asks the server first who and where — the address comes from the customer's own message,
+   * so it is shown rather than assumed — and only sends once Blake has seen it. This goes to a
+   * customer in his name and cannot be taken back, so it is the one action on the map that
+   * always stops to say exactly what is about to happen.
+   */
+  messageClient: async (text) => {
+    const thread = threads.find((t) => t.id === selectedId)
+    if (!thread) return
+    let where
+    try {
+      where = await actMessagePreview(thread.id)
+    } catch (err) {
+      const msg = String(err?.message || err)
+      if (/sign in|401/i.test(msg)) {
+        hud.toast('Sign in first — a tab just opened', 'err')
+        window.open('/api/act/auth', '_blank', 'noopener')
+      } else hud.toast(`Can't message them: ${msg}`, 'err')
+      return
+    }
+    const ok = window.confirm(
+      `Email ${where.toName || where.client} <${where.to}>?
+
+In the thread: ${where.subject || '(no subject)'}
+
+"${text.slice(0, 280)}${text.length > 280 ? '…' : ''}"`,
+    )
+    if (!ok) return
+    hud.appendChat(thread.id, 'me', text)
+    try {
+      const r = await actMessage(thread.id, text)
+      hud.toast(`Sent to ${r.client} (${r.to})`)
+    } catch (err) {
+      hud.appendChat(thread.id, 'worker', `It did not send: ${String(err?.message || err)}`)
     }
   },
 

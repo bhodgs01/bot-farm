@@ -249,3 +249,88 @@ export async function nudgeClient({ thread, who }) {
   console.log(`act: ${who} drafted a reminder to ${to} for ${job} (draft ${draft.id})`)
   return { id: draft.id, to, subject }
 }
+
+
+// ── Message the client behind a print ─────────────────────────────────────────────────
+/**
+ * The print farm knows who an order is for by NAME only — its orders carry no email address.
+ * What each order does carry is a note naming the email thread it came from ("Email thread
+ * 'Toy Figurine' 2026-09-21"), because every print job here started as somebody writing in.
+ * So the reply goes back into THAT thread: the address comes from the customer's own message,
+ * nothing is guessed, and they read the update in the conversation where they asked for it.
+ *
+ * Split in two on purpose. `previewClientMessage` only reads — it resolves who and which
+ * thread, so the page can show Blake exactly where this is going before he presses Send. A
+ * customer email in his name is the one thing on the map that cannot be taken back.
+ */
+const FARM = (process.env.PRINT_FARM_URL || 'http://print-farm.print-farm.svc.cluster.local').replace(/\/$/, '')
+const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1/users/me'
+
+async function orderFor(thread) {
+  const id = thread?.ref?.order
+  if (id == null) throw new Error('This print is not for anybody in particular')
+  const r = await fetch(`${FARM}/api/orders`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(20000) })
+  if (!r.ok) throw new Error(`orders read → ${r.status}`)
+  const order = (await r.json()).find((o) => o.id == id)
+  if (!order?.client) throw new Error('That order has no client name on it')
+  return order
+}
+
+const header = (msg, name) => (msg.payload?.headers || []).find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || ''
+
+/** The newest message the client sent us, with what a reply needs to thread onto it. */
+async function clientThread(clientName) {
+  const token = await gmailToken()
+  const auth = { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(15000) }
+  // Their messages, not ours: a reply goes to the address THEY wrote from.
+  const q = encodeURIComponent(`from:"${clientName.replace(/"/g, '')}"`)
+  const list = await (await fetch(`${GMAIL_API}/messages?q=${q}&maxResults=5`, auth)).json()
+  const first = list.messages?.[0]
+  if (!first) throw new Error(`No email from ${clientName} to reply to`)
+  const msg = await (await fetch(`${GMAIL_API}/messages/${first.id}?format=metadata&metadataHeaders=From&metadataHeaders=Subject&metadataHeaders=Message-ID`, auth)).json()
+  const from = header(msg, 'From')
+  const to = (from.match(/<([^>]+)>/) || [null, from])[1].trim()
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) throw new Error(`Could not read ${clientName}'s address`)
+  const subject = header(msg, 'Subject')
+  return { threadId: msg.threadId, messageId: header(msg, 'Message-ID'), to, name: from.replace(/<[^>]*>/, '').replace(/"/g, '').trim() || clientName, subject }
+}
+
+/** Who this would go to, and in which thread. Reads only; sends nothing. */
+export async function previewClientMessage({ thread }) {
+  const order = await orderFor(thread)
+  const t = await clientThread(order.client)
+  return { client: order.client, job: order.name, to: t.to, toName: t.name, subject: t.subject, threadId: t.threadId }
+}
+
+/** RFC 2047 for a header that is not plain ASCII (an emoji, a curly quote). */
+const encodeHeader = (v) => (/^[\x20-\x7e]*$/.test(v) ? v : `=?UTF-8?B?${Buffer.from(v, 'utf8').toString('base64')}?=`)
+
+/** Send Blake's words, exactly as typed, into the client's own thread. */
+export async function sendClientMessage({ thread, text, who }) {
+  const body = String(text || '').trim()
+  if (!body) throw new Error('Nothing to send')
+  const order = await orderFor(thread)
+  const t = await clientThread(order.client)
+  const subject = /^re:/i.test(t.subject) ? t.subject : `Re: ${t.subject || order.name}`
+  const raw = [
+    `To: ${t.to}`,
+    `Subject: ${encodeHeader(subject)}`,
+    ...(t.messageId ? [`In-Reply-To: ${t.messageId}`, `References: ${t.messageId}`] : []),
+    'Content-Type: text/plain; charset=utf-8',
+    'MIME-Version: 1.0',
+    '',
+    body.replace(/\r?\n/g, '\r\n'),
+  ].join('\r\n')
+  const encoded = Buffer.from(raw, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+  const token = await gmailToken()
+  const res = await fetch(`${GMAIL_API}/messages/send`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ raw: encoded, threadId: t.threadId }),
+    signal: AbortSignal.timeout(20000),
+  })
+  if (!res.ok) throw new Error(`gmail send → ${res.status} ${(await res.text().catch(() => '')).slice(0, 120)}`)
+  const sent = await res.json()
+  console.log(`act: ${who} messaged ${order.client} <${t.to}> about order ${order.id} (${body.length} chars)`)
+  return { id: sent.id, to: t.to, client: order.client, subject }
+}

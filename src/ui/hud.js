@@ -405,7 +405,8 @@ export class Hud {
       // The same box, two jobs. On most workers it asks the worker what it needs; on a
       // thread that can be answered it is a message to a person, and must never be handed
       // to the model instead.
-      if (this._replyMode) this.actions.replyWorker?.(text)
+      if (this._messageMode) this.actions.messageClient?.(text)
+      else if (this._replyMode) this.actions.replyWorker?.(text)
       else this.actions.askWorker?.(text)
     })
     // Rename: a small pencil beside the title. An empty answer gives the source's name back.
@@ -703,20 +704,26 @@ export class Hud {
     // A thread that can be answered turns the ask box into a message box. There is no
     // "reply" button: the box below it is the reply, and two ways to do it is one too many.
     const canReply = (Array.isArray(thread.actions) ? thread.actions : []).includes('reply')
+    // A print that is for somebody can message them. Their words go to a customer in
+    // Blake's name, so this is a separate mode from both the worker chat and Ema's reply.
+    const canMessage = !canReply && (Array.isArray(thread.actions) ? thread.actions : []).includes('message')
+    const client = String(thread.ref?.client || '').trim()
+    this._messageMode = canMessage
     this._replyMode = canReply
     const who = String(thread.title || '').replace(/^\p{Extended_Pictographic}️?\s*/u, '') || 'them'
     const askInput = this.$('.thread-pop form.ask input')
-    askInput.placeholder = canReply ? `Write back to ${who}…` : 'Ask what it needs…'
-    askInput.maxLength = canReply ? 2000 : 400
+    askInput.placeholder = canMessage ? `Message ${client || 'the client'}…` : canReply ? `Write back to ${who}…` : 'Ask what it needs…'
+    askInput.maxLength = canReply || canMessage ? 2000 : 400
     const askBtn = this.$('.thread-pop form.ask button[type=submit]')
-    askBtn.textContent = canReply ? 'Send' : 'Ask'
-    askBtn.title = canReply ? `Send this straight to ${who}` : 'Ask this worker'
+    askBtn.textContent = canReply || canMessage ? 'Send' : 'Ask'
+    askBtn.title = canMessage ? `Email ${client || 'the client'}, in their own thread` : canReply ? `Send this straight to ${who}` : 'Ask this worker'
+    this._renderStarters(canMessage ? client : null, thread)
     // A failure the map knows the fix for offers it, first, and says what it will do.
     const fixable = Boolean(thread.hasError && thread.remedy)
     // The pager lives on the chief's card: it is his to test, and belongs with the rest of
     // what the colony does while nobody is watching.
     const pageable = thread.id === 'chief:day'
-    const acts = (Array.isArray(thread.actions) ? thread.actions : []).filter((a) => a !== 'reply' && !(hasStories && a === 'read')).concat(fixable ? ['fix'] : []).concat(pageable ? ['pager'] : []).concat(nudgeable ? ['nudge'] : []).concat(ticketable ? ['ticket'] : []).concat(thread.hasError ? ['ack'] : thread.acked ? ['unack'] : []).concat(thread.watched ? ['unstar'] : ['star'])
+    const acts = (Array.isArray(thread.actions) ? thread.actions : []).filter((a) => a !== 'reply' && a !== 'message' && !(hasStories && a === 'read')).concat(fixable ? ['fix'] : []).concat(pageable ? ['pager'] : []).concat(nudgeable ? ['nudge'] : []).concat(ticketable ? ['ticket'] : []).concat(thread.hasError ? ['ack'] : thread.acked ? ['unack'] : []).concat(thread.watched ? ['unstar'] : ['star'])
     // "Fix it" names the thing it will do to the cluster. A button that hides which
     // deployment it restarts is a button nobody should press.
     const label = (a) => (a === 'fix' && thread.remedy?.label ? `🔧 ${thread.remedy.label}` : STAGE_LABEL[a] || a)
@@ -789,6 +796,43 @@ export class Hud {
         .join('') + (items.length > shown.length ? `<div class="more">… and ${items.length - shown.length} more</div>` : '')
     for (const row of wrap.querySelectorAll('.row')) {
       row.addEventListener('click', () => this.actions.focusThread?.(row.dataset.id))
+    }
+  }
+
+  /**
+   * One-tap openings for the messages a print actually needs. They fill the box rather than
+   * send, so every one gets read and edited before it goes to a customer — a starter is a
+   * shortcut to a sentence, never a message sent on Blake's behalf.
+   */
+  _renderStarters(client, thread) {
+    const form = this.$('.thread-pop form.ask')
+    let row = this.$('.thread-pop .starters')
+    if (!client) {
+      if (row) row.hidden = true
+      return
+    }
+    if (!row) {
+      row = document.createElement('div')
+      row.className = 'starters'
+      form.parentNode.insertBefore(row, form)
+    }
+    const first = client.split(/\s+/)[0] || 'there'
+    const job = String(thread.details?.Job || thread.title || 'your print').replace(/^[^\w$]+/, '').trim()
+    const STARTERS = [
+      ['✅ Finished', `Hi ${first}, good news — ${job} is finished and ready. `],
+      ['🕳️ Holes in the model', `Hi ${first}, ${job} finished printing, but the model came out with holes in it. `],
+      ['🧵 Out of filament', `Hi ${first}, quick update on ${job}: I ran out of filament partway through, so it's paused until more arrives. `],
+      ['⏳ Running late', `Hi ${first}, a heads-up that ${job} is running a little behind. `],
+    ]
+    row.hidden = false
+    row.innerHTML = STARTERS.map(([label], i) => `<button class="chip" type="button" data-i="${i}">${escapeHtml(label)}</button>`).join('')
+    for (const b of row.querySelectorAll('button')) {
+      b.addEventListener('click', () => {
+        const input = this.$('.thread-pop form.ask input')
+        input.value = STARTERS[Number(b.dataset.i)][1]
+        input.focus()
+        input.setSelectionRange(input.value.length, input.value.length)
+      })
     }
   }
 

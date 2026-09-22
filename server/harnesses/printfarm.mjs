@@ -95,7 +95,10 @@ async function fetchThreads() {
         source: 'print-farm',
         canOpen: true,
         canArchive: false,
-        ref: { printer: p.id },
+        // The order this machine is working for, if any — enough for "message the client" to
+        // find the customer's own email thread. A one-off print has no order and no button.
+        ref: { printer: p.id, order: order?.id ?? null, client: order?.client || '' },
+        actions: order?.client ? ['message'] : [],
       })
     } else {
       const offline = p.online === false
@@ -134,7 +137,10 @@ async function fetchThreads() {
         source: 'print-farm',
         canOpen: true,
         canArchive: false,
-        ref: { printer: p.id },
+        // The order this machine is working for, if any — enough for "message the client" to
+        // find the customer's own email thread. A one-off print has no order and no button.
+        ref: { printer: p.id, order: order?.id ?? null, client: order?.client || '' },
+        actions: order?.client ? ['message'] : [],
       })
     }
   }

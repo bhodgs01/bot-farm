@@ -120,3 +120,9 @@ export const actPagerTest = () => post('/api/act/pager-test', {})
 
 /** The hourly snapshots the day scrubber replays. */
 export const fetchHistory = (days = 2) => req(`/api/history?days=${days}`)
+
+/** Who a client message would go to, and in which thread. Sends nothing. */
+export const actMessagePreview = (threadId) => post('/api/act/message/preview', { id: threadId })
+
+/** Send Blake's words to the client behind a print, in their own email thread. */
+export const actMessage = (threadId, text) => post('/api/act/message', { id: threadId, text })
