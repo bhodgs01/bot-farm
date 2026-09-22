@@ -65,12 +65,19 @@ async function fetchThreads() {
     (Array.isArray(projects) ? projects : []).map(async (p) => {
       if (p.is_archived || NOT_MINE.test(p.title)) return
       const zone = ZONE_FOR.find(([re]) => re.test(p.title))?.[1] || p.title
+      // 2026-09-22: read EVERY page. This stopped at page 2, and Vikunja returns a project's
+      // tasks oldest first, so a project past 100 tickets showed only its 100 oldest. Collectorz
+      // (202 tickets) lost everything after #252, which was nearly all of its 32 open ones, so the
+      // hex looked quiet while the queue was full. The ticket-bot behind the Clawd board had the
+      // same bug at 50 and was fixed the same night. A page that fails drops the project for this
+      // pass rather than showing a partial list as if it were the whole one.
       let tasks = []
       try {
-        tasks = await getJson(`/projects/${p.id}/tasks?per_page=50`)
-        if (Array.isArray(tasks) && tasks.length === 50) {
-          const more = await getJson(`/projects/${p.id}/tasks?per_page=50&page=2`).catch(() => [])
-          tasks = tasks.concat(Array.isArray(more) ? more : [])
+        for (let page = 1; page <= 40; page++) {
+          const chunk = await getJson(`/projects/${p.id}/tasks?per_page=50&page=${page}`)
+          if (!Array.isArray(chunk)) return
+          tasks = tasks.concat(chunk)
+          if (chunk.length < 50) break
         }
       } catch {
         return
