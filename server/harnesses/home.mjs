@@ -43,6 +43,17 @@ const OUTSIDE = /front|door|garage|driveway|porch|yard|gate/i
 const VISITOR_CLASSES = new Set(['motion', 'occupancy', 'presence', 'moving'])
 const DESK = /at_desk|desk_occupancy/i
 
+/**
+ * The house's night, in Blake's clock: 22:00 to 07:00, the same window the night watch and
+ * the Frances doors use, so "something is open after dark" means one thing everywhere.
+ */
+const DOORS_NIGHT_START = Number(process.env.DOORS_NIGHT_START ?? 22)
+const DOORS_NIGHT_END = Number(process.env.DOORS_NIGHT_END ?? 7)
+function isNightKC(now = new Date()) {
+  const h = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Chicago' }).format(now))
+  return DOORS_NIGHT_START > DOORS_NIGHT_END ? h >= DOORS_NIGHT_START || h < DOORS_NIGHT_END : h >= DOORS_NIGHT_START && h < DOORS_NIGHT_END
+}
+
 function base(entityId, attrs, kind, extra = {}) {
   const now = Date.now()
   const changed = Date.parse(extra.changed || '') || now
@@ -229,12 +240,17 @@ async function fetchThreads() {
       open.length ? `OPEN: ${open.map((d) => d.name).join(', ')}` : 'Everything is shut',
       `closed: ${doors.filter((d) => !d.open).map((d) => d.name).join(', ') || 'none'}`,
     ]
+    // An open door is information by day and a problem by night. At 3pm the back door is
+    // open because somebody is in the garden; at 2am it is open because somebody forgot, and
+    // that is the one worth a red flag. So the keeper always lists what is open — the badge
+    // and the hover line never go away — but only raises its hand during the night.
+    const night = isNightKC()
     const t = base('house.doors', {}, 'doors', {
       title: '🚪 Doors',
       preview: lines.join(String.fromCharCode(10)),
-      branch: open.length ? `${open.length} open` : 'all shut',
+      branch: open.length ? `${open.length} open${night ? ' · after dark' : ''}` : 'all shut',
       model: `${doors.length} sensors`,
-      error: open.length > 0,
+      error: night && open.length > 0,
       changed: latest ? new Date(latest).toISOString() : undefined,
       sizeBytes: 1000 * (1 + doors.length * 30),
     })

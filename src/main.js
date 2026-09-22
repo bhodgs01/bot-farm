@@ -2020,6 +2020,8 @@ function queueItems() {
 let napping = false
 let timeBeforeNap = null
 function applyNap(on) {
+  // The colony gets drowsy with the house: everyone without a reason to be awake nods off.
+  colony.mascots?.setNap(on)
   if (on === napping) return
   napping = on
   clockSetting = true

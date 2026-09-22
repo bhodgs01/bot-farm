@@ -1093,7 +1093,10 @@ ${r.note}` : m.baseIntro
       // A face that means something beats a face that is merely different. Anyone the colony
       // has an opinion about wears it and holds it; everyone else keeps cycling, which is what
       // stops a room full of characters looking like waxworks.
-      const forced = this.moods?.[m.kind] || this._pitMood(m, elapsed)
+      // A specific reason outranks the hour: a pit droid working a broken node at 3am looks
+      // annoyed, not sleepy, and a kid who owes chores stays cross. Only characters with no
+      // reason of their own drift off.
+      const forced = this.moods?.[m.kind] || this._pitMood(m, elapsed) || (this._bedtime(elapsed) ? 'sleepy' : null)
       if (forced) {
         if (m.expr !== forced) this._setExpression(m, forced)
         m.exprUntil = elapsed + 2
@@ -1109,6 +1112,27 @@ ${r.note}` : m.baseIntro
     this._updateSoot(dt, elapsed)
     // Totoro raises his umbrella whenever it's really raining in KC.
     if (this.totoroUmbrella) this.totoroUmbrella.visible = Boolean(this.colony.sky?.weather?.rain)
+  }
+
+  /** Nap mode, from main.js — the house has asked for quiet, so the colony gets drowsy. */
+  setNap(on) {
+    this.napping = Boolean(on)
+  }
+
+  /**
+   * Is it bedtime for the colony? The real clock in Kansas City, or nap mode — deliberately NOT
+   * the sky. Blake keeps the map dark through the day because he likes the look, so the sky's
+   * night factor is high all afternoon; keying off it would put the whole colony to sleep at
+   * 2pm. Checked once a second, since the answer changes twice a day.
+   */
+  _bedtime(elapsed) {
+    if (this.napping) return true
+    if (this._bedAt === undefined || elapsed - this._bedAt > 1) {
+      this._bedAt = elapsed
+      const h = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: 'America/Chicago' }).format(new Date()))
+      this._asleep = h >= 22 || h < 7
+    }
+    return this._asleep
   }
 
   /**
