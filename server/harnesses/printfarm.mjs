@@ -10,6 +10,13 @@
  * Read-only: GET /api/fleet and /api/orders on the print-farm service, nothing else.
  */
 
+/**
+ * "Print is ready" closes an order out through the farm, with Blake's note carried into the
+ * pickup email. That needs print-farm and print-service to pass the note along, and until
+ * they do, a close-out would still happen but the note would be silently dropped — while the
+ * card promised it. So it stays off until those two are deployed: PRINT_CLOSEOUT=1.
+ */
+const CLOSEOUT = process.env.PRINT_CLOSEOUT === '1'
 const FARM_URL = process.env.PRINT_FARM_URL || 'http://print-farm.print-farm.svc.cluster.local'
 const OPEN_URL = process.env.PRINT_FARM_OPEN_URL || 'https://print.kcproto.com'
 const TTL_MS = 30 * 1000
@@ -98,7 +105,7 @@ async function fetchThreads() {
         // The order this machine is working for, if any — enough for "message the client" to
         // find the customer's own email thread. A one-off print has no order and no button.
         ref: { printer: p.id, order: order?.id ?? null, client: order?.client || '' },
-        actions: order?.client ? ['message'] : [],
+        actions: order?.client ? ['message', ...(CLOSEOUT ? ['closeout'] : [])] : [],
       })
     } else {
       const offline = p.online === false
@@ -140,7 +147,7 @@ async function fetchThreads() {
         // The order this machine is working for, if any — enough for "message the client" to
         // find the customer's own email thread. A one-off print has no order and no button.
         ref: { printer: p.id, order: order?.id ?? null, client: order?.client || '' },
-        actions: order?.client ? ['message'] : [],
+        actions: order?.client ? ['message', ...(CLOSEOUT ? ['closeout'] : [])] : [],
       })
     }
   }

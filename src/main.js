@@ -2080,7 +2080,30 @@ settings.onChange((changed, scope) => {
 // ── the queue ────────────────────────────────────────────────────────────────────────
 
 /** Everyone who wants a human, most urgent first: a problem before a mail, a mail before a task. */
-const QUEUE_ORDER = ['blocked', 'door', 'plant', 'print', 'mail', 'waiting']
+// 'dada' is Ema waiting on a reply. Her heart and crew dot always showed it, but she was never
+// in this list, so Needs-you had no idea the one message that matters most was waiting.
+const QUEUE_ORDER = ['blocked', 'dada', 'door', 'plant', 'print', 'mail', 'waiting']
+/**
+ * Which drawer of Needs-you a thread belongs in: what kind of action it wants, not which hex
+ * it stands on. A failure is a failure whoever it belongs to, and nine tickets across five
+ * clients are still one job — going through the tickets. Broken always wins, so an offline
+ * printer files under Broken rather than Prints.
+ */
+function queueGroup(a) {
+  const t = a.thread || {}
+  const kind = String(t.kind || '')
+  const src = String(t.source || '')
+  if (t.hasError || a.status === 'blocked') return 'broken'
+  if (kind === 'dada' || src === 'dada-chat' || /^say:|^family:/.test(t.id || '')) return 'family'
+  if (/^(cal|deadline|meeting):/.test(t.id || '') || kind === 'calendar') return 'today'
+  if (/^news:/.test(t.id || '') || src === 'news') return 'news'
+  if (a.status === 'mail' || kind === 'mail') return 'mail'
+  if (a.status === 'print' || src === 'print-farm' || kind === 'order') return 'prints'
+  if (kind === 'task' || String(t.id || '').startsWith('task:')) return 'tickets'
+  if (a.status === 'door' || a.status === 'plant' || src === 'home-assistant') return 'home'
+  return 'other'
+}
+
 function queueItems() {
   const rank = new Map(QUEUE_ORDER.map((s, i) => [s, i]))
   return colony.astronauts.agents
@@ -2094,6 +2117,7 @@ function queueItems() {
       project: a.thread.project,
       count: Number(a.thread.count) || 0,
       need: String(a.thread.preview || '').split('\n')[0],
+      group: queueGroup(a),
     }))
 }
 

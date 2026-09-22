@@ -1124,7 +1124,7 @@ export async function apiMiddleware(req, res, next) {
       const { id } = await readJsonBody(req, 16 * 1024)
       const thread = (await scanThreads()).find((t) => t.id === id)
       if (!thread) return send(res, 404, { error: 'That print has walked off the map' })
-      if (!(thread.actions || []).includes('message')) return send(res, 400, { error: 'That print is not for a client' })
+      if (!(thread.actions || []).includes('closeout')) return send(res, 400, { error: 'Close-out from the map is not switched on yet' })
       try {
         return send(res, 200, { ok: true, ...(await previewCloseOut({ thread })) })
       } catch (err) {
@@ -1138,7 +1138,7 @@ export async function apiMiddleware(req, res, next) {
       const { id, note } = await readJsonBody(req, 32 * 1024)
       const thread = (await scanThreads()).find((t) => t.id === id)
       if (!thread) return send(res, 404, { error: 'That print has walked off the map' })
-      if (!(thread.actions || []).includes('message')) return send(res, 400, { error: 'That print is not for a client' })
+      if (!(thread.actions || []).includes('closeout')) return send(res, 400, { error: 'Close-out from the map is not switched on yet' })
       try {
         return send(res, 200, { ok: true, ...(await closeOutOrder({ thread, note, who })) })
       } catch (err) {

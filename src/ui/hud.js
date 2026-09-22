@@ -773,31 +773,99 @@ export class Hud {
    * The queue: everyone who wants a human, most urgent first. Click a row to fly there.
    */
   setQueue(items) {
-    const key = items.map((i) => `${i.id}:${i.status}:${i.count || 0}:${i.need || ''}`).join('|')
+    const key = items.map((i) => `${i.id}:${i.status}:${i.count || 0}:${i.need || ''}:${i.group || ''}`).join('|')
     if (this._last.queue === key) return
     this._last.queue = key
     this.$('.q-count').textContent = String(items.length)
     this.$('.queue-card').dataset.empty = String(items.length === 0)
     const wrap = this.$('.queue')
-    const shown = items.slice(0, 40)
-    wrap.innerHTML =
-      shown
-        .map(
-          (i) => {
-            // The one-line "what's wrong" under the title: which door is open, what a kid
-            // said — so the row answers itself without a click. Hidden when it just echoes the title.
-            const need = i.need && i.need !== i.title ? `<span class="n">${escapeHtml(i.need)}</span>` : ''
-            return (
-              `<button class="row ${statusClass(i.status)}" data-status="${escapeHtml(i.status)}" data-id="${escapeHtml(i.id)}" title="${escapeHtml(i.need || '')}">` +
-              `<i class="dot"></i><span class="t">${escapeHtml(i.title)}${i.count ? ` <b>${i.count}</b>` : ''}</span>` +
-              need +
-              `<span class="w">${escapeHtml(i.label)}</span><span class="p">${escapeHtml(i.project)}</span></button>`
-            )
-          }
+    const row = (i) => {
+      // The one-line "what's wrong" under the title: which door is open, what a kid said — so
+      // the row answers itself without a click. Hidden when it just echoes the title.
+      const need = i.need && i.need !== i.title ? `<span class="n">${escapeHtml(i.need)}</span>` : ''
+      return (
+        `<button class="row ${statusClass(i.status)}" data-status="${escapeHtml(i.status)}" data-id="${escapeHtml(i.id)}" title="${escapeHtml(i.need || '')}">` +
+        `<i class="dot"></i><span class="t">${escapeHtml(i.title)}${i.count ? ` <b>${i.count}</b>` : ''}</span>` +
+        need +
+        `<span class="w">${escapeHtml(i.label)}</span><span class="p">${escapeHtml(i.project)}</span></button>`
+      )
+    }
+    // Drawers, most urgent first. Each folds to its header, and remembers — collapse Tickets
+    // once and it stays collapsed, while Broken keeps shouting until it is fixed.
+    const byGroup = new Map()
+    for (const i of items) {
+      const g = QUEUE_GROUPS[i.group] ? i.group : 'other'
+      if (!byGroup.has(g)) byGroup.set(g, [])
+      byGroup.get(g).push(i)
+    }
+    const folded = this._foldedGroups()
+    wrap.innerHTML = Object.keys(QUEUE_GROUPS)
+      .filter((g) => byGroup.has(g))
+      .map((g) => {
+        const list = byGroup.get(g)
+        const shut = folded.has(g)
+        const { icon, label } = QUEUE_GROUPS[g]
+        return (
+          `<div class="q-group${shut ? ' shut' : ''}" data-group="${g}">` +
+          `<button class="q-head" type="button" aria-expanded="${!shut}" title="${shut ? 'Show' : 'Fold away'} ${escapeHtml(label)}">` +
+          `<span class="chev">${shut ? '▸' : '▾'}</span><span class="ic">${icon}</span><span class="lbl">${escapeHtml(label)}</span>` +
+          `<span class="cnt">${list.length}</span></button>` +
+          `<div class="q-rows">${shut ? '' : g === 'tickets' ? this._byClient(list, row, folded) : list.slice(0, 40).map(row).join('')}</div></div>`
         )
-        .join('') + (items.length > shown.length ? `<div class="more">… and ${items.length - shown.length} more</div>` : '')
-    for (const row of wrap.querySelectorAll('.row')) {
-      row.addEventListener('click', () => this.actions.focusThread?.(row.dataset.id))
+      })
+      .join('')
+    for (const r of wrap.querySelectorAll('.row')) {
+      r.addEventListener('click', () => this.actions.focusThread?.(r.dataset.id))
+    }
+    for (const h of wrap.querySelectorAll('.q-head, .q-sub')) {
+      h.addEventListener('click', () => {
+        const g = h.dataset.fold || h.parentElement.dataset.group
+        const f = this._foldedGroups()
+        if (f.has(g)) f.delete(g)
+        else f.add(g)
+        try {
+          localStorage.setItem(FOLDED_KEY, JSON.stringify([...f]))
+        } catch {
+          /* private window: it still folds, it just forgets on reload */
+        }
+        this._last.queue = null // re-render with the new fold
+        this.setQueue(items)
+      })
+    }
+  }
+
+  /**
+   * Tickets, one fold per client. Thirty tickets in one drawer is still a wall, and they are
+   * never worked through as one pile — it is Collectorz this afternoon and the AI Club
+   * tomorrow. Biggest client first, and each folds on its own.
+   */
+  _byClient(list, row, folded) {
+    const by = new Map()
+    for (const i of list) {
+      const c = i.project || 'Unfiled'
+      if (!by.has(c)) by.set(c, [])
+      by.get(c).push(i)
+    }
+    return [...by.entries()]
+      .sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]))
+      .map(([client, rows]) => {
+        const key = `tickets/${client}`
+        const shut = folded.has(key)
+        return (
+          `<button class="q-sub" type="button" data-fold="${escapeHtml(key)}" aria-expanded="${!shut}">` +
+          `<span class="chev">${shut ? '▸' : '▾'}</span><span class="lbl">${escapeHtml(client)}</span><span class="cnt">${rows.length}</span></button>` +
+          (shut ? '' : rows.slice(0, 40).map(row).join(''))
+        )
+      })
+      .join('')
+  }
+
+  /** The drawers Blake has folded away, per browser. */
+  _foldedGroups() {
+    try {
+      return new Set(JSON.parse(localStorage.getItem(FOLDED_KEY) || '[]'))
+    } catch {
+      return new Set()
     }
   }
 
@@ -826,7 +894,7 @@ export class Hud {
       ['✅ Finished', `Hi ${first}, good news — I've finished printing ${job}. `],
       // Holes in the model came up once and almost never does; ready-to-go is every job.
       // Not a sentence: this one closes the order out, and the farm sends the pickup email.
-      ['📦 Print is ready', null],
+      ...(Array.isArray(thread.actions) && thread.actions.includes('closeout') ? [['📦 Print is ready', null]] : []),
       ['🧵 Out of filament', `Hi ${first}, quick update on ${job}: I ran out of filament partway through, so it's paused until more arrives. `],
       ['⏳ Running late', `Hi ${first}, a heads-up that your print (${job}) is running a little behind. `],
     ]
@@ -863,7 +931,7 @@ export class Hud {
     this._closeOutMode = Boolean(on)
     const input = this.$('.thread-pop form.ask input')
     const btn = this.$('.thread-pop form.ask button[type=submit]')
-    const chip = this.$('.thread-pop .starters .chip[data-i="1"]')
+    const chip = [...this.el.querySelectorAll('.thread-pop .starters .chip')].find((c) => c.textContent.includes('Print is ready'))
     if (chip) chip.classList.toggle('armed', this._closeOutMode)
     if (!input || !btn) return
     if (this._closeOutMode) {
@@ -1180,6 +1248,23 @@ function cssFromGlow(color) {
 function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
 }
+
+/**
+ * Needs-you drawers, in the order they are shown: what is broken before what is waiting, and
+ * the people in Blake's life before the tickets in his inbox.
+ */
+const QUEUE_GROUPS = {
+  broken: { icon: '🔧', label: 'Broken' },
+  family: { icon: '💗', label: 'Family' },
+  today: { icon: '📅', label: 'Today' },
+  mail: { icon: '✉️', label: 'Mail' },
+  prints: { icon: '🖨️', label: 'Prints' },
+  tickets: { icon: '🎫', label: 'Tickets' },
+  home: { icon: '🏠', label: 'Home' },
+  news: { icon: '📰', label: 'News' },
+  other: { icon: '•', label: 'Other' },
+}
+const FOLDED_KEY = 'botfarm.queue.folded'
 
 /** Status → the colour family the top-bar counters already use for it. */
 function statusClass(status) {

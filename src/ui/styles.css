@@ -1757,3 +1757,36 @@ kbd {
 .thread-pop .starters .chip:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,0.3); }
 /* Print is ready, armed: the next Send closes the order out. */
 .thread-pop .starters .chip.armed { background: rgba(79,154,99,0.28); border-color: #4f9a63; color: #dff5e5; }
+
+/* Needs-you drawers. The header is the whole handle: one click folds a group to one line. */
+.queue .q-group { display: flex; flex-direction: column; gap: 4px; }
+.queue .q-group + .q-group { margin-top: 6px; }
+.queue .q-head {
+  display: flex; align-items: center; gap: 7px; width: 100%;
+  padding: 5px 8px; border: 0; border-radius: 8px;
+  background: rgba(255,255,255,0.04); color: var(--muted);
+  font: inherit; font-size: 11.5px; font-weight: 650; letter-spacing: 0.04em; text-transform: uppercase;
+  cursor: pointer; text-align: left;
+}
+.queue .q-head:hover { background: rgba(255,255,255,0.09); color: var(--text); }
+.queue .q-head .chev { width: 10px; opacity: 0.7; }
+.queue .q-head .lbl { flex: 1; }
+.queue .q-head .cnt {
+  min-width: 20px; padding: 1px 6px; border-radius: 999px; text-align: center;
+  background: rgba(255,255,255,0.10); color: var(--text); font-weight: 700; letter-spacing: 0;
+}
+/* Broken keeps its colour even folded, so a collapsed drawer of failures still reads as one. */
+.queue .q-group[data-group="broken"] .q-head .cnt { background: rgba(201,79,79,0.35); color: #ffd9d9; }
+.queue .q-rows { display: flex; flex-direction: column; gap: 4px; }
+.queue .q-group.shut .q-rows { display: none; }
+/* A client's tickets inside the Tickets drawer: a quieter header, indented under it. */
+.queue .q-sub {
+  display: flex; align-items: center; gap: 7px; width: 100%;
+  margin: 2px 0 0; padding: 3px 8px 3px 18px; border: 0; border-radius: 6px;
+  background: transparent; color: var(--dim);
+  font: inherit; font-size: 11.5px; font-weight: 600; cursor: pointer; text-align: left;
+}
+.queue .q-sub:hover { background: rgba(255,255,255,0.06); color: var(--text); }
+.queue .q-sub .chev { width: 10px; opacity: 0.7; }
+.queue .q-sub .lbl { flex: 1; }
+.queue .q-sub .cnt { color: var(--muted); font-weight: 700; }
