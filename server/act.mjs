@@ -334,3 +334,64 @@ export async function sendClientMessage({ thread, text, who }) {
   console.log(`act: ${who} messaged ${order.client} <${t.to}> about order ${order.id} (${body.length} chars)`)
   return { id: sent.id, to: t.to, client: order.client, subject }
 }
+
+
+// ── "Print is ready": close the order out, with Blake's note in the pickup email ─────────
+/**
+ * Close-out is the print farm's own "job delivered" (POST /api/orders/:id/close): the order
+ * goes complete, the client's share links are revoked, open plate runs are aborted and the
+ * dedicated printers are released. After it commits, the farm has print-service send the
+ * standard pickup email — address, itemised summary, timelapse, payment options — and mark
+ * the project completed on Janine's board. So this does not send an email of its own; it
+ * asks the farm to close, and passes Blake's note through to the one email that goes out.
+ *
+ * The trap: that email is sent AFTER the close commits, fire-and-forget, and print-service
+ * finds the customer's address on Janine's board by name. A name that matches no project, or
+ * two, or a project with no email, means the order closes — printer released, share link
+ * revoked — and nobody is told. So the recipient is resolved here first, the same way
+ * print-service resolves it, and nothing is closed unless exactly one address comes back.
+ */
+async function pickupRecipient(client) {
+  const r = await fetch(`${JANINE}/api/projects`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(12000) })
+  if (!r.ok) throw new Error(`projects board → ${r.status}`)
+  const board = await r.json()
+  const projects = Array.isArray(board) ? board : board.projects || []
+  // Mirrors print-service's /api/pickup/manual: exact, then whole-word, then substring, and
+  // a loose match only when it is unambiguous.
+  const needle = String(client).toLowerCase().trim()
+  const fields = (p) => [String(p.client || ''), String(p.name || '')].map((x) => x.toLowerCase())
+  const wordsOf = (f) => f.split(/[^a-z0-9]+/i).filter(Boolean)
+  let m = projects.filter((p) => fields(p).some((f) => f === needle))
+  if (!m.length) m = projects.filter((p) => fields(p).some((f) => wordsOf(f).includes(needle)))
+  if (!m.length) m = projects.filter((p) => fields(p).some((f) => f.includes(needle)))
+  if (m.length > 1) throw new Error(`${client} matches ${m.length} projects on the board (${m.map((p) => p.name).join(', ')}), so the pickup email would refuse to send. Make it unique first.`)
+  if (!m.length) throw new Error(`${client} is not on the projects board, so the pickup email would go to nobody.`)
+  if (!m[0].email) throw new Error(`${client}'s project has no email on it, so the pickup email would go to nobody.`)
+  return { to: m[0].email, project: m[0].name }
+}
+
+/** Who the pickup email would reach, and what closing does. Reads only; closes nothing. */
+export async function previewCloseOut({ thread }) {
+  const order = await orderFor(thread)
+  const who = await pickupRecipient(order.client)
+  return { orderId: order.id, client: order.client, job: order.name, to: who.to, project: who.project }
+}
+
+/** Close the order out, carrying Blake's note into the pickup email. */
+export async function closeOutOrder({ thread, note, who }) {
+  const order = await orderFor(thread)
+  // Checked again right before closing: the board may have changed since the preview, and a
+  // close is not something to discover was pointless afterwards.
+  const recipient = await pickupRecipient(order.client)
+  const r = await fetch(`${FARM}/api/orders/${encodeURIComponent(order.id)}/close`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ note: String(note || '').trim().slice(0, 2000) }),
+    signal: AbortSignal.timeout(30000),
+  })
+  const body = await r.json().catch(() => ({}))
+  if (r.status === 409) throw new Error('That order is already closed out')
+  if (!r.ok) throw new Error(body.error || `close → ${r.status}`)
+  console.log(`act: ${who} closed out order ${order.id} (${order.client}) -> pickup to ${recipient.to}${note ? ' with a note' : ''}`)
+  return { orderId: order.id, client: order.client, to: recipient.to }
+}

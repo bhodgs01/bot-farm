@@ -126,3 +126,9 @@ export const actMessagePreview = (threadId) => post('/api/act/message/preview', 
 
 /** Send Blake's words to the client behind a print, in their own email thread. */
 export const actMessage = (threadId, text) => post('/api/act/message', { id: threadId, text })
+
+/** Who the pickup email would reach if this print's order were closed out. Closes nothing. */
+export const actCloseOutPreview = (threadId) => post('/api/act/closeout/preview', { id: threadId })
+
+/** Close the order out; the note rides into the farm's pickup email. */
+export const actCloseOut = (threadId, note) => post('/api/act/closeout', { id: threadId, note })

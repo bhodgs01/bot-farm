@@ -40,6 +40,8 @@ import {
   actFix,
   actMessagePreview,
   actMessage,
+  actCloseOutPreview,
+  actCloseOut,
   actPagerTest,
   fetchHistory,
 } from './game/api.js'
@@ -793,6 +795,49 @@ In the thread: ${where.subject || '(no subject)'}
       hud.toast(`Sent to ${r.client} (${r.to})`)
     } catch (err) {
       hud.appendChat(thread.id, 'worker', `It did not send: ${String(err?.message || err)}`)
+    }
+  },
+
+  /**
+   * "Print is ready": close the order out, which has the farm send the pickup email with
+   * Blake's note at the end. It cannot be undone — the order completes, the printer is
+   * released and the client's share link is switched off — so the confirm says all of it,
+   * and says who the email reaches, before anything happens.
+   */
+  closeOut: async (note) => {
+    const thread = threads.find((t) => t.id === selectedId)
+    if (!thread) return
+    let plan
+    try {
+      plan = await actCloseOutPreview(thread.id)
+    } catch (err) {
+      const msg = String(err?.message || err)
+      if (/sign in|401/i.test(msg)) {
+        hud.toast('Sign in first — a tab just opened', 'err')
+        window.open('/api/act/auth', '_blank', 'noopener')
+      } else hud.toast(`Can't close it out: ${msg}`, 'err')
+      return
+    }
+    const ok = window.confirm(
+      [
+        `Close out "${plan.job}" for ${plan.client}?`,
+        '',
+        `• The pickup email goes to ${plan.to}`,
+        note ? `  with your note at the end: "${note.slice(0, 200)}${note.length > 200 ? '…' : ''}"` : '  (no note of yours added)',
+        '• The order is marked complete and the project moves to Pay me',
+        "• Its printer is released and the client's share link is switched off",
+        '',
+        'This cannot be undone.',
+      ].join(String.fromCharCode(10)),
+    )
+    if (!ok) return
+    try {
+      const r = await actCloseOut(thread.id, note)
+      hud.toast(`Closed out ${r.client} — pickup email to ${r.to}`)
+      hud._setCloseOut?.(false)
+      setTimeout(poll, 2500)
+    } catch (err) {
+      hud.toast(`It did not close: ${String(err?.message || err)}`, 'err')
     }
   },
 

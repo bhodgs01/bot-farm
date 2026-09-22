@@ -400,12 +400,13 @@ export class Hud {
       e.preventDefault()
       const input = this.$('.thread-pop form.ask input')
       const text = input.value.trim()
-      if (!text) return
+      if (!text && !this._closeOutMode) return
       input.value = ''
       // The same box, two jobs. On most workers it asks the worker what it needs; on a
       // thread that can be answered it is a message to a person, and must never be handed
       // to the model instead.
-      if (this._messageMode) this.actions.messageClient?.(text)
+      if (this._closeOutMode) this.actions.closeOut?.(text)
+      else if (this._messageMode) this.actions.messageClient?.(text)
       else if (this._replyMode) this.actions.replyWorker?.(text)
       else this.actions.askWorker?.(text)
     })
@@ -709,6 +710,7 @@ export class Hud {
     const canMessage = !canReply && (Array.isArray(thread.actions) ? thread.actions : []).includes('message')
     const client = String(thread.ref?.client || '').trim()
     this._messageMode = canMessage
+    if (thread.id !== this._closeOutFor) this._setCloseOut(false)
     this._replyMode = canReply
     const who = String(thread.title || '').replace(/^\p{Extended_Pictographic}️?\s*/u, '') || 'them'
     const askInput = this.$('.thread-pop form.ask input')
@@ -800,9 +802,9 @@ export class Hud {
   }
 
   /**
-   * One-tap openings for the messages a print actually needs. They fill the box rather than
-   * send, so every one gets read and edited before it goes to a customer — a starter is a
-   * shortcut to a sentence, never a message sent on Blake's behalf.
+   * One-tap openings for the messages a print actually needs. They add to the box rather
+   * than send, so every one gets read and finished before it goes to a customer — a starter
+   * is a shortcut to a sentence, never a message sent on Blake's behalf.
    */
   _renderStarters(client, thread) {
     const form = this.$('.thread-pop form.ask')
@@ -819,20 +821,60 @@ export class Hud {
     const first = client.split(/\s+/)[0] || 'there'
     const job = String(thread.details?.Job || thread.title || 'your print').replace(/^[^\w$]+/, '').trim()
     const STARTERS = [
-      ['✅ Finished', `Hi ${first}, good news — ${job} is finished and ready. `],
-      ['🕳️ Holes in the model', `Hi ${first}, ${job} finished printing, but the model came out with holes in it. `],
+      // Worded so the job name is never the subject of a verb: job names are often plural
+      // ("2 toy figurines"), and "your 2 toy figurines is ready" reads like a form letter.
+      ['✅ Finished', `Hi ${first}, good news — I've finished printing ${job}. `],
+      // Holes in the model came up once and almost never does; ready-to-go is every job.
+      // Not a sentence: this one closes the order out, and the farm sends the pickup email.
+      ['📦 Print is ready', null],
       ['🧵 Out of filament', `Hi ${first}, quick update on ${job}: I ran out of filament partway through, so it's paused until more arrives. `],
-      ['⏳ Running late', `Hi ${first}, a heads-up that ${job} is running a little behind. `],
+      ['⏳ Running late', `Hi ${first}, a heads-up that your print (${job}) is running a little behind. `],
     ]
     row.hidden = false
     row.innerHTML = STARTERS.map(([label], i) => `<button class="chip" type="button" data-i="${i}">${escapeHtml(label)}</button>`).join('')
     for (const b of row.querySelectorAll('button')) {
       b.addEventListener('click', () => {
         const input = this.$('.thread-pop form.ask input')
-        input.value = STARTERS[Number(b.dataset.i)][1]
+        const line = STARTERS[Number(b.dataset.i)][1]
+        if (line === null) {
+          this._closeOutFor = thread.id
+          this._setCloseOut(!this._closeOutMode, client)
+          return
+        }
+        this._setCloseOut(false)
+        const have = input.value.trim()
+        // Adds to the draft rather than replacing it, so a starter can go in after something
+        // already typed and Blake's own notes follow on the end. A second starter drops its
+        // greeting — nobody wants "Hi Jackson" twice in one email.
+        const rest = line.replace(/^Hi [^,]*,\s*/, '')
+        input.value = have ? `${have} ${rest.charAt(0).toUpperCase()}${rest.slice(1)}` : line
         input.focus()
         input.setSelectionRange(input.value.length, input.value.length)
       })
+    }
+  }
+
+  /**
+   * "Print is ready" mode. The box stops being a message and becomes a note for the pickup
+   * email the farm sends when the order closes — the address, summary, timelapse and payment
+   * options are already in that email, so all Blake adds is the personal part at the end.
+   */
+  _setCloseOut(on, client = '') {
+    this._closeOutMode = Boolean(on)
+    const input = this.$('.thread-pop form.ask input')
+    const btn = this.$('.thread-pop form.ask button[type=submit]')
+    const chip = this.$('.thread-pop .starters .chip[data-i="1"]')
+    if (chip) chip.classList.toggle('armed', this._closeOutMode)
+    if (!input || !btn) return
+    if (this._closeOutMode) {
+      input.placeholder = `Add a note to ${client ? client.split(/\s+/)[0] + "'s" : 'the'} pickup email (optional)…`
+      btn.textContent = '📦 Close out'
+      btn.title = 'Close the order out: the farm emails the pickup note, with yours at the end'
+      input.focus()
+    } else if (this._messageMode) {
+      input.placeholder = `Message ${String(this.selected?.thread?.ref?.client || 'the client')}…`
+      btn.textContent = 'Send'
+      btn.title = 'Email them, in their own thread'
     }
   }
 

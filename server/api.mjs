@@ -12,7 +12,7 @@ import {
   setThreadArchived,
 } from './scan.mjs'
 import { ask, chatEnabled, johnnyAsk } from './ask.mjs'
-import { setProjectStatus, closeTask, completeChores, feedCartiDone, createTicket, janineDraftAction, nudgeClient, clearSay, previewClientMessage, sendClientMessage } from './act.mjs'
+import { setProjectStatus, closeTask, completeChores, feedCartiDone, createTicket, janineDraftAction, nudgeClient, clearSay, previewClientMessage, sendClientMessage, previewCloseOut, closeOutOrder } from './act.mjs'
 import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
 import { applySeen, markSeen } from './seen.mjs'
 import { nightWatch, morningDigest, recentPushes, pagerTest } from './notify.mjs'
@@ -1114,6 +1114,38 @@ export async function apiMiddleware(req, res, next) {
         return send(res, 409, { ok: false, error: String(err?.message || err) })
       }
     }
+    // "Print is ready": close the order out through the print farm, with Blake's note carried
+    // into the pickup email. Preview resolves who that email reaches and refuses if it would
+    // reach nobody; only the second call closes anything.
+    if (url.pathname === '/api/act/closeout/preview' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to close out orders', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      const { id } = await readJsonBody(req, 16 * 1024)
+      const thread = (await scanThreads()).find((t) => t.id === id)
+      if (!thread) return send(res, 404, { error: 'That print has walked off the map' })
+      if (!(thread.actions || []).includes('message')) return send(res, 400, { error: 'That print is not for a client' })
+      try {
+        return send(res, 200, { ok: true, ...(await previewCloseOut({ thread })) })
+      } catch (err) {
+        return send(res, 409, { ok: false, error: String(err?.message || err) })
+      }
+    }
+    if (url.pathname === '/api/act/closeout' && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to close out orders', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      const { id, note } = await readJsonBody(req, 32 * 1024)
+      const thread = (await scanThreads()).find((t) => t.id === id)
+      if (!thread) return send(res, 404, { error: 'That print has walked off the map' })
+      if (!(thread.actions || []).includes('message')) return send(res, 400, { error: 'That print is not for a client' })
+      try {
+        return send(res, 200, { ok: true, ...(await closeOutOrder({ thread, note, who })) })
+      } catch (err) {
+        return send(res, 409, { ok: false, error: String(err?.message || err) })
+      }
+    }
+
     if (url.pathname === '/api/act/message' && req.method === 'POST') {
       const who = chatIdentity(req)
       if (!who) return send(res, 401, { error: 'Sign in to message clients', signIn: '/api/act/auth' })
