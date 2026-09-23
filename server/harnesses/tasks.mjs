@@ -38,7 +38,9 @@ const ZONE_FOR = [
   [/caregiver|frances/i, 'Frances'],
   [/janine/i, 'KC Proto'],
   [/client ops|kc proto|meetings/i, 'KC Proto'],
-  [/unlimited ?awesome/i, 'Unlimited Awesome'],
+  // Awesome and Campus are the same client: Alan's company and the product being built for
+  // it. Two projects, one hex — the campus work does not deserve a tile of its own.
+  [/unlimited/i, 'Unlimited Awesome'],
   [/hive/i, 'Trade Floor'],
   [/^inbox$/i, 'Inbox'],
 ]
