@@ -118,8 +118,25 @@ async function fetchThreads() {
           ref: { project: p.id },
         })
       }
+      // 2026-09-23: a busy hex read as a swarm of raised hands (Collectorz: 19 open, one of them
+      // a bug). Bugs still get a minion each. Feature requests, feedback and plans fold into ONE
+      // minion carrying the list, and anything labelled "Waiting on <name>" folds into another:
+      // that ball is in someone else's court. Overdue tickets never fold, the `!` must stay loud.
+      const groups = new Map()
+      const fold = (key, label, t, line) => {
+        if (!groups.has(key)) groups.set(key, { label, items: [] })
+        groups.get(key).items.push({ t, line })
+      }
       for (const t of Array.isArray(tasks) ? tasks : []) {
         if (t.done) continue
+        if (!notes) {
+          const overdueNow = validDate(t.due_date) && validDate(t.due_date) < now
+          const waitingOn = (t.labels || []).map((l) => /^waiting on (.+)$/i.exec(l.title || '')?.[1]).find(Boolean)
+          const type = /^\s*\[(feature|feedback|plan|idea)\]/i.exec(t.title || '')?.[1]
+          const line = `• #${t.id} ${Number(t.priority) >= 4 ? '★ ' : ''}${String(t.title || 'Task').replace(/^\s*\[\w+\]\s*/, '').slice(0, 90)}`
+          if (!overdueNow && waitingOn) { fold(`waiting:${waitingOn.toLowerCase()}`, `⏳ Waiting on ${waitingOn}`, t, line); continue }
+          if (!overdueNow && type) { fold('features', '💡 Feature requests', t, line); continue }
+        }
         const due = validDate(t.due_date)
         const overdue = due && due < now
         const soon = due && !overdue && due - now < SOON_MS
@@ -172,31 +189,68 @@ async function fetchThreads() {
           ref: { task: t.id },
         })
       }
+      for (const [key, g] of groups) {
+        const items = g.items.slice().sort((a, b) => (Number(b.t.priority) || 0) - (Number(a.t.priority) || 0) || a.t.id - b.t.id)
+        out.push({
+          id: `task:group:${p.id}:${key}`,
+          kind: 'task',
+          count: items.length,
+          title: `${g.label} (${items.length})`,
+          preview: items.map((i) => i.line).join(String.fromCharCode(10)),
+          project: zone,
+          projectPath: `tasks://project/${p.id}`,
+          worktree: '',
+          cwd: p.title,
+          gitBranch: key === 'features' ? 'backlog' : 'waiting',
+          model: '',
+          effort: '',
+          createdAt: Math.min(...items.map((i) => validDate(i.t.created) || now)),
+          lastActivityAt: Math.max(...items.map((i) => validDate(i.t.updated) || validDate(i.t.created) || 0)) || now,
+          lastFocusedAt: 0,
+          running: false,
+          // Calm on purpose: a backlog or someone else's move is not a hand raised at Blake.
+          unread: false,
+          hasError: false,
+          grouped: items.map((i) => ({ id: i.t.id, title: i.t.title, hasError: false, unread: !calm })),
+          starred: false,
+          routine: '',
+          prState: '',
+          archived: false,
+          hasTranscript: false,
+          sizeBytes: 1000 * (1 + items.length * 30),
+          source: 'vikunja',
+          canOpen: true,
+          canArchive: false,
+          ref: { project: p.id },
+        })
+      }
       keeper()
     })
   )
   // One keeper on KC Proto carries the whole list: the count over his head, the titles
   // on hover, a `?` if anything is due soon and a `!` if anything is overdue.
+  // A folded minion still stands for every ticket it carries, so the totals count those.
+  const tickets = out.flatMap((t) => (t.grouped ? t.grouped.map((g) => ({ ...g, cwd: t.cwd, createdAt: t.createdAt })) : [t]))
   if (out.length) {
-    const overdue = out.filter((t) => t.hasError).length
-    const soon = out.filter((t) => t.unread).length
-    const lines = out
+    const overdue = tickets.filter((t) => t.hasError).length
+    const soon = tickets.filter((t) => t.unread).length
+    const lines = tickets
       .slice()
       .sort((a, b) => (b.hasError - a.hasError) || (b.unread - a.unread) || a.createdAt - b.createdAt)
       .slice(0, 14)
       .map((t) => `• ${t.hasError ? '⚠ ' : ''}${t.title}${t.cwd ? ` (${t.cwd})` : ''}`)
-    if (out.length > 14) lines.push(`… and ${out.length - 14} more`)
+    if (tickets.length > 14) lines.push(`… and ${tickets.length - 14} more`)
     out.push({
       id: 'task:all',
       kind: 'task',
-      count: out.length,
+      count: tickets.length,
       title: '📋 Tasks',
       preview: lines.join(String.fromCharCode(10)),
       project: 'KC Proto',
       projectPath: 'tasks://all',
       worktree: '',
       cwd: 'all projects',
-      gitBranch: overdue ? `${overdue} overdue` : soon ? `${soon} due soon` : `${out.length} open`,
+      gitBranch: overdue ? `${overdue} overdue` : soon ? `${soon} due soon` : `${tickets.length} open`,
       model: '',
       effort: '',
       createdAt: 0,
@@ -210,7 +264,7 @@ async function fetchThreads() {
       prState: '',
       archived: false,
       hasTranscript: false,
-      sizeBytes: 1000 * (1 + out.length * 30),
+      sizeBytes: 1000 * (1 + tickets.length * 30),
       source: 'vikunja',
       canOpen: true,
       canArchive: false,
@@ -250,7 +304,9 @@ export default {
   scanThreads,
   openThread: (ref) => {
     const id = Number(ref?.task)
-    return Number.isInteger(id) && id > 0 ? { ok: true, browser: true, url: `${OPEN_URL}/tasks/${id}` } : { ok: true, browser: true, url: OPEN_URL }
+    const project = Number(ref?.project)
+    if (Number.isInteger(id) && id > 0) return { ok: true, browser: true, url: `${OPEN_URL}/tasks/${id}` }
+    return { ok: true, browser: true, url: Number.isInteger(project) && project > 0 ? `${OPEN_URL}/projects/${project}` : OPEN_URL }
   },
   newSession: () => ({ ok: false, error: 'Tasks are made in Vikunja' }),
   setArchived: async () => ({ ok: false, error: 'Mark it done in Vikunja; it walks home on its own' }),
