@@ -132,3 +132,9 @@ export const actCloseOutPreview = (threadId) => post('/api/act/closeout/preview'
 
 /** Close the order out; the note rides into the farm's pickup email. */
 export const actCloseOut = (threadId, note) => post('/api/act/closeout', { id: threadId, note })
+
+/** Read a desk story back out into calendar fields. Writes nothing. */
+export const actCalendarPreview = (threadId, index) => post('/api/act/calendar/preview', { id: threadId, index })
+
+/** Put that story on the KC Proto calendar. */
+export const actCalendarAdd = (threadId, index) => post('/api/act/calendar', { id: threadId, index })

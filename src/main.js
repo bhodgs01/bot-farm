@@ -42,6 +42,8 @@ import {
   actMessage,
   actCloseOutPreview,
   actCloseOut,
+  actCalendarPreview,
+  actCalendarAdd,
   actPagerTest,
   fetchHistory,
 } from './game/api.js'
@@ -838,6 +840,41 @@ In the thread: ${where.subject || '(no subject)'}
       setTimeout(poll, 2500)
     } catch (err) {
       hud.toast(`It did not close: ${String(err?.message || err)}`, 'err')
+    }
+  },
+
+  /**
+   * Put an event from the desk on the calendar. The desk writes prose, so the date is read
+   * back out of the story first and shown to Blake before anything is saved — a date lifted
+   * out of a sentence is a guess, and a wrong one lands silently in his week.
+   */
+  addToCalendar: async (threadId, index, btn) => {
+    const was = btn ? btn.textContent : ''
+    if (btn) { btn.disabled = true; btn.textContent = 'Reading…' }
+    try {
+      const { event } = await actCalendarPreview(threadId, index)
+      const when = event.allDay
+        ? `${event.date} (all day)`
+        : `${event.date} at ${event.start}${event.end ? `–${event.end}` : ''}`
+      const ok = window.confirm(
+        [`Add to the KC Proto calendar?`, '', event.title, when, event.location || '', '',
+         'Your personal calendar is read-only to this account, so it goes on KC Proto.']
+          .filter((l) => l !== '')
+          .join(String.fromCharCode(10)),
+      )
+      if (!ok) return
+      if (btn) btn.textContent = 'Adding…'
+      const r = await actCalendarAdd(threadId, index)
+      hud.toast(`On the calendar: ${r.title}`)
+      if (btn) { btn.textContent = '📅 Added'; return }
+    } catch (err) {
+      const msg = String(err?.message || err)
+      if (/sign in|401/i.test(msg)) {
+        hud.toast('Sign in first — a tab just opened', 'err')
+        window.open('/api/act/auth', '_blank', 'noopener')
+      } else hud.toast(msg, 'err')
+    } finally {
+      if (btn && btn.textContent !== '📅 Added') { btn.disabled = false; btn.textContent = was }
     }
   },
 

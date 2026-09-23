@@ -609,6 +609,7 @@ export class Hud {
         <div class="src">${src}${s.url ? ` <a href="${escapeHtml(String(s.url))}" target="_blank" rel="noopener">source ↗</a>` : ''}</div>
       </div>
       <div class="nav">
+        ${thread.id === 'news:events' ? `<button class="btn" data-cal="${i}" title="Put this on the KC Proto calendar">📅 Add</button>` : ''}
         <button class="btn" data-go="-1" ${i === 0 ? 'disabled' : ''}>‹ Prev</button>
         ${i < n - 1 ? `<button class="btn primary" data-go="1">Next ›</button>` : unread ? `<button class="btn primary" data-done="1">Done ✓</button>` : `<button class="btn" data-go="-${n}">Start over</button>`}
         ${unread ? `<button class="btn ghost" data-done="1" title="Mark the whole briefing read">Dismiss</button>` : ''}
@@ -624,6 +625,9 @@ export class Hud {
       })
     }
     for (const b of box.querySelectorAll('[data-done]')) b.addEventListener('click', () => this.actions.stageThread?.('read', thread.id))
+    for (const b of box.querySelectorAll('[data-cal]')) {
+      b.addEventListener('click', () => this.actions.addToCalendar?.(thread.id, Number(b.dataset.cal), b))
+    }
   }
 
   /**

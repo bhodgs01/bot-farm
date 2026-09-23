@@ -17,6 +17,7 @@ import { applyAcks, ack, unack, applyStars, setStar } from './acks.mjs'
 import { applySeen, markSeen } from './seen.mjs'
 import { nightWatch, morningDigest, recentPushes, pagerTest } from './notify.mjs'
 import { remedyFor, runRemedy } from './remedy.mjs'
+import { readEvent, addEvent } from './calendar-add.mjs'
 import { snapshot as newsSnapshot, markRead as newsMarkRead, generate as newsGenerate, update as newsUpdate, topicById, todayKC, newsEnabled } from './news.mjs'
 import { refreshNews } from './harnesses/news.mjs'
 import { napMode, fetchNap } from './harnesses/home.mjs'
@@ -1094,6 +1095,26 @@ export async function apiMiddleware(req, res, next) {
         return send(res, 200, { ok: true, ...(await pagerTest({ who })) })
       } catch (err) {
         return send(res, 502, { ok: false, error: String(err?.message || err) })
+      }
+    }
+
+    // An event off the Events desk, onto the calendar. The desk writes prose, so the date has
+    // to be read back out of it — preview does that and writes nothing, so Blake sees what was
+    // understood before it lands in his week.
+    if ((url.pathname === '/api/act/calendar/preview' || url.pathname === '/api/act/calendar') && req.method === 'POST') {
+      const who = chatIdentity(req)
+      if (!who) return send(res, 401, { error: 'Sign in to add to the calendar', signIn: '/api/act/auth' })
+      if (!chatAllowed(`act:${who}`)) return send(res, 429, { error: 'Slow down' })
+      const { id, index } = await readJsonBody(req, 16 * 1024)
+      const thread = (await scanThreads()).find((t) => t.id === id)
+      const story = Array.isArray(thread?.stories) ? thread.stories[Number(index)] : null
+      if (!story) return send(res, 404, { error: 'That story is not on the desk any more' })
+      try {
+        const event = await readEvent(story)
+        if (url.pathname.endsWith('/preview')) return send(res, 200, { ok: true, event })
+        return send(res, 200, { ok: true, event, ...(await addEvent({ event, story, who })) })
+      } catch (err) {
+        return send(res, 409, { ok: false, error: String(err?.message || err) })
       }
     }
 
