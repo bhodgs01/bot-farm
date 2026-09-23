@@ -100,12 +100,32 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
-    const body = await fsp.readFile(file)
     const type = TYPES[path.extname(file)] || 'application/octet-stream'
-    const cache = file.includes(`${path.sep}assets${path.sep}`)
+    const isAsset = file.includes(`${path.sep}assets${path.sep}`)
+    const isHtml = path.extname(file) === '.html'
+    // Everything that is not a hashed bundle used to go out as `no-cache` with nothing to
+    // revalidate against, so every single load re-fetched the lot: twenty-five family
+    // photographs, four glb kits and an eight-megabyte desk. That is why the crew kept
+    // turning up headless — their faces were being downloaded again from scratch every time.
+    //
+    // An ETag off size and mtime fixes it without a service worker (which pinned Blake to
+    // stale builds last time and is not coming back). The page itself still revalidates every
+    // load, so a new build lands at once; the media it references answers 304 and sends
+    // nothing. Touch a face and its mtime changes, so the ETag does too.
+    const st = await fsp.stat(file)
+    const etag = `W/"${st.size.toString(16)}-${Math.floor(st.mtimeMs).toString(16)}"`
+    const cache = isAsset
       ? 'public, max-age=31536000, immutable'
-      : 'no-cache'
-    res.writeHead(200, { 'Content-Type': type, 'Content-Length': body.length, 'Cache-Control': cache })
+      : isHtml
+        ? 'no-cache'
+        : 'public, max-age=3600, must-revalidate'
+    if (req.headers['if-none-match'] === etag) {
+      res.writeHead(304, { ETag: etag, 'Cache-Control': cache })
+      res.end()
+      return
+    }
+    const body = await fsp.readFile(file)
+    res.writeHead(200, { 'Content-Type': type, 'Content-Length': body.length, 'Cache-Control': cache, ETag: etag })
     res.end(body)
   } catch {
     res.writeHead(404, { 'Content-Type': 'text/plain' }).end('Not found')
