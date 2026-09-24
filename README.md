@@ -1,3 +1,5 @@
+> **ARCHIVED 2026-09-24.** This code moved to [bhodgs01/campus](https://github.com/bhodgs01/campus) at `apps/botfarm`, the monorepo shared by Unlimited Campus, the School of Brain and the Bot Farm. Nothing here is maintained; do not push.
+
 # Bot Farm — the JARVIS Armada as a colony
 
 **[bot-farm.kcproto.com](https://bot-farm.kcproto.com)** — a fork of
