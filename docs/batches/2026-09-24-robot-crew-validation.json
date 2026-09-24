@@ -1,0 +1,269 @@
+{
+  "parts": [
+    {
+      "name": "backPack",
+      "bone": "chest",
+      "role": "trim",
+      "triangles": 608,
+      "size": [
+        0.43,
+        0.48,
+        0.2335
+      ]
+    },
+    {
+      "name": "chestCore",
+      "bone": "chest",
+      "role": "glow",
+      "triangles": 48,
+      "size": [
+        0.075,
+        0.014,
+        0.014
+      ]
+    },
+    {
+      "name": "chestPlate",
+      "bone": "chest",
+      "role": "suit",
+      "triangles": 760,
+      "size": [
+        0.66,
+        0.647,
+        0.324
+      ]
+    },
+    {
+      "name": "earPods",
+      "bone": "head",
+      "role": "trim",
+      "triangles": 416,
+      "size": [
+        0.6,
+        0.14,
+        0.14
+      ]
+    },
+    {
+      "name": "footPad.l",
+      "bone": "foot.l",
+      "role": "trim",
+      "triangles": 400,
+      "size": [
+        0.2,
+        0.1559,
+        0.407
+      ]
+    },
+    {
+      "name": "footPad.r",
+      "bone": "foot.r",
+      "role": "trim",
+      "triangles": 400,
+      "size": [
+        0.2,
+        0.1559,
+        0.407
+      ]
+    },
+    {
+      "name": "foreArmPlate.l",
+      "bone": "lowerarm.l",
+      "role": "suit",
+      "triangles": 416,
+      "size": [
+        0.17,
+        0.297,
+        0.2115
+      ]
+    },
+    {
+      "name": "foreArmPlate.r",
+      "bone": "lowerarm.r",
+      "role": "suit",
+      "triangles": 416,
+      "size": [
+        0.17,
+        0.297,
+        0.2115
+      ]
+    },
+    {
+      "name": "handUnit.l",
+      "bone": "hand.l",
+      "role": "trim",
+      "triangles": 756,
+      "size": [
+        0.165,
+        0.2335,
+        0.1365
+      ]
+    },
+    {
+      "name": "handUnit.r",
+      "bone": "hand.r",
+      "role": "trim",
+      "triangles": 756,
+      "size": [
+        0.165,
+        0.2335,
+        0.1365
+      ]
+    },
+    {
+      "name": "headLamp",
+      "bone": "head",
+      "role": "glow",
+      "triangles": 160,
+      "size": [
+        0.514,
+        0.514,
+        0.018
+      ]
+    },
+    {
+      "name": "headShell",
+      "bone": "head",
+      "role": "suit",
+      "triangles": 536,
+      "size": [
+        0.571,
+        0.571,
+        0.2205
+      ]
+    },
+    {
+      "name": "headVisor",
+      "bone": "head",
+      "role": "trim",
+      "triangles": 544,
+      "size": [
+        0.47,
+        0.47,
+        0.061
+      ]
+    },
+    {
+      "name": "hipBlock",
+      "bone": "hips",
+      "role": "trim",
+      "triangles": 580,
+      "size": [
+        0.515,
+        0.2095,
+        0.3015
+      ]
+    },
+    {
+      "name": "neckStack",
+      "bone": "head",
+      "role": "trim",
+      "triangles": 388,
+      "size": [
+        0.21,
+        0.34,
+        0.212
+      ]
+    },
+    {
+      "name": "shinPlate.l",
+      "bone": "lowerleg.l",
+      "role": "suit",
+      "triangles": 552,
+      "size": [
+        0.215,
+        0.415,
+        0.2195
+      ]
+    },
+    {
+      "name": "shinPlate.r",
+      "bone": "lowerleg.r",
+      "role": "suit",
+      "triangles": 552,
+      "size": [
+        0.215,
+        0.415,
+        0.2195
+      ]
+    },
+    {
+      "name": "shoulderPod.l",
+      "bone": "upperarm.l",
+      "role": "trim",
+      "triangles": 424,
+      "size": [
+        0.2075,
+        0.288,
+        0.309
+      ]
+    },
+    {
+      "name": "shoulderPod.r",
+      "bone": "upperarm.r",
+      "role": "trim",
+      "triangles": 424,
+      "size": [
+        0.2075,
+        0.288,
+        0.309
+      ]
+    },
+    {
+      "name": "thighPlate.l",
+      "bone": "upperleg.l",
+      "role": "suit",
+      "triangles": 556,
+      "size": [
+        0.244,
+        0.473,
+        0.2255
+      ]
+    },
+    {
+      "name": "thighPlate.r",
+      "bone": "upperleg.r",
+      "role": "suit",
+      "triangles": 556,
+      "size": [
+        0.244,
+        0.473,
+        0.2255
+      ]
+    },
+    {
+      "name": "upperArmPlate.l",
+      "bone": "upperarm.l",
+      "role": "suit",
+      "triangles": 428,
+      "size": [
+        0.2015,
+        0.3736,
+        0.2165
+      ]
+    },
+    {
+      "name": "upperArmPlate.r",
+      "bone": "upperarm.r",
+      "role": "suit",
+      "triangles": 428,
+      "size": [
+        0.2015,
+        0.3736,
+        0.2165
+      ]
+    }
+  ],
+  "totalTriangles": 11104,
+  "tests": [
+    "exact part names and bones",
+    "finite single merged geometry",
+    "temporary geometries disposed",
+    "under 900 triangles per part",
+    "maximum dimension 1.2",
+    "reflection and triangle winding",
+    "exactly two glow parts",
+    "no forbidden scene or browser API"
+  ],
+  "liveSkeletonTested": false
+}
