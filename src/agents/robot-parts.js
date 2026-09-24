@@ -1,6 +1,9 @@
 /**
  * Bot Farm robot crew hardware — rig units, +Y up, +Z front, +X left.
- * Engine provides THREE, BufferGeometryUtils and roundedBox.
+ * Written to be handed THREE, BufferGeometryUtils and roundedBox as globals, the way the
+ * set-piece importer on another project supplies them. Nothing here defines globals, so the
+ * imports below were added when this landed: without them every part throws ReferenceError on
+ * the first call and the colony never finishes loading.
  * Only PARTS and MANIFEST are exported. No scene objects or palette colours.
  * All translations are baked into the returned BONE-LOCAL geometry; manifest
  * transforms are deliberately identity, so the engine must not add them twice.
@@ -9,6 +12,10 @@
  * supplied. Head reference centre remains .46 above its bone.
  * trim must provide the dark sensor/actuator finish; gloss is engine-controlled.
  */
+import * as THREE from 'three'
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
+import { roundedBox } from './part-helpers.js'
+
 const PI = Math.PI;
 
 // Contoured shell loft: bevelled rectangular sections, eight vertices per ring.

@@ -17,33 +17,7 @@
  * Re-run this whenever crew.glb or robot-parts.js changes.
  */
 import * as THREE from 'three'
-import * as BufferGeometryUtils from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { readFileSync } from 'fs'
-
-// The engine's own helpers, which the parts are authored against.
-globalThis.THREE = THREE
-globalThis.BufferGeometryUtils = BufferGeometryUtils
-globalThis.paint = () => {}
-globalThis.roundedBox = (w, h, d, r) => {
-  const geo = new THREE.BoxGeometry(w, h, d, 2, 2, 2)
-  const pos = geo.attributes.position
-  const v = new THREE.Vector3()
-  const half = new THREE.Vector3(w / 2 - r, h / 2 - r, d / 2 - r)
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i)
-    const inner = new THREE.Vector3(
-      THREE.MathUtils.clamp(v.x, -half.x, half.x),
-      THREE.MathUtils.clamp(v.y, -half.y, half.y),
-      THREE.MathUtils.clamp(v.z, -half.z, half.z)
-    )
-    const out = v.clone().sub(inner)
-    if (out.lengthSq() > 0) out.setLength(r)
-    pos.setXYZ(i, inner.x + out.x, inner.y + out.y, inner.z + out.z)
-  }
-  pos.needsUpdate = true
-  geo.computeVertexNormals()
-  return geo
-}
 
 const { PARTS, MANIFEST } = await import('../src/agents/robot-parts.js')
 
