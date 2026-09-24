@@ -1,0 +1,539 @@
+import * as THREE from 'three'
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js'
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js'
+import { SHADOW_SIZES } from './shadows.js'
+import { createTiltShift } from './tiltshift.js'
+
+/** Safari and friends — not Chrome, which also says "Safari" in its user agent. */
+const IS_WEBKIT =
+  typeof navigator !== 'undefined' &&
+  /apple/i.test(navigator.vendor || '') &&
+  !/chrome|chromium|edg\//i.test(navigator.userAgent || '')
+
+/**
+ * Renderer, post chain, and the frame loop.
+ *
+ * Two things here are load-bearing for performance:
+ *
+ * 1. **The post chain is built lazily and torn down when off.** With bloom disabled the
+ *    composer is not merely skipped — it is disposed, so its float render targets stop
+ *    costing memory and bandwidth. Turning HDR off on a weak machine has to actually
+ *    give the memory back, not just stop drawing.
+ * 2. **Render scale is separate from device pixel ratio.** `setPixelRatio` alone cannot go
+ *    below 1 usefully on a retina panel, so the drawing buffer is sized directly. That is
+ *    the single biggest lever there is, and it is what the auto-quality governor pulls.
+ *
+ *    The setting is a fraction of *the display's own resolution*, not of CSS pixels: 100%
+ *    on a retina panel is 2 buffer pixels per CSS pixel. Reading it as CSS pixels is what
+ *    the earlier version did, and it quietly rendered every retina machine at half
+ *    resolution — text on the name plates and the badge glyphs magnify hardest, so they
+ *    are where a soft buffer shows up first.
+ */
+export class Engine {
+  constructor(settings) {
+    this.settings = settings
+    // Timer replaces the deprecated Clock. Connecting it to the document means a tab that
+    // has been in the background reports a zero delta rather than one enormous catch-up
+    // frame, so nothing in the colony teleports when you come back to it.
+    this.timer = new THREE.Timer()
+    this.timer.connect(document)
+    this.elapsed = 0
+    this.updaters = []
+    this.running = false
+
+    this.scene = new THREE.Scene()
+    this.camera = new THREE.PerspectiveCamera(settings.get('fov'), 1, 0.5, 900)
+
+    this.renderer = new THREE.WebGLRenderer({
+      antialias: false, // handled by SMAA in the post chain, or not at all
+      powerPreference: 'high-performance',
+      stencil: false,
+      depth: true,
+      /**
+       * Off everywhere it can be: preserving the buffer costs a full copy on every frame,
+       * forever, and the screenshot path already works around needing it.
+       *
+       * On WebKit it has to be on. Safari treats a window with another app in front of it
+       * as *hidden*, stops driving `requestAnimationFrame`, and then composites the canvas
+       * anyway — and a drawing buffer nobody has drawn into since the last composite is
+       * transparent black. The symptom is the whole colony blinking out for a frame every
+       * few seconds, but only while something is layered over the window, which is exactly
+       * the case where nothing is repainting it.
+       */
+      preserveDrawingBuffer: IS_WEBKIT,
+    })
+    this.renderer.setPixelRatio(1) // the drawing buffer is sized by hand, see resize()
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = settings.get('exposure')
+    // PCFSoftShadowMap is deprecated and silently downgraded by three anyway.
+    this.renderer.shadowMap.type = THREE.PCFShadowMap
+    this.renderer.info.autoReset = false
+
+    this.canvas = this.renderer.domElement
+    this.canvas.classList.add('bot-crossing-canvas')
+
+    this.composer = null
+    this.bloomPass = null
+    this.smaaPass = null
+    this.tiltShift = null
+    /** How far the view is orbiting; the focal plane sits here. Fed by the frame loop. */
+    this._focusDistance = 30
+
+    this.perf = new PerfMonitor()
+    this._boundLoop = this._loop.bind(this)
+    this._onResize = () => this.resize()
+
+    this.applySettings()
+  }
+
+  mount(parent) {
+    parent.appendChild(this.canvas)
+    window.addEventListener('resize', this._onResize)
+    // A window dragged between a retina and a non-retina display changes DPR with no resize.
+    this._dprQuery = matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
+    this._dprQuery.addEventListener?.('change', this._onResize)
+    // A page that loads in a background tab has a zero-width parent and no `resize` event
+    // coming, which would leave a one-pixel drawing buffer until the window happened to
+    // move. The observer fires the moment the element is actually laid out.
+    this._observer = new ResizeObserver(this._onResize)
+    this._observer.observe(parent)
+
+    // Coming back from hidden — a tab switch, or another window moving off this one — the
+    // compositor can ask for the canvas before the frame loop has run once. Drawing here
+    // rather than waiting for the next animation frame is what stops that moment being a
+    // black flash.
+    this._onWake = () => {
+      if (document.hidden || !this.running) return
+      this.resize()
+      this.renderFrame()
+    }
+    document.addEventListener('visibilitychange', this._onWake)
+    window.addEventListener('focus', this._onWake)
+    window.addEventListener('pageshow', this._onWake)
+
+    this.resize()
+    return this
+  }
+
+  add(updater) {
+    this.updaters.push(updater)
+    return updater
+  }
+
+  /**
+   * Point the renderer at a different world — the arcade swapping the campus for a game, and
+   * back again. The post chain's RenderPass captured the scene when it was built, so setting
+   * `engine.scene` on its own would leave bloom and tilt-shift still drawing the campus.
+   */
+  setScene(scene) {
+    this.scene = scene
+    for (const pass of this.composer?.passes || []) if (pass.isRenderPass) pass.scene = scene
+    return scene
+  }
+
+  /** Rebuilds only what a settings change actually invalidated. */
+  applySettings() {
+    const s = this.settings
+    const renderer = this.renderer
+
+    const size = SHADOW_SIZES[s.get('shadows')] || 0
+    renderer.shadowMap.enabled = size > 0
+    // A shadow map that changes size has to be thrown away or three keeps the old target.
+    if (this._shadowSize !== size) {
+      this._shadowSize = size
+      this.scene.traverse((o) => {
+        if (o.isLight && o.shadow?.map) {
+          o.shadow.map.dispose()
+          o.shadow.map = null
+          if (size) o.shadow.mapSize.setScalar(size)
+        }
+      })
+      renderer.shadowMap.needsUpdate = true
+    }
+
+    renderer.toneMappingExposure = s.get('exposure')
+    // a ride borrows a human field of view: the campus's narrow lens is for the miniature
+    // look from the air, and from a seat it magnifies the rail beside you into a wall
+    this.camera.fov = this.rideFov || s.get('fov')
+    this.camera.updateProjectionMatrix()
+
+    // rideBoost: anti-aliasing on for a ride, where thin posts a metre away shimmer otherwise
+    const aa = s.get('antialias') || Boolean(this.rideBoost)
+    const wantsPost = s.get('bloom') || aa || s.get('tiltShift')
+    if (wantsPost) this._ensureComposer()
+    else this._disposeComposer()
+
+    if (this.composer) {
+      if (this.bloomPass) {
+        this.bloomPass.enabled = s.get('bloom')
+        this.bloomPass.strength = s.get('bloomStrength')
+      }
+      if (this.smaaPass) this.smaaPass.enabled = aa
+      if (this.tiltShift) {
+        // suppressTiltShift: a ride turns the aerial depth-of-field off, since from a seat it
+        // smears every thin upright next to you (a balloon's rods, the ferry's posts) into a
+        // flickering bar; it comes back when you get off
+        this.tiltShift.enabled = s.get('tiltShift') && !this.suppressTiltShift
+        this.tiltShift.setStrength(s.get('tiltShiftStrength'))
+        this.tiltShift.setAngle(s.get('tiltShiftAngle'))
+        this.tiltShift.setCamera(this.camera)
+      }
+    }
+
+    // a new render scale from the settings panel is the user's call: the governor starts over
+    if (this._lastRenderScale !== s.get('renderScale')) {
+      this._lastRenderScale = s.get('renderScale')
+      this._governedScale = null
+      this._dropped = false
+    }
+    this.resize(true)
+  }
+
+  _ensureComposer() {
+    if (this.composer) return
+    // A depth texture on the target is what lets tilt-shift be a real depth of field rather
+    // than a screen-space smear. It costs one attachment, where asking three's own BokehPass
+    // for the same thing costs a second pass over the entire scene.
+    const depthTexture = new THREE.DepthTexture(1, 1)
+    depthTexture.type = THREE.UnsignedIntType
+    const target = new THREE.WebGLRenderTarget(1, 1, {
+      type: THREE.HalfFloatType, // HDR: values above 1 survive to the bloom pass
+      colorSpace: THREE.LinearSRGBColorSpace,
+      samples: 0,
+      depthBuffer: true,
+      stencilBuffer: false,
+      depthTexture,
+    })
+    const composer = new EffectComposer(this.renderer, target)
+    composer.addPass(new RenderPass(this.scene, this.camera))
+
+    // A high threshold is what keeps this an accent rather than a haze: only the eyes,
+    // lamps, sparks and the sun's disc clear it, so lit surfaces stay crisp.
+    this.bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), this.settings.get('bloomStrength'), 0.55, 0.92)
+    composer.addPass(this.bloomPass)
+    // One NaN pixel anywhere in the scene (a degenerate normal, a zero-length vector on some
+    // GPU) gets blurred by the bloom mips across a huge rectangle, and NaN added to the frame
+    // renders black: that was the black bar. The glow only ever reads sanitized light.
+    {
+      const hp = this.bloomPass.materialHighPassFilter
+      const line = 'vec4 texel = texture2D( tDiffuse, vUv );'
+      if (hp.fragmentShader.includes(line)) {
+        hp.fragmentShader = hp.fragmentShader.replace(line, `${line}
+          if ( any( isnan( texel ) ) || any( isinf( texel ) ) ) texel = vec4( 0.0 );
+          texel.rgb = min( texel.rgb, vec3( 64.0 ) );`)
+        hp.needsUpdate = true
+      } else console.warn('[engine] bloom high-pass shader changed; NaN guard not applied')
+    }
+
+    // After bloom, so an out-of-focus lamp keeps its glow and the glow goes soft with it
+    // — blurring first would drop those pixels under the bloom threshold and switch the
+    // glow off exactly where the eye expects the most of it. Still before OutputPass, so
+    // the blur averages linear HDR values rather than tone-mapped ones.
+    this.tiltShift = createTiltShift()
+    for (const pass of this.tiltShift.passes) composer.addPass(pass)
+    // RenderPass and the bloom pass both leave their result in the composer's *read* buffer
+    // and neither asks for a swap, so renderTarget2 is what actually holds the scene — and
+    // its depth texture is the clone that got written, not the one handed in above.
+    // Deliberately not bound to a fixed target here — see `_syncDepthTexture`.
+    this.tiltShift.enabled = this.settings.get('tiltShift')
+    this.tiltShift.setStrength(this.settings.get('tiltShiftStrength'))
+    this.tiltShift.setAngle(this.settings.get('tiltShiftAngle'))
+    this.tiltShift.setCamera(this.camera)
+    this.tiltShift.setFocusDistance(this._focusDistance)
+
+    // OutputPass is what applies tone mapping + sRGB once, at the end of the chain.
+    composer.addPass(new OutputPass())
+
+    this.smaaPass = new SMAAPass(1, 1)
+    composer.addPass(this.smaaPass)
+
+    this.composer = composer
+  }
+
+  _disposeComposer() {
+    if (!this.composer) return
+    this.composer.renderTarget1?.dispose()
+    this.composer.renderTarget2?.dispose()
+    for (const pass of this.composer.passes) pass.dispose?.()
+    this.composer = null
+    this.bloomPass = null
+    this.smaaPass = null
+    this.tiltShift = null
+  }
+
+  resize(force = false) {
+    const parent = this.canvas.parentElement
+    if (!parent) return
+    const w = Math.max(1, parent.clientWidth)
+    const h = Math.max(1, parent.clientHeight)
+
+    this.camera.aspect = w / h
+    this.camera.updateProjectionMatrix()
+
+    // once the governor has lowered the scale it stays lowered: resetting it here on every
+    // focus or layout event made the governor drop it again a few seconds later, and each of
+    // those resizes blanked a frame
+    const scale = Math.min(this._targetScale(), this._governedScale ?? Infinity)
+    const bw = Math.max(1, Math.round(w * scale))
+    const bh = Math.max(1, Math.round(h * scale))
+    // setting a canvas's size clears it, even to the same size: skip when nothing changed
+    if (!force && this.viewport && this.viewport.bw === bw && this.viewport.bh === bh && this.viewport.w === w && this.viewport.h === h) return
+
+    // Only the drawing buffer is sized here. The element's own size is left to the CSS
+    // (`position: absolute; inset: 0`), because a hand-written width is a second opinion
+    // about how big the canvas is — and the moment the two disagree, the scene is drawn to
+    // one rectangle while every panel is positioned against the other.
+    this.renderer.setSize(bw, bh, false)
+    this.composer?.setSize(bw, bh)
+    this.tiltShift?.setSize(bw, bh)
+      this.tiltShift?.setCamera(this.camera)
+    this.viewport = { w, h, bw, bh, scale }
+    // a resize can land after this frame was drawn (a ResizeObserver runs after animation
+    // frames): draw again now so the compositor never presents the cleared canvas
+    if (this.running && !this.renderer.xr?.isPresenting) this.renderFrame()
+  }
+
+  /**
+   * Buffer pixels per CSS pixel. `renderScale` is a share of what the display can actually
+   * show, so 100% is native on any panel and 50% is half of it either way.
+   */
+  /**
+   * Point the depth-of-field pass at the depth that was actually just written.
+   *
+   * This cannot be wired once at build time. `EffectComposer` keeps its read/write buffers
+   * between frames, and this chain performs an odd number of swaps, so the two targets trade
+   * places every frame — and `RenderPass` always draws into whichever is currently the *read*
+   * buffer. Binding one target's depth texture permanently therefore samples the previous
+   * frame's depth on every other frame, which shows up as the whole picture strobing between
+   * sharp and smeared rather than as anything recognisable as a depth-of-field bug.
+   */
+  _syncDepthTexture() {
+    if (this.tiltShift && this.composer) {
+      this.tiltShift.setDepthTexture(this.composer.readBuffer.depthTexture)
+    }
+  }
+
+  /** What the view is looking at, so the plane of focus can sit on it. */
+  setFocusDistance(distance) {
+    this._focusDistance = distance
+    this.tiltShift?.setFocusDistance(distance)
+  }
+
+  _targetScale() {
+    return this.settings.get('renderScale') * (window.devicePixelRatio || 1)
+  }
+
+  start() {
+    if (this.running) return
+    this.running = true
+    this.timer.reset()
+    this.renderer.setAnimationLoop(this._boundLoop)
+  }
+
+  stop() {
+    this.running = false
+    this.renderer.setAnimationLoop(null)
+  }
+
+  _loop() {
+    this.timer.update()
+    // The timer already zeroes the delta across a hidden tab; the clamp is the backstop for
+    // an ordinary long frame, so one stalled frame never jumps the whole colony forward.
+    const dt = Math.min(this.timer.getDelta(), 0.1)
+    this.elapsed += dt
+
+    for (const u of this.updaters) u.update?.(dt, this.elapsed)
+
+    this.renderer.info.reset()
+    // Inside a headset the post chain is skipped: WebXR renders both eyes itself, and
+    // resizing the drawing buffer mid-session is not ours to do.
+    const presenting = this.renderer.xr?.isPresenting
+    if (!presenting && this.composer && (this.settings.get('bloom') || this.settings.get('antialias') || this.rideBoost || this.settings.get('tiltShift'))) {
+      this._syncDepthTexture()
+      this.composer.render(dt)
+    } else {
+      this.renderer.render(this.scene, this.camera)
+    }
+
+    this.perf.sample(dt, this.renderer.info)
+    if (!presenting && this.settings.get('autoQuality')) this._governQuality()
+    if (!presenting) this._checkFit()
+  }
+
+  /**
+   * Self-heal: if a resize was ever missed (a window snapped, a monitor change, a tab restored)
+   * or the browser gave the canvas a smaller drawing buffer than asked for, the scene draws into
+   * only part of the canvas and the rest reads as a black bar. Twice a second, compare and refit.
+   */
+  _checkFit() {
+    const now = performance.now()
+    if (now - (this._fitAt || 0) < 500) return
+    this._fitAt = now
+    const parent = this.canvas.parentElement
+    const vp = this.viewport
+    if (!parent || !vp) return
+    const gl = this.renderer.getContext()
+    const clamped = gl.drawingBufferWidth < this.canvas.width || gl.drawingBufferHeight < this.canvas.height
+    if (clamped) {
+      // ask for what the GPU will actually give, keeping the aspect
+      const k = Math.min(gl.drawingBufferWidth / this.canvas.width, gl.drawingBufferHeight / this.canvas.height)
+      this._governedScale = Math.max(0.3, vp.scale * k * 0.98)
+      this.resize(true)
+      return
+    }
+    if (parent.clientWidth !== vp.w || parent.clientHeight !== vp.h || this.canvas.width !== vp.bw || this.canvas.height !== vp.bh) this.resize(true)
+  }
+
+  /**
+   * Draw one frame without stepping the simulation. Used by the screenshot path, which has
+   * to read the drawing buffer in the same task as the draw that filled it — the alternative
+   * is `preserveDrawingBuffer`, which costs a full copy on every frame forever.
+   */
+  /**
+   * One frame at a size of your choosing, returned as a PNG data URL — a poster-sized
+   * still rather than a screen grab. The drawing buffer and the post chain are resized,
+   * drawn once, read, and put straight back; the canvas element keeps its CSS size the
+   * whole time, so nothing on screen moves. The read has to happen before the restore,
+   * because resizing the buffer clears it.
+   */
+  renderAt(bw, bh) {
+    const prev = this.viewport
+    const apply = (w, h) => {
+      this.renderer.setSize(w, h, false)
+      this.composer?.setSize(w, h)
+      this.tiltShift?.setSize(w, h)
+    }
+    apply(bw, bh)
+    let url = ''
+    try {
+      this.renderFrame()
+      url = this.canvas.toDataURL('image/png')
+    } finally {
+      apply(prev.bw, prev.bh)
+      this.tiltShift?.setCamera(this.camera)
+      this.viewport = prev
+      this.renderFrame()
+    }
+    return url
+  }
+
+  renderFrame() {
+    this.renderer.info.reset()
+    if (this.composer && (this.settings.get('bloom') || this.settings.get('antialias') || this.rideBoost || this.settings.get('tiltShift'))) {
+      this._syncDepthTexture()
+      this.composer.render(0)
+    } else {
+      this.renderer.render(this.scene, this.camera)
+    }
+  }
+
+  /**
+   * Adaptive render scale. Never touches the setting the user chose; it scales *under* it.
+   *
+   * Every move resizes the drawing buffer and rebuilds the post chain's render targets,
+   * which is a visible event — on WebKit it can cost a black frame outright. So the bar for
+   * moving is deliberately high: a full second between samples, several consecutive samples
+   * agreeing before anything changes, and a long cooldown before it climbs back after a
+   * drop. A governor that reacts to one bad second finds the boundary and then sits on it,
+   * resizing back and forth for as long as you leave the window open.
+   */
+  _governQuality() {
+    const now = performance.now()
+    if (now - (this._lastGovern || 0) < 1000) return
+    this._lastGovern = now
+
+    const fps = this.perf.fps
+    if (fps <= 0) return
+    // A window that is hidden, occluded or simply not focused gets its animation frames
+    // throttled by the browser. Those slow frames say nothing about the GPU, and reacting
+    // to them is how a colony left open on a second monitor quietly turns to mush.
+    if (document.hidden || (typeof document.hasFocus === 'function' && !document.hasFocus())) {
+      this._slow = 0
+      return
+    }
+    const ceiling = this._targetScale()
+    const current = this.viewport?.scale ?? ceiling
+    // The floor is half the display's own resolution, not half a CSS pixel: on a retina
+    // panel the old absolute 0.5 was a quarter-resolution buffer, which reads as broken
+    // rather than as a machine having a hard time.
+    // Never below 60% of the display: lower reads as out of focus, not as a slow machine.
+    const floor = 0.6 * (window.devicePixelRatio || 1)
+
+    // Sustained evidence, not one sample: 3 slow seconds to drop, 8 fast ones to climb.
+    this._slow = fps < 45 ? (this._slow || 0) + 1 : 0
+    this._fast = fps > 58 ? (this._fast || 0) + 1 : 0
+    const dpr = window.devicePixelRatio || 1
+
+    let next = current
+    if (this._slow >= 3) {
+      next = Math.max(floor, current - 0.15 * dpr)
+      this._slow = 0
+      // One way only on the campus: a heavy scene sits right on the boundary, and climbing
+      // back is what made it resize every few seconds, which read as the screen flickering.
+      this._dropped = true
+      // Having just proved this machine cannot hold the higher scale, do not go back and
+      // ask it again ten seconds later — that is the oscillation.
+      this._climbAt = now + 8000
+    } else if (this._fast >= 8 && current < ceiling && now >= (this._climbAt || 0) && !this._dropped) {
+      next = Math.min(ceiling, current + 0.2 * dpr)
+      this._fast = 0
+    }
+
+    if (Math.abs(next - current) > 0.01) {
+      const parent = this.canvas.parentElement
+      if (!parent) return
+      const bw = Math.max(1, Math.round(parent.clientWidth * next))
+      const bh = Math.max(1, Math.round(parent.clientHeight * next))
+      this.renderer.setSize(bw, bh, false)
+      this.composer?.setSize(bw, bh)
+      this.tiltShift?.setSize(bw, bh)
+      this.tiltShift?.setCamera(this.camera)
+      this.viewport = { ...this.viewport, bw, bh, scale: next }
+      this._governedScale = next
+      this.autoScaled = next < ceiling - 0.01
+      // setSize clears the buffer after this frame was drawn; draw again now so the compositor
+      // never presents the cleared canvas
+      this.renderFrame()
+    }
+  }
+
+  dispose() {
+    this.stop()
+    this.timer.dispose()
+    window.removeEventListener('resize', this._onResize)
+    this._dprQuery?.removeEventListener?.('change', this._onResize)
+    this._observer?.disconnect()
+    document.removeEventListener('visibilitychange', this._onWake)
+    window.removeEventListener('focus', this._onWake)
+    window.removeEventListener('pageshow', this._onWake)
+    this._disposeComposer()
+    this.renderer.dispose()
+  }
+}
+
+/** Rolling frame stats — an EMA so the readout does not flicker on a single slow frame. */
+class PerfMonitor {
+  constructor() {
+    this.fps = 0
+    this.frameMs = 0
+    this.drawCalls = 0
+    this.triangles = 0
+    this._frames = 0
+  }
+
+  sample(dt, info) {
+    const ms = dt * 1000
+    const k = this._frames < 10 ? 0.3 : 0.06
+    this.frameMs += (ms - this.frameMs) * k
+    this.fps = this.frameMs > 0 ? 1000 / this.frameMs : 0
+    this._frames++
+    if (this._frames % 10 === 0) {
+      this.drawCalls = info.render.calls
+      this.triangles = info.render.triangles
+    }
+  }
+}

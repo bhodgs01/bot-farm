@@ -1,0 +1,12 @@
+{
+  "name": "campus-engine",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "The shared three.js render pipeline behind Unlimited Campus, the School of Brain and the Bot Farm.",
+  "license": "MIT",
+  "main": "index.js",
+  "peerDependencies": {
+    "three": "^0.185.0"
+  }
+}
