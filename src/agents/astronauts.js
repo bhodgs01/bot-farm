@@ -195,8 +195,26 @@ function rewind(geo) {
   return geo
 }
 
+/**
+ * Proportion fixes, from looking at the crew rather than measuring them.
+ *
+ * The chest plate was authored 0.66 wide and 0.32 deep against a torso that is 0.73 by 0.52, so
+ * the dark endoskeleton showed through the front and sides of every robot — it read as a black
+ * body with a white bib rather than as armour. It is opened out to cover what it is meant to
+ * cover, front especially, since the back is already behind the compute pack.
+ *
+ * The eye was asked for as "a small emissive eye bar or twin sensors" and came back as a torus
+ * round the whole head. Unlit, pushed past 1.0 and picked up by the bloom pass, a full
+ * perimeter ring at night turned every head into a headlamp and swamped the sensor face behind
+ * it. Shrunk to a ring that sits inside the face, where it reads as an eye.
+ */
+const PROPORTION = {
+  chestPlate: (geo) => geo.scale(1.18, 1, 1.4).translate(0, 0, 0.02),
+  headLamp: (geo) => geo.scale(0.4, 0.4, 1),
+}
+
 /** Per-part corrections, applied once at build time. */
-const PART_FIX = {}
+const PART_FIX = { ...PROPORTION }
 for (const [name, f] of Object.entries(LIMB_FIT)) {
   PART_FIX[name] = (geo) => rewind(geo.scale(1, -f.k, 1).translate(0, f.y, 0))
 }
@@ -1342,7 +1360,7 @@ export class Astronauts {
         agent.status === 'blocked'
           ? (Math.sin(elapsed * 9) > 0.2 ? 1 : 0.05)
           : 0.55 + 0.45 * Math.sin(elapsed * 2.6 + agent.phase)
-      this.robotGlow.eye.setColorAt(i, c.copy(agent.eye).multiplyScalar(0.6 + pulse * 1.1))
+      this.robotGlow.eye.setColorAt(i, c.copy(agent.eye).multiplyScalar(0.35 + pulse * 0.55))
       this.robotGlow.core.setColorAt(i, c.copy(agent.trim).multiplyScalar(0.7 + pulse * 1.6))
 
       // Atlas frame for the face.
