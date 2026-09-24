@@ -6,6 +6,8 @@
  * of keys that moved, so the renderer can rebuild only what actually needs rebuilding.
  */
 
+import { SHADOW_SIZES } from '../engine/index.js'
+
 const STORE_KEY = 'botcrossing.settings.v1'
 /** Pre-rename key. Read once so an existing colony keeps the settings it was tuned to. */
 const LEGACY_STORE_KEY = 'cosmo.settings.v1'
@@ -116,7 +118,7 @@ export const PRESETS = {
   },
 }
 
-export const SHADOW_SIZES = { off: 0, low: 1024, high: 2048, ultra: 4096 }
+export { SHADOW_SIZES } // the engine's own table, so the presets and the shadow maps agree
 const TEXTURE_SIZES = { low: 256, medium: 512, high: 1024, ultra: 1024 }
 const PARTICLE_BUDGET = { off: 0, low: 900, full: 3000 }
 
