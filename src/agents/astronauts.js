@@ -2,6 +2,7 @@ import * as THREE from 'three'
 import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js'
 import { buildFaceAtlas, FACE, FACE_LOOPS, FRAME_COLS, FRAME_ROWS } from './faces.js'
 import { attachMatrixAt, decorateSkinned, frameFor } from './crew.js'
+import { PARTS as ROBOT_PARTS, MANIFEST as ROBOT_MANIFEST } from './robot-parts.js'
 
 /**
  * Every astronaut in the colony, drawn in seven draw calls.
@@ -120,20 +121,100 @@ function hatFor(t) {
  * units — the root transform carries CREW_SCALE, so everything downstream of a bone is
  * measured in the rig's space and stays put if that scale is ever retuned.
  */
+/**
+ * Fitting the hardware to the rig it is actually worn on.
+ *
+ * The parts were authored without the rest pose in hand, so two things about the limbs were
+ * guessed and both were wrong. A bone's child sits at **+Y**, not -Y, so every limb plate and
+ * both grippers were mirrored onto the empty side of their joint — a bicep plate standing up
+ * out of the shoulder. And the guessed limb lengths were off in both directions: the thigh was
+ * assumed half again as long as it is, the forearm rather shorter.
+ *
+ * The numbers below are not guesses either. `tools/fit-hardware.mjs` reads crew.glb, works out
+ * which mannequin vertices each bone actually owns, and expresses that flesh in the bone's own
+ * frame — the flesh, not the bone-to-child span, because those differ a lot: the foot bone
+ * reaches its toe joint in 0.149 but the foot itself is 0.33 long. Each plate is then mirrored
+ * and fitted to the flesh it covers, 0.012 proud at each end so it reads as armour bolted over
+ * an endoskeleton rather than a sleeve drawn on it. Re-run that script if the rig ever changes.
+ *
+ * Mirroring by a negative scale reverses every triangle's winding, which would turn each plate
+ * inside out under backface culling, so the index is re-wound afterwards. Only Y moves: front
+ * stays front.
+ */
+const LIMB_FIT = {
+  'upperArmPlate.l': { k: 1.0769, y: -0.1559 },
+  'upperArmPlate.r': { k: 1.0769, y: -0.1559 },
+  'foreArmPlate.l': { k: 1.2962, y: -0.0601 },
+  'foreArmPlate.r': { k: 1.3589, y: -0.08 },
+  'handUnit.l': { k: 1.1249, y: -0.0124 },
+  'handUnit.r': { k: 1.1249, y: -0.0124 },
+  'thighPlate.l': { k: 0.6269, y: -0.0298 },
+  'thighPlate.r': { k: 0.6269, y: -0.0298 },
+  'shinPlate.l': { k: 0.61, y: -0.0764 },
+  'shinPlate.r': { k: 0.61, y: -0.0764 },
+}
+
+/**
+ * The feet were authored the way a foot sits in the world — sole down at -Y, toe forward at +Z —
+ * but the foot bone is not framed that way: it is rolled most of the way round, because the
+ * ankle carries the whole angle between shin and sole. Rolling the part back through that angle
+ * lays the sole on the ground and points the toe where the toe bone is.
+ *
+ * The pad came out almost exactly foot-sized on its own, so it is only widened a fifth to cover
+ * the flesh, and the offsets are nearly nothing — which is the sign the roll is right. An
+ * earlier sign slip rolled it 44 degrees instead of 136, and because those are reflections of
+ * each other about the diagonal the bounding box barely changed: same size, foot at right
+ * angles to itself, sole through the floor. Check where the sole lands, not how big the box is.
+ */
+const FOOT_FIT = { rx: -2.3744, sx: 1.2, x: 0.0168, y: 0.0115, z: 0.0045 }
+
+/** Re-wind every triangle, after a negative scale has turned them all inside out. */
+function rewind(geo) {
+  const idx = geo.getIndex()
+  if (idx) {
+    const a = idx.array
+    for (let i = 0; i < a.length; i += 3) {
+      const t = a[i]
+      a[i] = a[i + 2]
+      a[i + 2] = t
+    }
+    idx.needsUpdate = true
+  } else {
+    const pos = geo.attributes.position.array
+    for (let i = 0; i < pos.length; i += 9) {
+      for (let c = 0; c < 3; c++) {
+        const t = pos[i + c]
+        pos[i + c] = pos[i + 6 + c]
+        pos[i + 6 + c] = t
+      }
+    }
+    geo.attributes.position.needsUpdate = true
+  }
+  geo.computeVertexNormals()
+  return geo
+}
+
+/** Per-part corrections, applied once at build time. */
+const PART_FIX = {}
+for (const [name, f] of Object.entries(LIMB_FIT)) {
+  PART_FIX[name] = (geo) => rewind(geo.scale(1, -f.k, 1).translate(0, f.y, 0))
+}
+for (const side of ['l', 'r']) {
+  const sx = side === 'l' ? -FOOT_FIT.x : FOOT_FIT.x
+  PART_FIX[`footPad.${side}`] = (geo) =>
+    geo.rotateX(FOOT_FIT.rx).scale(FOOT_FIT.sx, 1, 1).translate(sx, FOOT_FIT.y, FOOT_FIT.z)
+}
+
 const P = {
   helmetR: 0.48,
   headUp: 0.46, // the head bone sits at the neck; the helmet centres above it
-  packZ: -0.3,
-  packUp: 0.06,
-  // The antenna stands on the crown of the helmet rather than out of its side, so it reads
-  // at the distance the colony is normally looked at instead of turning into a loose speck.
-  antX: 0.16,
-  antY: 0.88,
-  antZ: -0.05,
-  tipX: 0.2,
-  tipY: 1.14,
-  lightZ: 0.26,
-  lightY: 0.05,
+  // The features on the robot's sensor disc. A shallow cap off a small sphere, pushed back so
+  // its crown lands at z 0.06 — a whisker proud of the dark face at 0.049 — and spanning
+  // about 0.20 by 0.12, which is the width of the disc rather than the width of a helmet.
+  faceR: 0.26,
+  faceW: 0.79,
+  faceH: 0.47,
+  faceZ: 0.06 - 0.26,
   // The hammer, in the right hand's own frame. The hand bone's own +Y runs back down the
   // forearm, so the shaft is turned through half a circle to stand the head up out of the
   // fist rather than hang it through the floor.
@@ -191,30 +272,38 @@ export class Astronauts {
     // rig is ever scaled again.
     const R = P.helmetR
 
-    // Helmet shell.
-    const helmetGeo = new THREE.SphereGeometry(R, 16, 11)
-    parts.helmet = this._mesh(helmetGeo, suit(0.26, { metalness: 0.03, envMapIntensity: 1.35 }), capacity, false)
-
-    // Visor: a dark screen wrapped onto the helmet. The patch itself is a rectangle in UV
-    // space, so its rounded silhouette is cut in the fragment shader instead — a squircle
-    // SDF, which gives soft corners a rectangular patch can never have, and lets the white
-    // helmet show through where the screen ends.
-    const visorGeo = sphereCap(R * 1.032, 2.45, Math.PI * 0.62, 20, 14)
-    parts.visor = this._mesh(visorGeo, this._visorMaterial(), capacity, false)
-
-    // Backpack + a life-support cylinder on each side.
-    const packGeo = roundedBox(R * 0.89, R * 0.98, R * 0.55, R * 0.19)
-    parts.pack = this._mesh(packGeo, suit(0.66), capacity, true)
-
-    const antGeo = new THREE.CylinderGeometry(R * 0.042, R * 0.053, R * 0.57, 4)
-    antGeo.translate(0, R * 0.285, 0)
-    parts.antenna = this._mesh(antGeo, suit(0.24, { metalness: 0.95 }), capacity, false)
-
-    // The blinking bits: antenna tip and chest lamp. Unlit and pushed past 1.0 so they
-    // are the things the bloom pass picks out at night.
+    // The hardware. Twenty-three rigid parts — head shell, sensor face, chest armour, limb
+    // plating, grippers, feet — each authored around one named bone and each its own
+    // instanced draw call for the whole crew. The mannequin underneath is still the thing
+    // that moves; these just ride its bones.
+    //
+    // Unlit and pushed past 1.0 for the two emissive parts, so the eye halo and the chest
+    // strip are what the bloom pass picks out at night.
     const glowMat = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: true })
-    parts.tip = this._mesh(new THREE.SphereGeometry(R * 0.125, 6, 4), glowMat, capacity, false)
-    parts.lamp = this._mesh(new THREE.SphereGeometry(R * 0.16, 6, 5), glowMat.clone(), capacity, false)
+    const byBone = new Map()
+    for (const [name, spec] of Object.entries(ROBOT_MANIFEST)) {
+      const geo = PART_FIX[name] ? PART_FIX[name](ROBOT_PARTS[name]()) : ROBOT_PARTS[name]()
+      const mat =
+        spec.role === 'glow'
+          ? glowMat.clone()
+          : name === 'headVisor'
+            ? // The sensor face. Near-black and glossy on every robot whatever its colour,
+              // because a coloured face reads as a painted mask rather than glass.
+              new THREE.MeshStandardMaterial({ color: 0x0a0b10, roughness: 0.16, metalness: 0.3, envMapIntensity: 1.6 })
+            : spec.role === 'trim'
+              ? // The dark machined finish: actuators, packs, cable runs, grippers, feet.
+                suit(0.34, { metalness: 0.55 })
+              : suit(0.42, { metalness: 0.12, envMapIntensity: 1.2 })
+      parts[name] = this._mesh(geo, mat, capacity, spec.role === 'suit')
+      if (!byBone.has(spec.bone)) byBone.set(spec.bone, [])
+      // 'fixed' keeps the sensor face out of the per-robot tinting below.
+      const role = name === 'headVisor' ? 'fixed' : spec.role
+      byBone.get(spec.bone).push({ name, mesh: parts[name], role, o: spec.offset, r: spec.rot })
+    }
+    // Grouped by bone so a frame reads each bone's matrix out of the baked table once
+    // rather than twenty-three times.
+    this.robotByBone = [...byBone.entries()].map(([bone, items]) => ({ bone, items }))
+    this.robotGlow = { eye: parts.headLamp, core: parts.chestCore }
 
     // The hammer, held in the right hand while a thread is running. Wood and steel rather
     // than suit white, so it reads as a tool at the distance the colony is watched from.
@@ -232,7 +321,11 @@ export class Astronauts {
     // a hair larger than the visor, so it lies exactly on the curved surface instead of
     // clipping through it — a flat plane at this radius sinks inside the sphere and the
     // features disappear.
-    const faceGeo = sphereCap(P.helmetR * 1.047, 1.72, 0.98, 16, 10)
+    // The features sit on the robot's sensor face rather than a helmet visor, so the cap is
+    // much smaller and much flatter: a shallow patch off a 0.26 sphere, pushed back so its
+    // crown lands just proud of the dark disc at z 0.06. Still a cap and not a plane —
+    // a plane at this radius sinks inside the shell and the features vanish.
+    const faceGeo = sphereCap(P.faceR, P.faceW, P.faceH, 16, 10)
     parts.face = this._mesh(faceGeo, this._faceMaterial(), capacity, false)
     this._attachFrameAttribute(parts.face, capacity)
 
@@ -254,9 +347,10 @@ export class Astronauts {
    * Hand over the baked crew rig and build the body mesh.
    *
    * Split out from the constructor because the rig is a fetch: the colony is built before
-   * boot has finished loading, and until this lands the crew is helmets and backpacks with
-   * nothing between them — which is fine, because no agent exists until the first roster
-   * arrives, and that comes after.
+   * boot has finished loading, and until this lands the crew is loose plating with nothing
+   * between it — which is fine, because no agent exists until the first roster arrives, and
+   * that comes after. It also means `_buildMeshes` has always run by the time this does,
+   * which is what lets the bone lookup below read the hardware's bone list.
    */
   setRig(rig) {
     if (!rig || this.rig === rig) return
@@ -306,6 +400,15 @@ export class Astronauts {
     this.chestSlot = rig.attachSlot.get('chest') ?? 0
     this.handSlot = rig.attachSlot.get('hand.r') ?? 0
 
+    // Every bone the hardware hangs off, looked up once. A missing bone would silently
+    // collapse its parts onto the head, so say so instead.
+    this.boneSlot = {}
+    for (const g of this.robotByBone || []) {
+      const slot = rig.attachSlot.get(g.bone)
+      if (slot === undefined) console.warn(`crew: no bone "${g.bone}" in the rig`)
+      this.boneSlot[g.bone] = slot ?? this.headSlot
+    }
+
     // Where the helmet sits above the ground at rest, in world units. The picker aims here
     // rather than at the feet, so a click lands on the part of an astronaut you are looking
     // at — and reading it off the rig means it follows CREW_SCALE without a second constant.
@@ -336,52 +439,16 @@ export class Astronauts {
   }
 
   /**
-   * The visor. A rounded-rectangle SDF in the patch's own UV space decides what is screen and
-   * what is helmet, and a thin band just inside the edge is lifted to read as a bezel.
-   */
-  _visorMaterial() {
-    const mat = new THREE.MeshStandardMaterial({ color: 0x08090e, roughness: 0.3, metalness: 0.16 })
-    mat.onBeforeCompile = (shader) => {
-      shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', `#include <common>\n varying vec2 vVisorUv;`)
-        .replace('#include <begin_vertex>', `#include <begin_vertex>\n vVisorUv = uv;`)
-
-      shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', `#include <common>\n varying vec2 vVisorUv;`)
-        .replace(
-          '#include <clipping_planes_fragment>',
-          `#include <clipping_planes_fragment>
-           // Rounded-box SDF: |max(q,0)| + min(max(q.x,q.y),0) - r, the standard 2D form.
-           vec2 p = ( vVisorUv - 0.5 ) * 2.0;
-           // "half" is a reserved word in GLSL ES; a variable named that will not compile.
-           vec2 halfSize = vec2( 0.86, 0.80 );
-           float radius = 0.52;
-           vec2 q = abs( p ) - halfSize + radius;
-           float sd = length( max( q, 0.0 ) ) + min( max( q.x, q.y ), 0.0 ) - radius;
-           if ( sd > 0.0 ) discard;
-           float bezel = smoothstep( -0.14, -0.01, sd );`
-        )
-        .replace(
-          '#include <emissivemap_fragment>',
-          `#include <emissivemap_fragment>
-           // A cool rim right at the cut, so the screen reads as set into a bezel.
-           totalEmissiveRadiance += vec3( 0.16, 0.22, 0.34 ) * bezel;`
-        )
-    }
-    return mat
-  }
-
-  /**
    * The face material. The atlas is a mask, so the shader ignores the sampled colour
    * entirely: the red channel becomes *alpha* and the instance's own colour becomes the
    * glow, which is how every astronaut gets a different eye colour from one shared texture.
    *
-   * The dark panel behind the features is the *visor*, which is a rounded shape cut by an
-   * SDF. This cap used to paint its own dark background as well, and because the cap is a
-   * rectangle that second background showed as a rectangle sitting on the rounded one —
-   * two panels, the corners of the upper one clipping out of the lower. Carrying alpha in
-   * the mask instead means the only thing this draws is the features themselves, so the
-   * visor's own silhouette is the only edge there is.
+   * The dark panel behind the features is the robot's own sensor disc, a separate part. This
+   * cap used to paint its own dark background as well, and because the cap is a rectangle
+   * that second background showed as a rectangle sitting on the round one — two panels, the
+   * corners of the upper one clipping out of the lower. Carrying alpha in the mask instead
+   * means the only thing this draws is the features themselves, so the disc's own silhouette
+   * is the only edge there is.
    *
    * `depthWrite` is off because this is transparent now: with it on, the cap would write
    * depth across its whole rectangle and punch a hole in anything drawn behind it later.
@@ -1187,7 +1254,7 @@ export class Astronauts {
   // ── writing the instance buffers ────────────────────────────────────────────────────
 
   _writeMatrices(elapsed, anim) {
-    const { helmet, visor, pack, antenna, tip, lamp, face, hammer } = this.parts
+    const { face, hammer } = this.parts
     const rig = this.rig
     const crew = this.crew
     const root = this._m
@@ -1227,20 +1294,20 @@ export class Astronauts {
       // Everything worn hangs off a bone at the frame the body is actually on, so a helmet
       // cannot drift off a head that is looking down or lying on the ground.
       if (rig) {
-        attachMatrixAt(rig, agent.frame, this.headSlot, bone)
-        worn.multiplyMatrices(root, bone)
-        setPart(child, worn, helmet, i, 0, P.headUp, 0, 0, 0, 0)
-        setPart(child, worn, visor, i, 0, P.headUp, 0, 0, 0, 0)
-        setPart(child, worn, face, i, 0, P.headUp, 0, 0, 0, 0)
-        setPart(child, worn, antenna, i, P.antX, P.antY, P.antZ, 0.06, 0, -0.12)
-        setPart(child, worn, tip, i, P.tipX, P.tipY, P.antZ, 0, 0, 0)
-        const hat = hatFor(agent.thread)
-        if (hat) setPart(child, worn, this.parts[`hat_${hat}`], hats[hat]++, 0, P.headUp + P.helmetR * 0.82, 0, 0, 0, 0)
-
-        attachMatrixAt(rig, agent.frame, this.chestSlot, bone)
-        worn.multiplyMatrices(root, bone)
-        setPart(child, worn, pack, i, 0, P.packUp, P.packZ, 0, 0, 0)
-        setPart(child, worn, lamp, i, 0, P.lightY, P.lightZ, 0, 0, 0)
+        // Each bone's matrix is read once, then everything bolted to it is placed off that
+        // same matrix — head shell, chest armour, a shin plate, a foot.
+        for (const g of this.robotByBone) {
+          attachMatrixAt(rig, agent.frame, this.boneSlot[g.bone], bone)
+          worn.multiplyMatrices(root, bone)
+          for (const part of g.items) {
+            setPart(child, worn, part.mesh, i, part.o[0], part.o[1], part.o[2], part.r[0], part.r[1], part.r[2])
+          }
+          if (g.bone === 'head') {
+            setPart(child, worn, face, i, 0, P.headUp, P.faceZ, 0, 0, 0)
+            const hat = hatFor(agent.thread)
+            if (hat) setPart(child, worn, this.parts[`hat_${hat}`], hats[hat]++, 0, P.headUp + 0.26, 0, 0, 0, 0)
+          }
+        }
 
         // The hammer only exists while a thread is running, so it gets its own instance
         // counter — an unused slot in the middle of an instanced mesh still draws.
@@ -1256,9 +1323,15 @@ export class Astronauts {
       const c = this._color
       if (agent.index !== i || agent.colorDirty) {
         agent.colorDirty = false
-        crew?.setColorAt(i, c.setHex(agent.suit))
-        helmet.setColorAt(i, c.setHex(agent.suit))
-        pack.setColorAt(i, agent.trim)
+        // The mannequin underneath is the endoskeleton: kept dark whatever the robot's
+        // colour, so where the plating leaves a gap you see machine rather than bare paint.
+        crew?.setColorAt(i, c.setHex(0x23262d))
+        for (const g of this.robotByBone) {
+          for (const part of g.items) {
+            if (part.role === 'suit') part.mesh.setColorAt(i, c.setHex(agent.suit))
+            else if (part.role === 'trim') part.mesh.setColorAt(i, c.copy(agent.trim).multiplyScalar(0.45))
+          }
+        }
         face.setColorAt(i, agent.eye)
         staticDirty = true
       }
@@ -1268,8 +1341,8 @@ export class Astronauts {
         agent.status === 'blocked'
           ? (Math.sin(elapsed * 9) > 0.2 ? 1 : 0.05)
           : 0.55 + 0.45 * Math.sin(elapsed * 2.6 + agent.phase)
-      tip.setColorAt(i, c.copy(agent.eye).multiplyScalar(0.6 + pulse * 1.1))
-      lamp.setColorAt(i, c.copy(agent.trim).multiplyScalar(0.7 + pulse * 1.6))
+      this.robotGlow.eye.setColorAt(i, c.copy(agent.eye).multiplyScalar(0.6 + pulse * 1.1))
+      this.robotGlow.core.setColorAt(i, c.copy(agent.trim).multiplyScalar(0.7 + pulse * 1.6))
 
       // Atlas frame for the face.
       const f = agent.faceFrame
@@ -1282,7 +1355,7 @@ export class Astronauts {
 
     const n = i
     // The glowing parts pulse every frame; the rest only re-upload when something moved slot.
-    const animated = new Set(['tip', 'lamp'])
+    const animated = new Set(['headLamp', 'chestCore'])
     for (const [name, mesh] of Object.entries(this.parts)) {
       mesh.count = name === 'hammer' ? hands : name.startsWith('hat_') ? hats[name.slice(4)] : n
       mesh.instanceMatrix.needsUpdate = true

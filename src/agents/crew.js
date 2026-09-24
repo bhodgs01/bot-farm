@@ -39,7 +39,16 @@ const TEXELS_PER_BONE = 4
  * hundred and forty kilobytes; the alternative is evaluating a skeleton per astronaut per
  * frame.
  */
-const ATTACH = ['head', 'chest', 'hand.r']
+/**
+ * The bones anything can be bolted to. Three of these carried the old spaceman — a helmet, a
+ * backpack and a hammer. The robot crew wears plating down both arms and both legs, so every
+ * joint it hangs hardware from is listed here; each one costs a matrix per character per frame.
+ */
+const ATTACH = [
+  'head', 'chest', 'hips',
+  'upperarm.l', 'upperarm.r', 'lowerarm.l', 'lowerarm.r', 'hand.l', 'hand.r',
+  'upperleg.l', 'upperleg.r', 'lowerleg.l', 'lowerleg.r', 'foot.l', 'foot.r',
+]
 
 /**
  * The clips, and how the colony uses them. `loop` false means the clip is a one-shot that
